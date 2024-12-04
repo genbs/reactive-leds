@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Document</title>
+		<style>
+			* {
+				margin: 0;
+			}
+			canvas {
+				width: 100%;
+				height: 100%;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas></canvas>
+		<script src="gydra-led.js"></script>
+
+		<script async>
+			function sleep(ms) {
+				return new Promise(resolve => setTimeout(resolve, ms))
+			}
+
+			async function main() {
+				const leds = new GydraLED("192.168.0.8:8889")
+				await leds.init()
+				console.log("initted", leds)
+				const config = await leds.getConfig()
+				const { ctx, canvas, draw } = createCanvas(config.leds)
+
+				let testColors = []
+
+				async function send() {
+					draw()
+					const columnSize = Math.floor(canvas.width / config.leds)
+					const canvasPixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+					const pixels = []
+
+					for (let i = 0; i < config.leds; i++) {
+						// Trova l'indice del primo pixel del LED corrente
+						const index = Math.floor(i * columnSize) * 4
+
+						// Estrai i valori RGB (ignoriamo il canale alpha)
+						const r = canvasPixels[index]
+						const g = canvasPixels[index + 1]
+						const b = canvasPixels[index + 2]
+
+						pixels.push(r, g, b)
+					}
+
+					await leds.setColor(pixels, 3)
+
+					requestAnimationFrame(send)
+				}
+
+				requestAnimationFrame(send)
+			}
+
+			function createCanvas(leds) {
+				const canvas = document.querySelector("canvas")
+				const ctx = canvas.getContext("2d", {
+					willReadFrequently: true,
+					alpha: false,
+				})
+
+				canvas.width = window.innerWidth
+				canvas.height = window.innerHeight
+
+				let testColors = []
+
+				let k = 0,
+					s = 0,
+					l = 0.5
+
+				function getColor(index, offset, count) {
+					const time = Date.now()
+
+					const hue = Math.cos(-time * 0.002 + Math.PI * 0.2 * offset) * 0.5 + 0.5
+					//const saturation = 1 / count
+					const saturation = 1
+					const lightness = Math.cos(time * 0.001 + Math.PI * 2 * offset) * 0.5 + 0.5
+					function clamp(value, min = 0, max = 1) {
+						return Math.min(Math.max(value, min), max)
+					}
+					return {
+						h: clamp(hue),
+						s: clamp(saturation),
+						l: clamp(lightness),
+					}
+				}
+
+				function hslToRgb(h, s, l) {
+					let r, g, b
+
+					if (s === 0) {
+						r = g = b = l // achromatic
+					} else {
+						const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+						const p = 2 * l - q
+						r = hueToRgb(p, q, h + 1 / 3)
+						g = hueToRgb(p, q, h)
+						b = hueToRgb(p, q, h - 1 / 3)
+					}
+
+					return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)]
+				}
+
+				function hueToRgb(p, q, t) {
+					if (t < 0) t += 1
+					if (t > 1) t -= 1
+					if (t < 1 / 6) return p + (q - p) * 6 * t
+					if (t < 1 / 2) return q
+					if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+					return p
+				}
+
+				function draw(count, columnSize) {
+					for (let i = 0; i < count; i++) {
+						const { h, s, l } = getColor(i, i / count, count)
+						const rgb = hslToRgb(h, s, l)
+						const hex = rgb.map(c => c.toString(16).padStart(2, "0")).join("")
+						const color = `#${hex}`
+						ctx.fillStyle = color
+						ctx.fillRect(i * columnSize, 0, columnSize, canvas.height)
+
+						testColors[i] = color
+					}
+				}
+
+				return { ctx, canvas, draw: () => draw(leds, Math.floor(canvas.width / leds)) }
+			}
+
+			main()
+		</script>
+	</body>
+</html>
