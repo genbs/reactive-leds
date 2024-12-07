@@ -15,6 +15,11 @@
 		</style>
 	</head>
 	<body>
+		<div id="container">
+			<input id="ip" type="text" placeholder="IP address" value="192.168.1." />
+			<button id="btn_connect">Connect</button>
+		</div>
+
 		<canvas></canvas>
 		<script src="gydra-led.js"></script>
 
@@ -23,8 +28,16 @@
 				return new Promise(resolve => setTimeout(resolve, ms))
 			}
 
-			async function main() {
-				const leds = new GydraLED("192.168.0.8:8889")
+			const btn = document.querySelector("#btn_connect")
+			btn.addEventListener("click", () => {
+				const ip = document.querySelector("#ip").value
+				console.log()
+				main(ip)
+			})
+
+			async function main(ip) {
+				console.log("connecting to", ip)
+				const leds = new GydraLED(ip)
 				await leds.init()
 				console.log("initted", leds)
 				const config = await leds.getConfig()
@@ -131,8 +144,6 @@
 
 				return { ctx, canvas, draw: () => draw(leds, Math.floor(canvas.width / leds)) }
 			}
-
-			main()
 		</script>
 	</body>
 </html>

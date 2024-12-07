@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Document</title>
+		<style>
+			* {
+				margin: 0;
+				overflow: hidden;
+				height: 100%;
+				width: 100%;
+			}
+
+			canvas {
+				width: 100%;
+				height: 100%;
+				image-rendering: pixelated;
+			}
+		</style>
+	</head>
+	<body>
+		<script src="gydra.js"></script>
+		<script>
+			const ws = new WebSocket("ws://localhost:8080")
+			const NUM_LEDS = 16
+			const colors = new Array(NUM_LEDS).fill(0).map(() => [0, 0, 0])
+
+			ws.onopen = () => {
+				console.log("WebSocket connected")
+				// Invia dati al server
+				const type = 0 // NeoPixelMessage.GET_CONFIG
+				const data = []
+				const message = new Uint8Array([type, ...data])
+				ws.send(message)
+
+				function getArray(data, components = 4) {
+					const len = data.length / components
+					const final = new Uint8Array(len * 5)
+
+					for (let i = 0; i < len; i++) {
+						const r = data[i * components]
+						const g = data[i * components + 1]
+						const b = data[i * components + 2]
+
+						final[i * 5] = i
+						final[i * 5 + 1] = r
+						final[i * 5 + 2] = g
+						final[i * 5 + 3] = b
+						final[i * 5 + 4] = components === 3 ? Math.max(r, g, b) : data[i * components + 3]
+					}
+
+					return final
+				}
+
+				function setColor(pixels, components = 4) {
+					const data = getArray(pixels, components)
+					const type = 2 // NeoPixelMessage.SET_COLOR
+					const message = new Uint8Array([type, ...data])
+
+					ws.send(message)
+				}
+
+				async function send() {
+					gydra.tick()
+					const pixels = gydra.defaultOutput.pixels(undefined, false)
+
+					setColor(pixels, 4)
+
+					requestAnimationFrame(send)
+				}
+
+				const gydra = createGydra(NUM_LEDS)
+
+				requestAnimationFrame(send)
+			}
+
+			ws.onmessage = event => {
+				console.log("Message from server:", event.data)
+			}
+
+			ws.onerror = error => {
+				console.error("WebSocket error:", error)
+			}
+
+			ws.onclose = () => {
+				console.log("WebSocket connection closed")
+			}
+
+			function createGydra(leds) {
+				const gydra = Gydra({
+					width: 1,
+					height: leds,
+					autoTick: false,
+				})
+				console.log("gydra", gydra)
+
+				gydra.eval(
+					"osc(20, .7).thresh().rotate(-Math.PI / 2).mult(gradient(1)).modulateScale(noise(1, 1).pixelate(1, 1), 10).colorama().saturate(10).out()"
+				)
+
+				return gydra
+			}
+		</script>
+	</body>
+</html>

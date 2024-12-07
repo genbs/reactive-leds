@@ -1,9 +1,11 @@
+#ifndef ENV_H
+#include "env.h"
+#endif
+
 #include <Adafruit_NeoPixel.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <DNSServer.h>
-
-#define FORMAT_LITTLEFS_IF_FAILED true
 
 #include "./wnet.h"
 #include "./webserver.h"
@@ -408,14 +410,18 @@ void led_mode()
 
 void setup()
 {
-	if (!LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED))
+	Serial.begin(115200);
+	pinMode(LED_BUILTIN, OUTPUT);
+
+#ifdef ESP8266
+	if (!LittleFS.begin())
+#else
+	if (!LittleFS.begin(true))
+#endif
 	{
 		Serial.println("LittleFS Mount Failed");
 		return;
 	}
-
-	Serial.begin(115200);
-	pinMode(LED_BUILTIN, OUTPUT);
 
 	bool loaded = load_config();
 

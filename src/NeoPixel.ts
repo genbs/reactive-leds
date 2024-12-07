@@ -136,6 +136,16 @@ export default class NeoPixel {
 		return final
 	}
 
+	public async setPixel(index: number, rgb: [number, number, number] | [number, number, number, number]) {
+		if (this.lock) {
+			return
+		}
+		this.lock = true
+		const data = [rgb[0], rgb[1], rgb[2], rgb[3] ?? Math.max(rgb[0], rgb[1], rgb[2])]
+		await this.send(NeoPixelMessage.SET_COLOR, new Uint8Array([index, data[0], data[1], data[2], data[3]]))
+		this.lock = false
+	}
+
 	public async setColor(data, components = 4) {
 		if (this.lock) {
 			return

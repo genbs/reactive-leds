@@ -1,3 +1,7 @@
+#ifndef ENV_H
+#include "env.h"
+#endif
+
 #ifdef ESP8266
 #ifndef ASYNCTCP_H_
 #include <ESPAsyncTCP.h>
