@@ -4,7 +4,7 @@ WiFiUDP udp;
 
 struct Config
 {
-    char hostname[32];
+    const char *hostname;
 };
 
 Config config;
@@ -19,7 +19,7 @@ enum MessageType
 void udp_begin(String hostname)
 {
     udp.begin(udp_port);
-    config.hostname = hostname;
+    config.hostname = hostname.c_str();
 }
 
 void handleColorUpdate(byte *packet, int len)
