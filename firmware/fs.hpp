@@ -18,7 +18,7 @@ bool FS_create(const char *path)
     return true;
 }
 
-String FS_read(const char *path, const char *key, const String &defaultValue = "")
+String FS_read(const char *path, const char *key, String defaultValue)
 {
     File file = LittleFS.open(path, "r");
     if (!file)
@@ -40,6 +40,10 @@ String FS_read(const char *path, const char *key, const String &defaultValue = "
                 file.close();
                 String value = line.substring(delimiterIndex + 1);
                 value.trim();
+
+                if (value.isEmpty())
+                    return defaultValue;
+
                 return value;
             }
         }
@@ -68,9 +72,14 @@ void FS_print(const char *path)
     file.close();
 }
 
+unsigned int FS_read_uint(const char *path, const char *key, unsigned int defaultValue = 0)
+{
+    return FS_read(path, key, String(defaultValue).c_str()).toInt();
+}
+
 bool FS_exist(const char *path, const char *key)
 {
-    return !FS_read(path, key).isEmpty();
+    return !FS_read(path, key, "").isEmpty();
 }
 
 bool FS_remove(const char *path, const char *key)
@@ -129,7 +138,7 @@ bool FS_remove(const char *path, const char *key)
     }
 }
 
-bool FS_write(const char *path, const char *key, const char *value)
+bool FS_write(const char *path, const char *key, String value)
 {
     String tempPath = String(path) + ".tmp";
     File tempFile = LittleFS.open(tempPath.c_str(), "w");
@@ -182,6 +191,11 @@ bool FS_write(const char *path, const char *key, const char *value)
     LittleFS.rename(tempPath.c_str(), path);
 
     return true;
+}
+
+bool FS_write_uint(const char *path, const char *key, unsigned int value)
+{
+    return FS_write(path, key, String(value).c_str());
 }
 
 void FS_begin()

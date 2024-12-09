@@ -51,7 +51,7 @@ bool WiFiAutoConnect()
         {
             String ssid = WiFi.SSID(i);
             Serial.println("SSID: " + ssid + " RSSI: " + String(WiFi.RSSI(i)) + " dBm");
-            String password = FS_read("/wifi", ssid.c_str());
+            String password = FS_read("/wifi", ssid.c_str(), "");
             if (!password.isEmpty())
             {
                 if (WiFiConnect(ssid.c_str(), password.c_str()))

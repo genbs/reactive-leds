@@ -2,29 +2,22 @@
 
 WiFiUDP udp;
 
-struct Config
-{
-    const char *hostname;
-};
-
-Config config;
-
 enum MessageType
 {
-    GET_CONFIG = 0,
-    SET_CONFIG = 1,
-    SET_COLORS = 2,
+    HANDSHAKE = 0,
+    GET_CONFIG = 1,
+    SET_CONFIG = 2,
+    SET_COLORS = 23,
 };
 
-void udp_begin(String hostname)
+void udp_begin()
 {
-    udp.begin(udp_port);
-    config.hostname = hostname.c_str();
+    udp.begin(config.port);
 }
 
 void handleColorUpdate(byte *packet, int len)
 {
-    for (int i = 0; i < NUM_LEDS; i++)
+    for (int i = 0; i < config.num_leds; i++)
     {
         uint8_t u = packet[i * 5 + 1];
         uint8_t r = packet[i * 5 + 2];
@@ -52,6 +45,21 @@ void udp_read()
 
             switch (message_type)
             {
+            case HANDSHAKE:
+                // send handshake
+                Serial.println("Handshake");
+
+                config_print();
+                udp.beginPacket(udp.remoteIP(), udp.remotePort());
+                udp.write(0);
+                udp.write((config.port >> 8) & 0xFF); 
+                udp.write(config.port & 0xFF);
+                udp.write(config.id);
+                udp.write(config.num_leds);
+
+                udp.endPacket();
+
+                break;
             case GET_CONFIG:
                 // send config
 

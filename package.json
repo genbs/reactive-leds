@@ -3,28 +3,26 @@
     "version": "1.2.0",
     "description": "",
     "scripts": {
-        "start": "webpack serve --config webpack.config.js --mode development",
-        "build": "webpack --config webpack.config.js --mode production && tsc",
+        "example": "webpack serve --config webpack.config.js --mode development",
+        "start": "ts-node -r tsconfig-paths/register server/main.ts",
         "format": "npx prettier ./src --write \"!**/*.json\" > /dev/null"
     },
     "publishConfig": {
         "@genbs:registry": "https://npm.pkg.github.com"
     },
     "repository": "https://github.com/genbs/gydra-led",
-    "directories": {
-        "test": "tests"
-    },
     "author": {
         "name": "Gennaro Bosone",
         "email": "gennaro.bs@gmail.com",
         "url": "https://github.com/genbs"
     },
-    "main": "./dist/index.js",
-    "browser": "./build/gydra-led.js",
-    "types": "./dist/index.d.ts",
+    "main": "./server/main.ts",
     "license": "ISC",
     "devDependencies": {
+        "@types/mdns": "^0.0.38",
         "ts-loader": "^9.5.1",
+        "ts-node": "^10.9.2",
+        "tsconfig-paths": "^4.2.0",
         "typescript": "^5.1.6",
         "webpack": "^5.88.2",
         "webpack-cli": "^5.1.4",

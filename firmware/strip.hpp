@@ -6,7 +6,7 @@ void strip_start()
     strip.begin();
     strip.setBrightness(255);
 
-    for (int i = 0; i < NUM_LEDS; i++)
+    for (int i = 0; i < config.num_leds; i++)
         strip.setPixelColor(i, 0, 0, 0);
 
     strip.show();

@@ -1,6 +1,5 @@
-#include "config.h"
-
 #include "./fs.hpp"
+#include "config.h"
 #include "./wifi/wifi.hpp"
 #include "mDNS.hpp"
 #include "./strip.hpp"
@@ -19,23 +18,23 @@ void setup()
 	Serial.begin(115200);
 
 	FS_begin();
-	strip_start();
+	config_begin();
 
-	String hostname = FS_read("/config", "hostname", default_hostname);
+	strip_start();
 
 	if (WiFiAutoConnect())
 	{
 		mode = RunMode::NORMAL;
-		InitMDNS(hostname);
+		InitMDNS();
 
-		udp_begin(hostname);
+		udp_begin();
 
 		strip_set_color_immediate(0, 255, 0, 0, 255);
 	}
 	else
 	{
 		mode = RunMode::AP;
-		APModeStart(hostname);
+		APModeStart();
 
 		strip_set_color_immediate(0, 255, 127, 0, 255);
 	}

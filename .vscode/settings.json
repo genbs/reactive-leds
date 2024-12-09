@@ -1,0 +1,20 @@
+{
+	"files.associations": {
+		"*.embeddedhtml": "html",
+		"*.h": "cpp",
+		"ostream": "cpp",
+		"print": "cpp",
+		"stdexcept": "cpp",
+		"string": "cpp",
+		"locale": "cpp",
+		"__bit_reference": "cpp",
+		"__hash_table": "cpp",
+		"__split_buffer": "cpp",
+		"array": "cpp",
+		"deque": "cpp",
+		"initializer_list": "cpp",
+		"string_view": "cpp",
+		"unordered_map": "cpp",
+		"vector": "cpp"
+	}
+}

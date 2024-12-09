@@ -33,8 +33,8 @@ void handle_ap_save(AsyncWebServerRequest *request)
         if (FS_write("/wifi", ssid.c_str(), password.c_str()))
         {
             String hostname = request->getParam("hostname", true)->value();
-
-            if (FS_write("/config", "hostname", hostname.c_str()))
+            config.hostname = hostname.c_str();
+            if (config_store())
             {
                 Serial.println("Configuration saved successfully.");
                 Serial.println("Restarting in 2 seconds.");
@@ -53,7 +53,7 @@ void handle_ap_save(AsyncWebServerRequest *request)
     }
 }
 
-void WiFiConnectAP(String hostname)
+void WiFiConnectAP()
 {
     WiFi.disconnect();
     delay(100);
@@ -62,7 +62,7 @@ void WiFiConnectAP(String hostname)
     Serial.println("Starting AP mode");
 
     WiFi.mode(WIFI_AP);
-    while (!WiFi.softAP(hostname.c_str(), ap_password))
+    while (!WiFi.softAP(config.hostname, config.ap_password))
     {
         Serial.println(".");
         delay(100);
@@ -72,14 +72,14 @@ void WiFiConnectAP(String hostname)
 
     Serial.println("");
     Serial.print("Started:\t");
-    Serial.println(hostname);
+    Serial.println(config.hostname);
     Serial.print("IP address:\t");
     Serial.println(WiFi.softAPIP());
 }
 
-void APModeStart(String hostname)
+void APModeStart()
 {
-    WiFiConnectAP(hostname);
+    WiFiConnectAP();
 
     dnsServer.start(53, "*", WiFi.softAPIP());
 
