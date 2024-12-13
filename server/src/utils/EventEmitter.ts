@@ -23,4 +23,8 @@ export default class EventEmitter<T extends Record<string, (...args: any[]) => v
 			}
 		}
 	}
+
+	removeAllListeners() {
+		this.listeners.clear()
+	}
 }

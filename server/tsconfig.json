@@ -4,6 +4,7 @@
 		"rootDir": "./src",
 		"outDir": "./dist",
 		"module": "CommonJS",
+		"jsx": "react-jsx",
 		"target": "ESNext",
 		"moduleResolution": "node",
 		"esModuleInterop": true,
@@ -14,7 +15,12 @@
 		"allowSyntheticDefaultImports": true,
 		"allowJs": true,
 		"lib": ["DOM", "ESNext"],
-		"resolveJsonModule": true
+		"resolveJsonModule": true,
+		"paths": {
+			"@services/*": ["src/services/*"],
+			"@utils/*": ["src/utils/*"],
+			"@protocol": ["src/protocol/index"]
+		}
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "build", "dist"]

@@ -1,9 +1,8 @@
 struct Config
 {
     char hostname[32];
-    char ap_password[32];
+    char ap_password[32]; // hidden in the web interface
     unsigned int port;
-
     unsigned short id;
     unsigned short num_leds;
 };

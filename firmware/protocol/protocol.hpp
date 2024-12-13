@@ -6,12 +6,25 @@ unsigned long lastUpdateTime = 0;
 const unsigned long updateInterval = 30; // milliseconds
 
 uint8_t *led_data;
+byte *packet;
+int max_packet_size = 1 + 5 * config.num_leds;
 
 void udp_begin()
 {
-    udp.begin(config.port);
+    if (udp.begin(config.port) != 1)
+    {
+        Serial.println("Failed to bind UDP port");
+        return;
+    }
+    else
+    {
+        Serial.println("Listen on UDP port: " + String(config.port));
+    }
 
-    led_data = (uint8_t *)malloc(config.num_leds * 5);
+    led_data = (uint8_t *)malloc(config.num_leds * 4);
+
+    max_packet_size = 1 + 5 * config.num_leds;
+    packet = (byte *)malloc(max_packet_size);
 }
 
 void udp_read()
@@ -19,29 +32,29 @@ void udp_read()
     int packetSize = udp.parsePacket();
     if (packetSize)
     {
-        byte packet[255];
-        int len = udp.read(packet, sizeof(packet));
+        int len = udp.read(packet, max_packet_size);
 
-        if (len > 0)
+        if (len >= 2)
         {
-            uint8_t message_type = packet[0];
+            uint8_t message_id = packet[0];
+            uint8_t message_type = packet[1];
 
             switch (message_type)
             {
             case PING:
-                protocol_ping();
+                protocol_ping(message_id);
                 break;
             case HANDSHAKE:
-                protocol_handshake();
+                protocol_handshake(message_id);
                 break;
             case GET_CONFIG:
-                protocol_get_config();
+                protocol_get_config(message_id);
                 break;
             case SET_CONFIG:
-                protocol_set_config(packet, len);
+                protocol_set_config(message_id, packet, len);
                 break;
-            case SET_COLORS:
-                protocol_set_colors(packet, len);
+            case SET_LEDS:
+                protocol_set_leds(message_id, packet, len);
                 break;
 
             default:
@@ -49,52 +62,52 @@ void udp_read()
                 break;
             }
         }
+
+        udp.clear();
     }
 }
 
-void protocol_ping()
+void protocol_ping(uint8_t message_id)
 {
-    Serial.println("PING");
-
     udp.beginPacket(udp.remoteIP(), udp.remotePort());
+    udp.write(message_id);
     udp.write(PING);
     udp.endPacket();
+
+    Serial.println("PING");
 }
 
-void protocol_get_config()
+void protocol_handshake(uint8_t message_id)
 {
-    Serial.println("GET_CONFIG");
-
     udp.beginPacket(udp.remoteIP(), udp.remotePort());
-
-    udp.write((config.port >> 8) & 0xFF);
-    udp.write(config.port & 0xFF);
-    udp.write(config.id);
-    udp.write(config.num_leds);
-
-    udp.endPacket();
-}
-
-void protocol_handshake()
-{
-    Serial.println("Handshake");
-
-    udp.beginPacket(udp.remoteIP(), udp.remotePort());
-
+    udp.write(message_id);
     udp.write(HANDSHAKE);
     udp.write((config.port >> 8) & 0xFF);
     udp.write(config.port & 0xFF);
     udp.write(config.id);
     udp.write(config.num_leds);
-    for (int i = 0; i < sizeof(config.hostname); i++)
-        udp.write(config.hostname[i]);
-
+    udp.write((uint8_t *)config.hostname, sizeof(config.hostname));
     udp.endPacket();
+
+    Serial.println("Handshake");
 }
 
-void protocol_set_config(byte *packet, int len)
+void protocol_get_config(uint8_t message_id)
 {
-    Serial.println("SET_CONFIG");
+    udp.beginPacket(udp.remoteIP(), udp.remotePort());
+    udp.write(message_id);
+    udp.write((config.port >> 8) & 0xFF);
+    udp.write(config.port & 0xFF);
+    udp.write(config.id);
+    udp.write(config.num_leds);
+    udp.write((uint8_t *)config.hostname, sizeof(config.hostname));
+    udp.endPacket();
+
+    Serial.println("GET_CONFIG");
+}
+
+void protocol_set_config(uint8_t message_id, byte *packet, int len)
+{
     if (len < 3)
     {
         Serial.println("Invalid SET_CONFIG packet");
@@ -113,32 +126,57 @@ void protocol_set_config(byte *packet, int len)
         config.hostname[sizeof(config.hostname) - 1] = '\0';
     }
 
+    udp.beginPacket(udp.remoteIP(), udp.remotePort());
+    udp.write(message_id);
+    udp.write(SET_CONFIG);
     if (config_store())
     {
-        Serial.println("Configuration saved successfully.");
-        Serial.println("Restarting in 2 seconds.");
+        udp.write(1);
+        Serial.println("Configuration saved successfully. Restarting in 2 seconds.");
         delay(2000);
         ESP.restart();
     }
     else
     {
+        udp.write(0);
         Serial.println("Configuration save failed.");
     }
+    udp.endPacket();
 }
 
-void protocol_set_colors(byte *packet, int len)
+void protocol_set_leds(uint8_t message_id, byte *packet, int len)
 {
-    for (int i = 0; i < config.num_leds; i++)
+    /*for (int n = 0; n < config.num_leds; n++)
     {
-        uint8_t u = packet[i * 5 + 1];
+        uint8_t i = i * 5 + 2; //[message_id, message_type]
+        uint8_t u = packet[i];
 
         if (u > config.num_leds)
             continue;
 
-        uint8_t r = packet[i * 5 + 2];
-        uint8_t g = packet[i * 5 + 3];
-        uint8_t b = packet[i * 5 + 4];
-        float w = packet[i * 5 + 5];
+        uint8_t r = packet[i + 1];
+        uint8_t g = packet[i + 2];
+        uint8_t b = packet[i + 3];
+        float w = packet[i + 4];
+        float br = w / 255.0;
+
+        led_data[u * 4 + 0] = r * br;
+        led_data[u * 4 + 1] = g * br;
+        led_data[u * 4 + 2] = b * br;
+        led_data[u * 4 + 3] = w;
+    }*/
+
+    for (int i = 2; i < len; i += 5)
+    {
+        uint8_t u = packet[i];
+
+        if (u > config.num_leds)
+            continue;
+
+        uint8_t r = packet[i + 1];
+        uint8_t g = packet[i + 2];
+        uint8_t b = packet[i + 3];
+        float w = packet[i + 4];
         float br = w / 255.0;
 
         led_data[u * 4 + 0] = r * br;
@@ -147,11 +185,24 @@ void protocol_set_colors(byte *packet, int len)
         led_data[u * 4 + 3] = w;
     }
 
+    udp.beginPacket(udp.remoteIP(), udp.remotePort());
+    udp.write(message_id);
+    udp.write(SET_LEDS);
     if (millis() - lastUpdateTime >= updateInterval)
     {
         update_strip();
         lastUpdateTime = millis();
+        udp.write(1);
+
+        Serial.println("SET_COLOR OK");
     }
+    else
+    {
+        udp.write(0);
+
+        Serial.println("SET_COLOR SKIP");
+    }
+    udp.endPacket();
 }
 
 void update_strip()
