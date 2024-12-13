@@ -1,7 +1,7 @@
 struct Config
 {
-    String hostname;
-    String ap_password;
+    char hostname[32];
+    char ap_password[32];
     unsigned int port;
 
     unsigned short id;
@@ -11,7 +11,7 @@ struct Config
 Config config = {
     .hostname = "genbs_led",
     .ap_password = "genbs_led_xyz",
-    .port = 4210,
+    .port = 4210, // from 4100 4300
     .id = 0,
     .num_leds = 16,
 };
@@ -19,8 +19,8 @@ Config config = {
 void config_print()
 {
     Serial.println("Config:");
-    Serial.println("hostname: " + config.hostname);
-    Serial.println("ap_password: " + config.ap_password);
+    Serial.println("hostname: " + String(config.hostname));
+    Serial.println("ap_password: " + String(config.ap_password));
     Serial.println("port: " + String(config.port));
     Serial.println("id: " + String(config.id));
     Serial.println("num_leds: " + String(config.num_leds));
@@ -28,8 +28,8 @@ void config_print()
 
 void config_begin()
 {
-    config.hostname = FS_read("/config", "hostname", config.hostname);
-    config.ap_password = FS_read("/config", "ap_password", config.ap_password);
+    strcpy(config.hostname, FS_read("/config", "hostname", config.hostname).c_str());
+    strcpy(config.ap_password, FS_read("/config", "ap_password", config.ap_password).c_str());
     config.port = FS_read_uint("/config", "port", config.port);
     config.id = FS_read_uint("/config", "id", config.id);
     config.num_leds = FS_read_uint("/config", "num_leds", config.num_leds);

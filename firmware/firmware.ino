@@ -3,7 +3,7 @@
 #include "./wifi/wifi.hpp"
 #include "mDNS.hpp"
 #include "./strip.hpp"
-#include "./protocol.hpp"
+#include "./protocol/protocol.hpp"
 
 enum RunMode
 {

@@ -1,26 +1,37 @@
-import netFinder from "./netfinder"
-import { onClientConnect, onMDNSClientDown, onMDNSClientUp } from "./stripeClient"
-import udpServer from "./udpServer"
-import websocketServer from "./websocketServer"
+import ESPController from "./espclient/ESPController"
+import { log } from "./log"
 
 /////////////////
 
 function main() {
-	netFinder.start(onMDNSClientUp, onMDNSClientDown)
+	const ec = new ESPController()
 
-	udpServer.start(4210, (msg, stripe) => {
-		console.log(`UDP message from ${stripe.host}: ${msg}`)
-		// aggiorna il client
+	ec.on("espConnect", esp => {
+		log(`\nESP client connected:
+			\r\tName:    ${esp.name}
+			\r\tAddress: ${esp.address}
+			\r\tHost:    ${esp.host}
+			\r\tHostname:    ${esp.config.hostname}
+			\r\tPort:    ${esp.config.port}
+			\r\tID:      ${esp.config.id}
+			`)
 	})
 
-	websocketServer.start(8080, (message: Uint8Array) => {
-		const stripe_id = message[0]
-		const data = message.slice(1)
+	ec.on("espDisconnect", esp => {
+		log(`ESP disconnected: ${esp.name}`)
 	})
 
-	onClientConnect(stripe => {
-		console.log("HANDSHAKE OK", stripe)
-	})
+	// ec.find("192.168.0.4", 4210).then(esp => {
+	// 	console.log("FINDED", esp)
+	// })
+
+	ec.start()
+
+	// websocketServer.start(8080)
+
+	// onClientConnect(stripe => {
+	// 	console.log("HANDSHAKE OK", stripe)
+	// })
 
 	// const udpServer = dgram.createSocket("udp4")
 	// const wsServer = new WebSocket.Server({ port: 8080 })

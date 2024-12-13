@@ -33,7 +33,9 @@ void handle_ap_save(AsyncWebServerRequest *request)
         if (FS_write("/wifi", ssid.c_str(), password.c_str()))
         {
             String hostname = request->getParam("hostname", true)->value();
-            config.hostname = hostname.c_str();
+            strncpy(config.hostname, hostname.c_str(), sizeof(config.hostname) - 1);
+            config.hostname[sizeof(config.hostname) - 1] = '\0';
+
             if (config_store())
             {
                 Serial.println("Configuration saved successfully.");
