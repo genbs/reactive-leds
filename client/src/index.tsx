@@ -1,58 +1,39 @@
+import { EWSRequestByteType } from "@shared"
 import { useEffect, useState } from "react"
 import { createRoot } from "react-dom/client"
-import useWS from "./ws/hook"
+import useStripes from "./hooks/useStripes"
+import useWS from "./hooks/useWS"
 
 const main = document.getElementById("root")!
 
 const root = createRoot(main)
 
-type Device = {
-	id: number
-	name: string
-	address: string
-	hostname: string
-	num_leds: number
-}
-
 function App() {
-	const [ws, connected] = useWS("ws://localhost:8080", true)
-	const [devices, setDevices] = useState<Device[]>([])
+	const [ws, connected] = useWS()
 
-	useEffect(() => {
-		if (!ws) return
-
-		ws.onMessage(data => {
-			// @ts-ignore
-			if (data.event === "devices") {
-				// @ts-ignore
-				setDevices(data.data)
-			} else {
-				console.log(data)
-			}
-		})
-
-		if (connected) {
-			ws.send({ type: "hello" })
-		}
-	}, [ws, connected])
+	const stripes = useStripes(ws)
 
 	function onChange(color: { r: number; g: number; b: number; w: number }) {
-		const data = []
+		for (const stripe of stripes) {
+			const data: Uint8Array = new Uint8Array(1 /* stripe_id */ + stripe.num_leds * 5)
 
-		const maxLedCount = Math.max(...devices.map(d => d.num_leds))
+			data[0] = stripe.id
+			for (let i = 0; i < stripe.num_leds; i++) {
+				data[i * 5 + 1] = color.r
+				data[i * 5 + 2] = color.g
+				data[i * 5 + 3] = color.b
+				data[i * 5 + 4] = color.w
+			}
 
-		for (let i = 0; i < maxLedCount; i++) {
-			data.push(i, color.r, color.g, color.b, color.w)
+			ws.sendRaw(EWSRequestByteType.SetLEDs, data)
 		}
-
-		ws.send({ event: "set-color", data })
 	}
 
 	return (
 		<>
 			<h1>Hello, world!</h1>
 			<p>
-				{connected ? "Connected" : "Disconnected"} {devices.length}
+				{connected ? "Connected" : "Disconnected"} {stripes.length}
 			</p>
 			{connected && (
 				<div>

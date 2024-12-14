@@ -1,13 +1,18 @@
+import { EventEmitter, EWSRequestByteType } from "@shared"
+
 const WS_RECONNECTION_TIMEOUT = 5000
 const WS_RECONNECTION_MAX_RETRIES = 5
+
+type WSEvents<T> = {
+	connectionChange?: (connected: boolean) => void
+	message?: (args: T) => void | false
+}
 
 export interface WSSettings {
 	url: string // WebSocket URL
 	debug: boolean // Enable debug logs
 	autoConnect: boolean // Automatically connect on instantiation
 	shouldReconnect: boolean | (() => boolean) // Reconnect on close
-	onConnect?: () => void // Callback on connection
-	onDisconnect?: () => void // Callback on disconnection
 }
 
 const defaultSettings: Partial<WSSettings> = {
@@ -16,14 +21,15 @@ const defaultSettings: Partial<WSSettings> = {
 	shouldReconnect: true,
 }
 
-class WS<TSignal = unknown, TCommand extends object = any> {
+export default class WS<TRecv = any, TSend = Uint8Array | object> extends EventEmitter<WSEvents<TRecv>> {
 	private retries = 0
 	public settings: WSSettings
 	public connected: boolean
 	private socket!: WebSocket | null
-	private events = [] as ((data: TSignal) => void)[]
 
 	constructor(settings: Partial<WSSettings> = {}) {
+		super()
+
 		this.settings = { ...defaultSettings, ...settings } as WSSettings
 
 		if (this.settings.autoConnect) this.connect()
@@ -43,24 +49,22 @@ class WS<TSignal = unknown, TCommand extends object = any> {
 			this.socket.close()
 		}
 
-		function onOpen(e: Event) {
+		const onOpen = (e: Event) => {
 			this.log("Connection established", e)
-			if (this.settings.onConnect) this.settings.onConnect()
+
 			this.connected = true
 			this.retries = 0
+
+			this.emit("connectionChange", true)
 		}
 
-		function onMessage(e: MessageEvent) {
-			if (typeof e.data !== "string" || e.data.length === 0) return
+		const onMessage = (e: MessageEvent) => {
+			if (e.data.length <= 0) return
 
-			//const data = JSON.parse(e.data)
 			const data = e.data
 			this.log("Received", e.data.length, data)
 
-			this.events.forEach(cb => {
-				const result = cb(data)
-				if (typeof result === "boolean" && result === false) this.events.splice(this.events.indexOf(cb), 1)
-			})
+			this.emit("message", data)
 		}
 
 		this.socket = new WebSocket(this.settings.url)
@@ -80,7 +84,7 @@ class WS<TSignal = unknown, TCommand extends object = any> {
 		this.socket?.close()
 	}
 
-	public send(data: TCommand) {
+	public send(data: TSend) {
 		this.log("Sending", data)
 
 		if (!this.socket) {
@@ -88,24 +92,18 @@ class WS<TSignal = unknown, TCommand extends object = any> {
 			return
 		}
 
-		this.socket.send(JSON.stringify(data))
+		this.socket.send(data instanceof Uint8Array ? data : JSON.stringify(data))
+	}
+
+	public sendRaw(type: EWSRequestByteType, data: Uint8Array) {
+		const message = new Uint8Array(data.length + 1)
+		message[0] = type
+		message.set(data, 1)
+
+		this.send(message as TSend)
 	}
 
 	// Event listeners
-
-	/**
-	 * NOTE: If the callback returns false, it will be removed from the listeners (util for once listeners).
-	 *
-	 * @param callback
-	 * @returns
-	 */
-	public onMessage(callback: (args: TSignal) => void | false) {
-		this.events.push(callback)
-
-		return () => {
-			this.events = this.events.filter(cb => cb !== callback)
-		}
-	}
 
 	/**
 	 * When the connection is closed, it will attempt to reconnect if the shouldReconnect setting is true.
@@ -116,7 +114,7 @@ class WS<TSignal = unknown, TCommand extends object = any> {
 	private onSocketClose(e: CloseEvent) {
 		this.log("Connection closed", e)
 
-		if (this.settings.onDisconnect) this.settings.onDisconnect()
+		this.emit("connectionChange", false)
 
 		const shouldReconnect =
 			typeof this.settings.shouldReconnect === "function"
@@ -137,11 +135,9 @@ class WS<TSignal = unknown, TCommand extends object = any> {
 
 	// Logging
 	// TODO: replace with a proper logger or global logger with global debug flag
-	private log(...args: (string | object | number)[]) {
+	private log(...args: any[]) {
 		if (!this.settings.debug) return
 
 		console.log("[WS]", ...args)
 	}
 }
-
-export default WS

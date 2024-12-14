@@ -1,7 +1,6 @@
 {
 	"compilerOptions": {
 		"baseUrl": ".",
-		"rootDir": "./src",
 		"outDir": "./dist",
 		"module": "CommonJS",
 		"jsx": "react-jsx",
@@ -18,10 +17,11 @@
 		"resolveJsonModule": true,
 		"paths": {
 			"@services/*": ["src/services/*"],
-			"@utils/*": ["src/utils/*"],
-			"@protocol": ["src/protocol/index"]
+			"@utils/*": ["../shared/utils/*"],
+			"@protocol": ["src/protocol/index"],
+			"@shared": ["../shared/index"]
 		}
 	},
-	"include": ["src/**/*"],
+	"include": ["src/**/*", "../shared/**/*"],
 	"exclude": ["node_modules", "build", "dist"]
 }

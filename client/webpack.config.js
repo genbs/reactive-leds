@@ -1,7 +1,7 @@
-const fs = require("fs")
 const path = require("path")
 const webpack = require("webpack")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
+const TsconfigPathsPlugin = require("tsconfig-paths-webpack-plugin")
 
 module.exports = {
 	entry: {
@@ -20,6 +20,7 @@ module.exports = {
 	devtool: "source-map",
 	resolve: {
 		extensions: [".ts", ".tsx", ".js", ".json"],
+		plugins: [new TsconfigPathsPlugin()],
 	},
 	module: {
 		rules: [{ test: /\.tsx?$/, loader: "ts-loader" }],

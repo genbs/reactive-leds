@@ -1,10 +1,9 @@
 import BonjourService, { BonjourClient } from "@services/Bonjur"
-import EventEmitter from "@utils/EventEmitter"
+import { EventEmitter, logger } from "@shared"
 
 import { ESPClient } from "./ESPClient"
 
 import proto from "@protocol"
-import { log } from "@utils/Log"
 
 type ESPServiceEvents = {
 	espConnect: (client: ESPClient) => void
@@ -36,7 +35,11 @@ export default class ESPService extends EventEmitter<ESPServiceEvents> {
 			this.onESPDisconnect(esp)
 		})
 
-		log("ESPService started")
+		logger.info("ESPService started")
+	}
+
+	add(client: ESPClient) {
+		this.onESPConnect(client)
 	}
 
 	private onESPConnect(client: ESPClient) {

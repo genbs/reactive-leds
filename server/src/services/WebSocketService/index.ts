@@ -1,11 +1,10 @@
+import { EventEmitter, logger, TWSRequest, TWSResponse } from "@shared"
 import WebSocket from "ws"
-import EventEmitter from "../../utils/EventEmitter"
-import { log } from "../../utils/Log"
 
 type WebSocketServiceEvents = {
 	onClientConnect: (client: WebSocket) => void
 	onClientDisconnect: (client: WebSocket) => void
-	onMessage: (message: WebSocket.RawData, client: WebSocket) => void
+	onMessage: (message: TWSRequest, client: WebSocket) => void
 }
 
 export default class WebSocketService extends EventEmitter<WebSocketServiceEvents> {
@@ -37,11 +36,14 @@ export default class WebSocketService extends EventEmitter<WebSocketServiceEvent
 			})
 
 			client.on("message", message => {
-				this.emit("onMessage", message, client)
+				if (typeof message === "string") {
+					message = JSON.parse(message)
+				}
+				this.emit("onMessage", message as unknown as TWSRequest, client)
 			})
 		})
 
-		log(`WebSocket Server listening on port ${this.port}`)
+		logger.info(`WebSocket Server listening on port ${this.port}`)
 	}
 
 	/**
@@ -51,11 +53,14 @@ export default class WebSocketService extends EventEmitter<WebSocketServiceEvent
 	 * @param client optional
 	 * @returns
 	 */
-	send(data: WebSocket.Data, client?: WebSocket) {
-		if (client) return client.send(data)
+	send(data: TWSResponse, client?: WebSocket) {
+		logger.debug("[WebSocketService] Sending message", data)
+		const message: string | Uint8Array = data instanceof Uint8Array ? data : JSON.stringify(data)
+
+		if (client) return client.send(message)
 
 		this.clients.forEach(client => {
-			client.send(data)
+			client.send(message)
 		})
 	}
 }

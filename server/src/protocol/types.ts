@@ -3,15 +3,22 @@ export type ProtocolBoardConfig = {
 	id: number
 	num_leds: number
 	hostname: string
+	brightness: number
 }
 
 export type ProtocolRequestID = number
+
+/**
+ * Color format: [r, g, b, b/w]
+ */
+export type Color = [number, number, number, number]
 
 export enum ProtocolMessageType {
 	PING = 0,
 	GET_CONFIG = 1,
 	SET_CONFIG = 2,
 	SET_LEDS = 3,
+	BLINK = 4,
 }
 
 export type ProtocolResponse = [ProtocolRequestID, ProtocolMessageType, ...number[]]

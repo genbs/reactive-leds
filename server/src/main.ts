@@ -1,54 +1,40 @@
-import ESPService from "@services/ESPService"
-import WebSocketService from "./services/WebSocketService"
-import { log } from "./utils/Log"
+import { ESPClient } from "@services/ESPService/ESPClient"
+import { logger } from "@shared"
+import Bridge from "./bridge"
 
 /////////////////
 
-const ec = new ESPService()
-ec.on("espConnect", esp => {
-	log(`ESP connected:\n${esp}`)
+const bridge = new Bridge(8080)
 
-	sendClients()
+logger.info("Starting bridge...")
+
+bridge.on("espConnect", esp => {
+	logger.info(`ESP Connected: ${esp})`)
+	bridge.sendStripesToClients()
 })
 
-ec.on("espDisconnect", esp => {
-	log(`ESP disconnected:\n${esp}`)
-
-	sendClients()
+bridge.on("espDisconnect", esp => {
+	logger.info(`ESP Disconnected: ${esp})`)
+	bridge.sendStripesToClients()
 })
 
-const wsServer = new WebSocketService(8080)
-
-wsServer.on("onClientConnect", ws => {
-	sendClients()
+bridge.on("clientConnect", ws => {
+	logger.info(`Client Connected`)
+	bridge.sendStripesToClients()
 })
 
-wsServer.on("onMessage", (message, ws) => {
-	log(`Message from client`)
-
-	const jsonmsg = JSON.parse(message.toString())
-	console.log("jsonmsg", jsonmsg.event)
-	if ("event" in jsonmsg && jsonmsg.event === "set-color") {
-		ec.clients.forEach(esp => {
-			esp.setLEDs(jsonmsg.data)
-		})
-	}
+bridge.on("clientDisconnect", ws => {
+	logger.info(`Client Disconnected`)
+	bridge.sendStripesToClients()
 })
 
-ec.start()
-wsServer.start()
+bridge.on("clientRequest", request => {
+	console.log("clientRequest", request)
+})
 
-function sendClients() {
-	wsServer.send(
-		JSON.stringify({
-			event: "devices",
-			data: [...ec.clients.values()].map(esp => ({
-				id: esp.config.id,
-				name: esp.name,
-				address: esp.address,
-				hostname: esp.config.hostname,
-				num_leds: esp.config.num_leds,
-			})),
-		})
-	)
-}
+bridge.start()
+
+const client = new ESPClient("test", "192.168.1.2", "test", false)
+client.port = 4200
+client.num_leds = 10
+bridge.ESPService.add(client)

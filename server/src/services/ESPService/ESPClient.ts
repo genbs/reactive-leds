@@ -1,5 +1,5 @@
 import proto from "@protocol"
-import EventEmitter from "@utils/EventEmitter"
+import { Color, EventEmitter, Stripe } from "@shared"
 import { ProtocolBoardConfig } from "src/protocol/types"
 
 type ESPClientEvents = {
@@ -7,14 +7,20 @@ type ESPClientEvents = {
 	onDisconnect: (self: ESPClient) => void
 }
 
-export class ESPClient extends EventEmitter<ESPClientEvents> {
+export class ESPClient extends EventEmitter<ESPClientEvents> implements Stripe {
 	static CHECK_ALIVE_INTERVAL = 5000
 
 	public name: string
 	public address: string
 	public host: string
 	public online = false
-	public config: ProtocolBoardConfig
+	public color?: Color
+
+	public port: number
+	public id: number
+	public num_leds: number
+	public hostname: string
+	public brightness: number
 
 	/**
 	 * The current data of the LEDs.
@@ -40,19 +46,22 @@ export class ESPClient extends EventEmitter<ESPClientEvents> {
 	 */
 	private checkAliveInterval: NodeJS.Timeout
 
-	constructor(name: string, address: string, host: string) {
+	constructor(name: string, address: string, host: string, checkAlive = true) {
 		super()
 
 		this.name = name
 		this.address = address
 		this.host = host
+		this.online = false
+
+		if (!checkAlive) return
 
 		this.isAlive()
 		this.checkAliveInterval = setInterval(() => this.isAlive(), ESPClient.CHECK_ALIVE_INTERVAL)
 
 		this.loadConfig().then(() => {
-			this.ledsData = new Uint8Array(this.config.num_leds * 5)
-			this.ledsDataDiff = new Uint8Array(this.config.num_leds * 5)
+			this.ledsData = new Uint8Array(this.num_leds * 5)
+			this.ledsDataDiff = new Uint8Array(this.num_leds * 5)
 		})
 	}
 
@@ -72,30 +81,40 @@ export class ESPClient extends EventEmitter<ESPClientEvents> {
 	 * Syncronous ping the device to check if it's online.
 	 */
 	async ping() {
-		return proto.ping(this.address, this.config.port)
+		return proto.ping(this.address, this.port)
 	}
 
 	/**
 	 * Load the device configuration.
 	 */
 	async loadConfig() {
-		const config = await proto.getConfig(this.address, this.config.port)
+		const config = await proto.getConfig(this.address, this.port)
 		if (!config) return
 
-		this.config = config
+		this.mergeConfig(this, config)
 	}
 
 	/**
 	 * Set the device configuration.
 	 */
 	async setConfig(config: Partial<ProtocolBoardConfig>) {
-		const newConfig = { ...this.config, ...config }
-		if (await proto.setConfig(this.address, this.config.port, newConfig)) {
-			this.config = newConfig
+		this.mergeConfig(config, this)
+
+		if (await proto.setConfig(this.address, this.port, config as ProtocolBoardConfig)) {
+			this.mergeConfig(this, config)
+
 			return true
 		}
 
 		return false
+	}
+
+	private mergeConfig(oldConfig: Partial<ProtocolBoardConfig>, newConfig: Partial<ProtocolBoardConfig>) {
+		oldConfig.port = newConfig.port ?? oldConfig.port
+		oldConfig.id = newConfig.id ?? oldConfig.id
+		oldConfig.num_leds = newConfig.num_leds ?? oldConfig.num_leds
+		oldConfig.hostname = newConfig.hostname ?? oldConfig.hostname
+		oldConfig.brightness = newConfig.brightness ?? oldConfig.brightness
 	}
 
 	/**
@@ -129,7 +148,11 @@ export class ESPClient extends EventEmitter<ESPClientEvents> {
 			}
 		}
 
-		proto.setLEDs(this.address, this.config.port, this.ledsDataDiff.slice(0, differenceLength * 5))
+		proto.setLEDs(this.address, this.port, this.ledsDataDiff.slice(0, differenceLength * 5))
+	}
+
+	blink() {
+		proto.blink(this.address, this.port)
 	}
 
 	/**
@@ -142,8 +165,18 @@ export class ESPClient extends EventEmitter<ESPClientEvents> {
 	}
 
 	toString() {
-		return `ESPClient ${this.name}@${this.host} | ${this.address}:${this.config.port} | ${
-			this.online ? "online" : "offline"
-		}}`
+		return `ESPClient ${this.name}@${this.host} | ${this.address}:${this.port} | ${this.online ? "online" : "offline"}}`
+	}
+
+	toObject(): Stripe {
+		return {
+			id: this.id,
+			name: this.name,
+			address: this.address,
+			hostname: this.hostname,
+			num_leds: this.num_leds,
+			online: this.online,
+			color: this.color,
+		}
 	}
 }

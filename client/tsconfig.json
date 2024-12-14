@@ -1,7 +1,6 @@
 {
 	"compilerOptions": {
 		"baseUrl": ".",
-		"rootDir": "./src",
 		"outDir": "./dist",
 		"module": "CommonJS",
 		"jsx": "react-jsx",
@@ -15,7 +14,10 @@
 		"allowSyntheticDefaultImports": true,
 		"allowJs": true,
 		"lib": ["DOM", "ESNext"],
-		"resolveJsonModule": true
+		"resolveJsonModule": true,
+		"paths": {
+			"@shared": ["../shared/index"]
+		}
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "build", "dist"]

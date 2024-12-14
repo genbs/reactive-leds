@@ -1,6 +1,8 @@
-import { log } from "console"
+import { logger } from "@shared"
 import dgram from "dgram"
+
 import {
+	Color,
 	EMPTY_MESSAGE_ID,
 	MessageTypeString,
 	ProtocolBoardConfig,
@@ -55,7 +57,8 @@ class Protocol {
 			port: (data[0] << 8) | data[1],
 			id: data[2],
 			num_leds: data[3],
-			hostname: data.slice(4).toString().replace(/\0/g, ""),
+			brightness: data[4],
+			hostname: data.slice(5).toString().replace(/\0/g, ""),
 		}
 	}
 
@@ -72,7 +75,14 @@ class Protocol {
 			ip,
 			port,
 			ProtocolMessageType.SET_CONFIG,
-			[(config.port >> 8) & 0xff, config.port & 0xff, config.id, config.num_leds, ...Buffer.from(config.hostname)],
+			[
+				(config.port >> 8) & 0xff,
+				config.port & 0xff,
+				config.id,
+				config.num_leds,
+				config.brightness,
+				...Buffer.from(config.hostname),
+			],
 			Protocol.SET_CONFIG_TIMEOUT
 		)
 
@@ -91,6 +101,31 @@ class Protocol {
 		return this.send(ip, port, ProtocolMessageType.SET_LEDS, [...data])
 	}
 
+	async blink(
+		ip: string,
+		port: number,
+		baseColor: Color = [70, 70, 70, 70],
+		blinkColor: Color = [255, 255, 255, 255],
+		count: number = 3,
+		delay: number = 1000
+	) {
+		const data = new Uint8Array([
+			baseColor[0],
+			baseColor[1],
+			baseColor[2],
+			baseColor[3],
+			blinkColor[0],
+			blinkColor[1],
+			blinkColor[2],
+			blinkColor[3],
+			count,
+			delay >> 8,
+			delay & 0xff,
+		])
+
+		return this.send(ip, port, ProtocolMessageType.BLINK, data)
+	}
+
 	/**
 	 * send UDP message to device, no response expected.
 	 *
@@ -99,10 +134,10 @@ class Protocol {
 	 * @param type ProtocolMessageType
 	 * @param data any
 	 */
-	private send(ip: string, port: number, type: ProtocolMessageType, data: number[]) {
+	private send(ip: string, port: number, type: ProtocolMessageType, data: number[] | Uint8Array) {
 		const message = new Uint8Array([EMPTY_MESSAGE_ID, type, ...data])
 
-		log(`Sending ${MessageTypeString[type]} to ${ip}:${port}`, message)
+		logger.debug(`Sending ${MessageTypeString[type]} to ${ip}:${port}`, message)
 
 		this.socket.send(message, 0, message.length, port, ip, err => err && console.error(err))
 	}

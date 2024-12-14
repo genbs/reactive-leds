@@ -1,5 +1,5 @@
+import { EventEmitter } from "@shared"
 import Bonjour, { RemoteService } from "bonjour"
-import EventEmitter from "../utils/EventEmitter"
 
 export type BonjourClient = {
 	name: string

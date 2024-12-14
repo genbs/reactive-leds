@@ -4,7 +4,7 @@ Adafruit_NeoPixel strip(16, 4, NEO_WRGB + NEO_KHZ800);
 void strip_start()
 {
     strip.begin();
-    strip.setBrightness(255);
+    strip.setBrightness(config.brightness);
 
     for (int i = 0; i < config.num_leds; i++)
         strip.setPixelColor(i, 0, 0, 0);
