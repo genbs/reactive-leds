@@ -1,10 +1,11 @@
-import { Stripe } from "@shared"
 import EditableValue from "./components/EditableValue"
-import { classname, style } from "./utils"
+import { Stripe } from "./Stripe"
+import { classname, hexToColor, style } from "./utils"
 
 export type StripeProps = {
 	stripe: Stripe
 	onChange: (stripe: Stripe) => void
+	children?: React.ReactNode
 }
 
 style(`
@@ -18,6 +19,11 @@ style(`
 		padding: .2rem .4rem;
 		border-radius: .2rem;
 	}	
+	.stripe-box__color {
+		width: 3rem;
+		height: 1rem;
+		border-radius: .2rem;
+	}
 	.stripe-box__status {
 		width: 1rem;
 		height: 1rem;
@@ -37,20 +43,24 @@ style(`
 	}
 `)
 
-export default function StripeBox({ stripe, onChange }: StripeProps) {
+export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 	const color = stripe.color ? stripe.color : [120, 120, 120, 255]
-	const rgbaColor = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${color[3] / 255})`
+
+	const hex = `#${color
+		.slice(0, 3)
+		.map(c => c.toString(16).padStart(2, "0"))
+		.join("")}`
 
 	return (
 		<div
 			style={{
-				borderColor: rgbaColor,
-				color: rgbaColor,
+				borderColor: stripe.colorHex,
+				color: stripe.colorHex,
 			}}
 			className="stripe-box"
 		>
-			<div className="flex">
-				<div style={{ borderColor: rgbaColor }} className="stripe-box__id">
+			<div className="flex flex--v-center gap">
+				<div style={{ borderColor: stripe.colorHex }} className="stripe-box__id">
 					<EditableValue
 						value={stripe.id}
 						onChange={id => onChange({ ...stripe, id })}
@@ -60,6 +70,12 @@ export default function StripeBox({ stripe, onChange }: StripeProps) {
 					/>
 				</div>
 				<div className="flex-1 flex stripe-box__name">
+					<EditableValue
+						value={hex}
+						onChange={color => onChange({ ...stripe, color: hexToColor(color) })}
+						type="color"
+						render={value => <div className="stripe-box__color" style={{ background: value }}></div>}
+					/>
 					<EditableValue
 						value={stripe.name}
 						onChange={name => onChange({ ...stripe, name })}
@@ -93,6 +109,8 @@ export default function StripeBox({ stripe, onChange }: StripeProps) {
 					className={classname("stripe-box__status", `stripe-box__status--${stripe.online ? "online" : "offline"}`)}
 				></div>
 			</div>
+
+			{children}
 		</div>
 	)
 }

@@ -9,6 +9,7 @@ style(`
         height: 1.5rem;
         margin: 0;
         padding: 0;
+		cursor: pointer;
     }	
 
     .editable-value--view {
@@ -38,7 +39,8 @@ type EditableValueProps<T> = {
 	onChange: (value: T) => void
 	min?: number
 	max?: number
-	type: "number" | "text"
+	type: "number" | "text" | "color"
+	render?(value: T): React.ReactNode
 }
 
 export default function EditableValue<T extends string | number>(props: EditableValueProps<T>) {
@@ -50,8 +52,27 @@ export default function EditableValue<T extends string | number>(props: Editable
 
 	useClickOutside(ref, () => setEditing(false))
 
+	useEffect(() => {
+		if (editing && ref.current) {
+			const input = ref.current.querySelector("input")
+			if (input) input.focus()
+
+			const handleKeyDown = (e: KeyboardEvent) => {
+				if (e.key === "Enter") props.onChange(value)
+				if (e.key === "Escape") {
+					setValue(props.value)
+					setEditing(false)
+				}
+			}
+
+			window.addEventListener("keydown", handleKeyDown)
+
+			return () => window.removeEventListener("keydown", handleKeyDown)
+		}
+	}, [editing, ref.current])
+
 	return (
-		<span className="editable-value-container" ref={ref}>
+		<span className="editable-value-container" ref={ref} onClick={() => !editing && setEditing(true)}>
 			{editing ? (
 				<>
 					<input
@@ -67,10 +88,10 @@ export default function EditableValue<T extends string | number>(props: Editable
 						✓
 					</span>
 				</>
+			) : props.render ? (
+				props.render(props.value)
 			) : (
-				<span className="editable-value editable-value--view" onClick={() => setEditing(true)}>
-					{props.value}
-				</span>
+				<span className="editable-value editable-value--view">{props.value}</span>
 			)}
 		</span>
 	)

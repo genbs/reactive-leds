@@ -1,5 +1,5 @@
 import proto from "@protocol"
-import { Color, EventEmitter, Stripe } from "@shared"
+import { Color, ESP, EventEmitter } from "@shared"
 import { ProtocolBoardConfig } from "src/protocol/types"
 
 type ESPClientEvents = {
@@ -7,7 +7,7 @@ type ESPClientEvents = {
 	onDisconnect: (self: ESPClient) => void
 }
 
-export class ESPClient extends EventEmitter<ESPClientEvents> implements Stripe {
+export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	static CHECK_ALIVE_INTERVAL = 5000
 
 	public name: string
@@ -169,7 +169,7 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements Stripe {
 		}}`
 	}
 
-	toObject(): Stripe {
+	toObject(): ESP {
 		return {
 			id: this.id,
 			name: this.name,

@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 
-import { Stripe, TWSResponse } from "@shared"
+import { TWSResponse } from "@shared"
+import store from "src/store"
 import WS from "src/ws"
+import { Stripe } from "../Stripe"
+import { useStore } from "./useStore"
 
-export default function useStripes(ws: WS | null) {
-	const [stripes, setStripes] = useState<Stripe[]>([])
+export default function useStripes(ws?: WS) {
+	const stripes = useStore().stripes
 
 	useEffect(() => {
 		if (!ws) return
@@ -13,9 +16,13 @@ export default function useStripes(ws: WS | null) {
 			if (typeof message !== "string") return
 
 			const { event, data } = JSON.parse(message) as TWSResponse
-			if (event === "get_stripe") setStripes(data)
+			if (event === "get_stripe") store.fromESPDevices(data)
 		})
 	}, [ws])
 
-	return stripes
+	function localUpdate(newStripes: Stripe[]) {
+		store.updateStripes(newStripes)
+	}
+
+	return [stripes, localUpdate] as const
 }

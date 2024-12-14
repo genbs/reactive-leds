@@ -1,3 +1,5 @@
+import { Color } from "@shared"
+
 export function hash(str: string): string {
 	let hash = 0
 	for (let i = 0; i < str.length; i++) {
@@ -22,4 +24,21 @@ export function style(css: string) {
 
 export function classname(...classes: (string | undefined)[]): string {
 	return classes.filter(Boolean).join(" ")
+}
+
+export function colorToHex(color?: Color): string {
+	if (!color) return "#000000"
+
+	return `#${color
+		.slice(0, 3)
+		.map(c => c.toString(16).padStart(2, "0"))
+		.join("")}`
+}
+
+export function hexToColor(hex: string): Color {
+	const r = parseInt(hex.slice(1, 3), 16)
+	const g = parseInt(hex.slice(3, 5), 16)
+	const b = parseInt(hex.slice(5, 7), 16)
+	const a = 255
+	return [r, g, b, a]
 }
