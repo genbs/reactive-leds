@@ -19,4 +19,4 @@ void protocol_set_config(uint8_t message_id, byte *packet, int len);
 void protocol_set_leds(uint8_t message_id, byte *packet, int len);
 void protocol_blink(uint8_t message_id, byte *packet, int len);
 
-void update_strip();
+// void update_strip();

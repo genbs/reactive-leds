@@ -3,6 +3,35 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="initial-scale=1, width=device-width" />
+
+		<style>
+			html {
+				background: #111;
+				color: #555;
+				font-family: monospace;
+			}
+			* {
+				user-select: none;
+				box-sizing: border-box;
+			}
+
+			.flex {
+				display: flex;
+				gap: 0.5rem;
+				align-items: center;
+			}
+			.flex--column {
+				flex-direction: column;
+			}
+
+			.gap-m {
+				gap: 1rem;
+			}
+
+			.flex-1 {
+				flex: 1;
+			}
+		</style>
 	</head>
 	<body>
 		<main id="root"></main>

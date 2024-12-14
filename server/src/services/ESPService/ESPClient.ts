@@ -12,7 +12,6 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements Stripe {
 
 	public name: string
 	public address: string
-	public host: string
 	public online = false
 	public color?: Color
 
@@ -51,7 +50,7 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements Stripe {
 
 		this.name = name
 		this.address = address
-		this.host = host
+		this.hostname = host
 		this.online = false
 
 		if (!checkAlive) return
@@ -165,7 +164,9 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements Stripe {
 	}
 
 	toString() {
-		return `ESPClient ${this.name}@${this.host} | ${this.address}:${this.port} | ${this.online ? "online" : "offline"}}`
+		return `ESPClient ${this.name}@${this.hostname} | ${this.address}:${this.port} | ${
+			this.online ? "online" : "offline"
+		}}`
 	}
 
 	toObject(): Stripe {
@@ -174,6 +175,8 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements Stripe {
 			name: this.name,
 			address: this.address,
 			hostname: this.hostname,
+			port: this.port,
+			brightness: this.brightness,
 			num_leds: this.num_leds,
 			online: this.online,
 			color: this.color,

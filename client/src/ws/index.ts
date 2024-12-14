@@ -1,4 +1,4 @@
-import { EventEmitter, EWSRequestByteType } from "@shared"
+import { EventEmitter, EWSPayloadType } from "@shared"
 
 const WS_RECONNECTION_TIMEOUT = 5000
 const WS_RECONNECTION_MAX_RETRIES = 5
@@ -84,23 +84,21 @@ export default class WS<TRecv = any, TSend = Uint8Array | object> extends EventE
 		this.socket?.close()
 	}
 
-	public send(data: TSend) {
-		this.log("Sending", data)
-
+	public send(payload: Uint8Array | TSend) {
 		if (!this.socket) {
 			this.log("Error: not connected, can't send message")
 			return
 		}
 
-		this.socket.send(data instanceof Uint8Array ? data : JSON.stringify(data))
-	}
+		this.log("Sending", payload)
+		const isBinary = payload instanceof Uint8Array
+		const payloadArray = isBinary ? new Uint8Array(payload) : new TextEncoder().encode(JSON.stringify(payload))
 
-	public sendRaw(type: EWSRequestByteType, data: Uint8Array) {
-		const message = new Uint8Array(data.length + 1)
-		message[0] = type
-		message.set(data, 1)
+		const message = new Uint8Array(1 + payloadArray.length)
+		message[0] = isBinary ? EWSPayloadType.Binary : EWSPayloadType.JSON
+		message.set(payloadArray, 1)
 
-		this.send(message as TSend)
+		this.socket.send(message)
 	}
 
 	// Event listeners

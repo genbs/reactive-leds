@@ -1,4 +1,4 @@
-import { EventEmitter, logger, TWSRequest, TWSResponse } from "@shared"
+import { EventEmitter, EWSPayloadType, logger, TWSRequest, TWSResponse } from "@shared"
 import WebSocket from "ws"
 
 type WebSocketServiceEvents = {
@@ -35,11 +35,18 @@ export default class WebSocketService extends EventEmitter<WebSocketServiceEvent
 				this.emit("onClientDisconnect", client)
 			})
 
-			client.on("message", message => {
-				if (typeof message === "string") {
-					message = JSON.parse(message)
+			client.on("message", (payload: Buffer) => {
+				if (payload.length === 0 || (payload[0] !== EWSPayloadType.JSON && payload[0] !== EWSPayloadType.Binary)) return
+
+				let message: TWSRequest
+
+				if (payload[0] === EWSPayloadType.JSON) {
+					message = JSON.parse(payload.subarray(1).toString())
+				} else {
+					message = new Uint8Array(payload.subarray(1))
 				}
-				this.emit("onMessage", message as unknown as TWSRequest, client)
+
+				this.emit("onMessage", message, client)
 			})
 		})
 

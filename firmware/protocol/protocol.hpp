@@ -5,7 +5,7 @@ WiFiUDP udp;
 unsigned long lastUpdateTime = 0;
 const unsigned long updateInterval = 1000 / 120; // milliseconds, 120Hz
 
-uint8_t *led_data;
+// uint8_t *led_data;
 byte *packet;
 int max_packet_size = 1 + 5 * config.num_leds;
 
@@ -21,7 +21,7 @@ void udp_begin()
         Serial.println("Listen on UDP port: " + String(config.port));
     }
 
-    led_data = (uint8_t *)malloc(config.num_leds * 4);
+    // led_data = (uint8_t *)malloc(config.num_leds * 4);
 
     max_packet_size = 1 + 5 * config.num_leds;
     packet = (byte *)malloc(max_packet_size);
@@ -54,7 +54,7 @@ void udp_read()
                 protocol_set_leds(message_id, packet, len);
                 break;
             case BLINK:
-                protocol_blink();
+                protocol_blink(message_id, packet, len);
                 break;
 
             default:
@@ -161,10 +161,15 @@ void protocol_set_leds(uint8_t message_id, byte *packet, int len)
         float w = packet[i + 4];
         float br = w / 255.0;
 
-        led_data[u * 4 + 0] = r * br;
-        led_data[u * 4 + 1] = g * br;
-        led_data[u * 4 + 2] = b * br;
-        led_data[u * 4 + 3] = w;
+        // led_data[u * 4 + 0] = r * br;
+        // led_data[u * 4 + 1] = g * br;
+        // led_data[u * 4 + 2] = b * br;
+        // led_data[u * 4 + 3] = w;
+        strip.setPixelColor(i,
+                            r * br,
+                            g * br,
+                            b * br,
+                            w);
     }
 
     udp.beginPacket(udp.remoteIP(), udp.remotePort());
@@ -172,7 +177,8 @@ void protocol_set_leds(uint8_t message_id, byte *packet, int len)
     udp.write(SET_LEDS);
     if (millis() - lastUpdateTime >= updateInterval)
     {
-        update_strip();
+        // update_strip();
+        strip.show();
         lastUpdateTime = millis();
         udp.write(1);
 
@@ -187,15 +193,15 @@ void protocol_set_leds(uint8_t message_id, byte *packet, int len)
     udp.endPacket();
 }
 
-void update_strip()
-{
-    for (int i = 0; i < config.num_leds; i++)
-    {
-        strip.setPixelColor(i, led_data[i * 4 + 0], led_data[i * 4 + 1], led_data[i * 4 + 2], led_data[i * 4 + 3]);
-    }
+// void update_strip()
+// {
+//     for (int i = 0; i < config.num_leds; i++)
+//     {
+//         strip.setPixelColor(i, led_data[i * 4 + 0], led_data[i * 4 + 1], led_data[i * 4 + 2], led_data[i * 4 + 3]);
+//     }
 
-    strip.show();
-}
+//     strip.show();
+// }
 
 void protocol_blink(uint8_t message_id, byte *packet, int len)
 {

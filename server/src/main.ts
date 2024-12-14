@@ -29,12 +29,23 @@ bridge.on("clientDisconnect", ws => {
 })
 
 bridge.on("clientRequest", request => {
-	console.log("clientRequest", request)
+	console.log("Received request", request)
 })
 
 bridge.start()
 
-const client = new ESPClient("test", "192.168.1.2", "test", false)
-client.port = 4200
-client.num_leds = 10
-bridge.ESPService.add(client)
+const client1 = new ESPClient("test", "192.168.1.2", "test.local", false)
+client1.port = 4200
+client1.num_leds = 10
+client1.id = 1
+client1.online = true
+client1.brightness = 255
+bridge.ESPService.add(client1)
+
+const client2 = new ESPClient("test2", "192.168.1.3", "test2.local", false)
+client2.port = 4201
+client2.num_leds = 10
+client2.id = 2
+client2.online = true
+client2.brightness = 255
+bridge.ESPService.add(client2)

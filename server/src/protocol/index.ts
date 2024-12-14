@@ -90,7 +90,7 @@ class Protocol {
 	}
 
 	/**
-	 * Set Strip configuration.
+	 * Turn on the leds based on the index and the specified color.
 	 *
 	 * @param ip device ip
 	 * @param port device port
@@ -101,6 +101,18 @@ class Protocol {
 		return this.send(ip, port, ProtocolMessageType.SET_LEDS, [...data])
 	}
 
+	/**
+	 * Blink the number of leds based on the id in the configuration.
+	 * You can set a base color and a blink color, the number and the delay between the blinks.
+	 *
+	 * @param ip
+	 * @param port
+	 * @param baseColor
+	 * @param blinkColor
+	 * @param count
+	 * @param delay
+	 * @returns
+	 */
 	async blink(
 		ip: string,
 		port: number,

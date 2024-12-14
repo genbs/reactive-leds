@@ -1,12 +1,22 @@
-import { EWSRequestByteType } from "@shared"
+import { EWSRequestByteType, Stripe } from "@shared"
 import { useEffect, useState } from "react"
 import { createRoot } from "react-dom/client"
 import useStripes from "./hooks/useStripes"
 import useWS from "./hooks/useWS"
+import StripeBox from "./StripeBox"
+import { style } from "./utils"
 
 const main = document.getElementById("root")!
 
 const root = createRoot(main)
+
+style(`
+	.stripes {
+	}
+	.stripes > * {
+		width: 100%;
+	}
+`)
 
 function App() {
 	const [ws, connected] = useWS()
@@ -15,18 +25,33 @@ function App() {
 
 	function onChange(color: { r: number; g: number; b: number; w: number }) {
 		for (const stripe of stripes) {
-			const data: Uint8Array = new Uint8Array(1 /* stripe_id */ + stripe.num_leds * 5)
+			const data: Uint8Array = new Uint8Array(1 /* message_type */ + 1 /* stripe_id */ + stripe.num_leds * 5)
 
-			data[0] = stripe.id
+			data[0] = EWSRequestByteType.SetLEDs
+			data[1] = stripe.id
 			for (let i = 0; i < stripe.num_leds; i++) {
-				data[i * 5 + 1] = color.r
-				data[i * 5 + 2] = color.g
-				data[i * 5 + 3] = color.b
-				data[i * 5 + 4] = color.w
+				data[i * 5 + 2] = color.r
+				data[i * 5 + 3] = color.g
+				data[i * 5 + 4] = color.b
+				data[i * 5 + 5] = color.w
 			}
 
-			ws.sendRaw(EWSRequestByteType.SetLEDs, data)
+			ws.send(data)
 		}
+	}
+
+	function updateStripe(stripe: Stripe) {
+		ws.send({
+			type: "update_stripe",
+			data: {
+				id: stripe.id,
+				name: stripe.name,
+				brightness: stripe.brightness,
+				port: stripe.port,
+				num_leds: stripe.num_leds,
+				color: stripe.color,
+			},
+		})
 	}
 
 	return (
@@ -38,6 +63,12 @@ function App() {
 			{connected && (
 				<div>
 					<Color onChange={onChange} />
+
+					<div className="flex flex--column gap-m stripes">
+						{stripes.map(stripe => (
+							<StripeBox key={stripe.id} stripe={stripe} onChange={updateStripe} />
+						))}
+					</div>
 				</div>
 			)}
 		</>
