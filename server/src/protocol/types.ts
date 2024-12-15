@@ -30,4 +30,5 @@ export const MessageTypeString = {
 	[ProtocolMessageType.GET_CONFIG]: "GET_CONFIG",
 	[ProtocolMessageType.SET_CONFIG]: "SET_CONFIG",
 	[ProtocolMessageType.SET_LEDS]: "SET_COLORS",
+	[ProtocolMessageType.BLINK]: "BLINK",
 }

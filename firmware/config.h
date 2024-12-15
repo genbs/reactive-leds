@@ -8,6 +8,16 @@ struct Config
     unsigned short brightness;
 };
 
+#ifdef ESP8266
+Config config = {
+    "genbs_led",       
+    "genbs_led_xyz",   
+    4210,              
+    0,                 
+    16,                
+    255                
+};
+#else
 Config config = {
     .hostname = "genbs_led",
     .ap_password = "genbs_led_xyz",
@@ -16,6 +26,7 @@ Config config = {
     .num_leds = 16,
     .brightness = 255,
 };
+#endif
 
 void config_print()
 {

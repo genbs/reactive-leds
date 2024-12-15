@@ -29,14 +29,14 @@ void setup()
 
 		udp_begin();
 
-		strip_set_color_immediate(0, 255, 0, 0, 255);
+		strip_set_color_immediate(0, 0, 255, 0);
 	}
 	else
 	{
 		mode = RunMode::AP;
 		APModeStart();
 
-		strip_set_color_immediate(0, 255, 127, 0, 255);
+		strip_set_color_immediate(0, 255, 127, 0);
 	}
 }
 

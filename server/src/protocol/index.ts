@@ -1,4 +1,3 @@
-import { logger } from "@shared"
 import dgram from "dgram"
 
 import {
@@ -12,8 +11,8 @@ import {
 } from "./types"
 
 class Protocol {
-	static PING_TIMEOUT = 500
-	static GET_CONFIG_TIMEOUT = 50
+	static PING_TIMEOUT = 1000
+	static GET_CONFIG_TIMEOUT = 5000
 	static SET_CONFIG_TIMEOUT = 200
 
 	private socket: dgram.Socket
@@ -98,7 +97,7 @@ class Protocol {
 	 * @returns
 	 */
 	async setLEDs(ip: string, port: number, data: Uint8Array) {
-		return this.send(ip, port, ProtocolMessageType.SET_LEDS, [...data])
+		return this.send(ip, port, ProtocolMessageType.SET_LEDS, data)
 	}
 
 	/**
@@ -116,10 +115,10 @@ class Protocol {
 	async blink(
 		ip: string,
 		port: number,
-		baseColor: Color = [70, 70, 70, 70],
+		baseColor: Color = [10, 10, 10, 10],
 		blinkColor: Color = [255, 255, 255, 255],
 		count: number = 3,
-		delay: number = 1000
+		delay: number = 3000
 	) {
 		const data = new Uint8Array([
 			baseColor[0],
@@ -149,7 +148,7 @@ class Protocol {
 	private send(ip: string, port: number, type: ProtocolMessageType, data: number[] | Uint8Array) {
 		const message = new Uint8Array([EMPTY_MESSAGE_ID, type, ...data])
 
-		logger.debug(`Sending ${MessageTypeString[type]} to ${ip}:${port}`, message)
+		console.log(`Sending ${type} ${MessageTypeString[type]} to ${ip}:${port}`, message)
 
 		this.socket.send(message, 0, message.length, port, ip, err => err && console.error(err))
 	}
@@ -165,25 +164,33 @@ class Protocol {
 	 * @param timeout milliseconds to wait for response
 	 * @returns
 	 */
-	private sendSync<T extends ProtocolMessageType>(
+	private sendSync(
 		ip: string,
 		port: number,
-		type: T,
-		data: number[] | null = null,
+		type: ProtocolMessageType,
+		data: number[] | Uint8Array | null = null,
 		timeout: number
 	): Promise<ProtocolResponse | null> {
 		// from 1 to 255 with modulo (0 is reserved for empty message)
 		this.requestID = (this.requestID % 255) + 1
 
-		const message = new Uint8Array([this.requestID, type, ...(data || [])])
+		const requestID = this.requestID
+		const message = new Uint8Array([requestID, type, ...(data || [])])
 		let closeTimeout: NodeJS.Timeout
 
 		return new Promise(resolve => {
 			let active = true
 
+			const startTime = performance.now()
 			const close = data => {
-				if (active!) return
+				if (!active) return
 
+				console.log(
+					`[Request:${requestID}] Received ${MessageTypeString[type]} from ${ip}:${port} in ${
+						performance.now() - startTime
+					}ms`,
+					data
+				)
 				active = false
 				clearTimeout(closeTimeout)
 				this.socket.off("message", onMessage)
@@ -192,7 +199,7 @@ class Protocol {
 			}
 
 			const onMessage = (msg: Buffer) =>
-				msg[0] === this.requestID && msg[1] === type && close(msg as unknown as ProtocolResponse)
+				msg[0] === requestID && msg[1] === type && close(msg as unknown as ProtocolResponse)
 
 			closeTimeout = setTimeout(() => close(null), timeout)
 			this.socket.on("message", onMessage)

@@ -59,10 +59,13 @@ class Store extends EventEmitter<{ update: (state: State) => void }> {
 	}
 }
 
+// delete item from localStorage
+//localStorage.removeItem("state")
+
 if (!localStorage.getItem("state")) localStorage.setItem("state", JSON.stringify({ stripes: [] }))
 
 const localState = JSON.parse(localStorage.getItem("state")!) as State
-debugger
+
 for (const stripe_index in localState.stripes) {
 	const stripe = localState.stripes[stripe_index]
 	const empty = new Uint8Array(stripe.num_leds * 4)

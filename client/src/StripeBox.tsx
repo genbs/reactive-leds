@@ -69,7 +69,7 @@ export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 						type="number"
 					/>
 				</div>
-				<div className="flex-1 flex stripe-box__name">
+				<div className="ellipsis flex-1 flex stripe-box__name flex--v-center gap">
 					<EditableValue
 						value={hex}
 						onChange={color => onChange({ ...stripe, color: hexToColor(color) })}
@@ -101,7 +101,7 @@ export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 					/>
 					)
 				</div>
-				<div>
+				<div className="ellipsis">
 					<span className="stripe-box__address">{stripe.address}</span>:
 					<span className="stripe-box__port">{stripe.port}</span>@{stripe.hostname}
 				</div>

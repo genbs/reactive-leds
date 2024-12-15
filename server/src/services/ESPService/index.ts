@@ -1,4 +1,4 @@
-import BonjourService, { BonjourClient } from "@services/Bonjur"
+import BonjourService from "@services/Bonjur"
 import { EventEmitter, logger } from "@shared"
 
 import { ESPClient } from "./ESPClient"
@@ -9,6 +9,9 @@ type ESPServiceEvents = {
 	espConnect: (client: ESPClient) => void
 	espDisconnect: (client: ESPClient) => void
 }
+
+const PORT_START = 4200
+const PORT_END = 4220
 
 export default class ESPService extends EventEmitter<ESPServiceEvents> {
 	public clients = new Map<ESPClient["address"], ESPClient>()
@@ -23,8 +26,9 @@ export default class ESPService extends EventEmitter<ESPServiceEvents> {
 		this.bonjourService.on("deviceUp", async device => {
 			if (this.clients.has(device.address)) return
 
-			if (await ESPService.findDeviceUDPPort(device.address, 4200, 4300)) {
-				this.createClient(device)
+			const port = await ESPService.findDeviceUDPPort(device.address)
+			if (port) {
+				this.createClient(device.address, port, device.name, device.host)
 			}
 		})
 
@@ -38,15 +42,19 @@ export default class ESPService extends EventEmitter<ESPServiceEvents> {
 		logger.info("ESPService started")
 	}
 
+	// used for mock
 	add(client: ESPClient) {
 		this.onESPConnect(client)
 	}
 
 	private onESPConnect(client: ESPClient) {
-		if (!this.clients.has(client.address)) {
-			this.clients.set(client.address, client)
-			this.emit("espConnect", client)
-		}
+		console.log("espCLientCOnnect")
+		//if (!this.clients.has(client.address)) {
+		this.clients.set(client.address, client)
+		//this.addressIDMap.set(client.address, client.id)
+
+		this.emit("espConnect", client)
+		//}
 	}
 
 	private onESPDisconnect(client: ESPClient) {
@@ -58,30 +66,44 @@ export default class ESPService extends EventEmitter<ESPServiceEvents> {
 		}
 	}
 
-	private createClient(device: BonjourClient) {
-		const client = new ESPClient(device.name, device.address, device.host)
+	private createClient(address: string, port: number, name?: string, host?: string) {
+		const client = new ESPClient(address, port, name, host)
 		client.on("onConnect", () => this.onESPConnect(client))
 		client.on("onDisconnect", () => this.onESPDisconnect(client))
 		return client
 	}
 
-	static async findDeviceUDPPort(address: string, startPort: number, endPort: number): Promise<boolean> {
-		for (let port = startPort; port <= endPort; port++) if (await proto.ping(address, port)) return true
-
-		return false
+	public get(id: ESPClient["id"]) {
+		// TBD, da cambiare
+		return [...this.clients.values()].find(client => client.id === id)
 	}
 
-	// async find(address: string, port?: number) {
-	// 	const device = this.mdnsService.findByAddress(address)
-	// 	if (!device) return null
+	static async findDeviceUDPPort(
+		address: string,
+		startPort: number = PORT_START,
+		endPort: number = PORT_END
+	): Promise<number> {
+		for (let port = startPort; port <= endPort; port++) {
+			if (await proto.ping(address, port)) {
+				return port
+			}
+		}
 
-	// 	if (this.clients.has(address)) {
-	// 		return this.clients.get(address)
-	// 	}
+		return 0
+	}
 
-	// 	const config = await ESPService.findDeviceUDPPort(address, port || 4200, port || 4300)
-	// 	if (!config) return null
+	async find(address: string, port?: number) {
+		// const device = this.bonjourService.findByAddress(address)
+		// console.log(`ESPService: device ${address}, not found`)
+		// if (!device) return null
 
-	// 	return this.createClient(device, config)
-	// }
+		if (this.clients.has(address)) {
+			return this.clients.get(address)
+		}
+
+		const openPort = await ESPService.findDeviceUDPPort(address, port, port)
+		if (!openPort) return
+
+		return this.createClient(address, openPort, address, address)
+	}
 }

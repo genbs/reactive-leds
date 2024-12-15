@@ -18,3 +18,9 @@ or
 ```bash
 echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210 | xxd -p
 ```
+
+### Show host on network
+
+```bash
+dns-sd -B _http._tcp local
+```

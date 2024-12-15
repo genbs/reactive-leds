@@ -12,8 +12,8 @@ void strip_start()
     strip.show();
 }
 
-void strip_set_color_immediate(int led, int r, int g, int b, int w)
+void strip_set_color_immediate(int led, int r, int g, int b)
 {
-    strip.setPixelColor(led, r, g, b, w);
+    strip.setPixelColor(led, r, g, b);
     strip.show();
 }

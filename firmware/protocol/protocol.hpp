@@ -1,3 +1,4 @@
+#include <sys/_stdint.h>
 #include <WiFiUdp.h>
 #include "protocol.h"
 
@@ -32,7 +33,7 @@ void udp_read()
     int packetSize = udp.parsePacket();
     if (packetSize)
     {
-        int len = udp.read(packet, max_packet_size);
+        int len = udp.read(packet, 256);
 
         if (len >= 2)
         {
@@ -63,7 +64,7 @@ void udp_read()
             }
         }
 
-        udp.clear();
+        // udp.clear();
     }
 }
 
@@ -81,6 +82,7 @@ void protocol_get_config(uint8_t message_id)
 {
     udp.beginPacket(udp.remoteIP(), udp.remotePort());
     udp.write(message_id);
+    udp.write(GET_CONFIG);
     udp.write((config.port >> 8) & 0xFF);
     udp.write(config.port & 0xFF);
     udp.write(config.id);
@@ -152,45 +154,48 @@ void protocol_set_leds(uint8_t message_id, byte *packet, int len)
     {
         uint8_t u = packet[i];
 
-        if (u > config.num_leds)
-            continue;
+        if (u < config.num_leds)
+        {
 
-        uint8_t r = packet[i + 1];
-        uint8_t g = packet[i + 2];
-        uint8_t b = packet[i + 3];
-        float w = packet[i + 4];
-        float br = w / 255.0;
+            uint8_t r = packet[i + 1];
+            uint8_t g = packet[i + 2];
+            uint8_t b = packet[i + 3];
+            float w = packet[i + 4];
+            //float br = w / 255.0;
 
-        // led_data[u * 4 + 0] = r * br;
-        // led_data[u * 4 + 1] = g * br;
-        // led_data[u * 4 + 2] = b * br;
-        // led_data[u * 4 + 3] = w;
-        strip.setPixelColor(i,
-                            r * br,
-                            g * br,
-                            b * br,
-                            w);
+            // led_data[u * 4 + 0] = r * br;
+            // led_data[u * 4 + 1] = g * br;
+            // led_data[u * 4 + 2] = b * br;
+            // led_data[u * 4 + 3] = w;
+            strip.setPixelColor(u,
+                                r,
+                                g,
+                                b, w);
+
+            // Serial.println("Set color " + String(u) + " = r: " + String(r) + ", g: " + String(g) + ", b:" + String(b) + ", w:" + String(w));
+        }
     }
 
-    udp.beginPacket(udp.remoteIP(), udp.remotePort());
-    udp.write(message_id);
-    udp.write(SET_LEDS);
+    uint8_t status = 0;
     if (millis() - lastUpdateTime >= updateInterval)
     {
         // update_strip();
         strip.show();
         lastUpdateTime = millis();
-        udp.write(1);
-
-        Serial.println("SET_COLOR: Updated");
+        status = 1;
+        // Serial.println("SET_LEDS: Updated");
     }
     else
     {
-        udp.write(0);
-
-        Serial.println("SET_COLOR: Skip update");
+        // Serial.println("SET_LEDS: Skip update");
     }
+    /*
+    udp.beginPacket(udp.remoteIP(), udp.remotePort());
+    udp.write(message_id);
+    udp.write(SET_LEDS);
+    udp.write(status);
     udp.endPacket();
+    */
 }
 
 // void update_strip()
@@ -223,10 +228,10 @@ void protocol_blink(uint8_t message_id, byte *packet, int len)
     {
         for (int i = 0; i < config.num_leds; i++)
         {
-            if (i > count)
-                strip.setPixelColor(i, 0, 0, 0, 0);
-            else
+            if (i < count)
                 strip.setPixelColor(i, base_color[0], base_color[1], base_color[2], base_color[3]);
+            else
+                strip.setPixelColor(i, 0, 0, 0, 0);
         }
         strip.show();
         delay(blink_delay);
@@ -235,7 +240,7 @@ void protocol_blink(uint8_t message_id, byte *packet, int len)
         {
             strip.setPixelColor(i, blink_color[0], blink_color[1], blink_color[2], blink_color[3]);
             strip.show();
-            delay(300);
+            delay(500);
         }
         delay(blink_delay);
     }

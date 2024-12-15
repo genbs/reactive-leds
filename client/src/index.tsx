@@ -1,5 +1,6 @@
 import { Color, EWSRequestByteType } from "@shared"
 import { createRoot } from "react-dom/client"
+import core from "./core"
 import useStripes from "./hooks/useStripes"
 import useWS from "./hooks/useWS"
 import { Stripe } from "./Stripe"
@@ -30,10 +31,11 @@ function App() {
 		data[0] = EWSRequestByteType.SetLEDs
 		data[1] = stripe.id
 		for (let i = 0; i < stripe.num_leds; i++) {
-			data[i * 5 + 2] = color[0]
-			data[i * 5 + 3] = color[1]
-			data[i * 5 + 4] = color[2]
-			data[i * 5 + 5] = color[3]
+			data[i * 5 + 2] = i
+			data[i * 5 + 3] = color[0]
+			data[i * 5 + 4] = color[1]
+			data[i * 5 + 5] = color[2]
+			data[i * 5 + 6] = color[3]
 
 			stripe.leds[i * 4] = color[0]
 			stripe.leds[i * 4 + 1] = color[1]
@@ -46,6 +48,9 @@ function App() {
 
 		ws.send(data)
 	}
+
+	core.setWS(ws)
+	core.setStripes(stripes)
 
 	function updateStripe(stripe: Stripe) {
 		ws.send({
@@ -69,6 +74,14 @@ function App() {
 			acc[acc.length - 1].push(val)
 			return acc
 		}, [] as T[][])
+	}
+
+	function runCode() {
+		core.start()
+	}
+
+	function stopCode() {
+		core.stop()
 	}
 
 	return (
@@ -117,6 +130,11 @@ function App() {
 								</div>
 							</StripeBox>
 						))}
+					</div>
+
+					<div>
+						<button onClick={runCode}>Run Code</button>
+						<button onClick={stopCode}>Run Code</button>
 					</div>
 				</div>
 			)}

@@ -17,6 +17,7 @@ void handle_ap_config(AsyncWebServerRequest *request)
                 SSID: <input type="text" name="ssid"><br>
                 Password: <input type="password" name="password"><br>
                 Hostname: <input type="text" name="hostname" value="genbs_led"><br>
+                Id: <input type="number" name="id" value="0"><br>
                 <input type="submit" value="Salva">
             </form>
         </html>
@@ -25,7 +26,7 @@ void handle_ap_config(AsyncWebServerRequest *request)
 
 void handle_ap_save(AsyncWebServerRequest *request)
 {
-    if (request->hasParam("ssid", true) && request->hasParam("password", true) && request->hasParam("hostname", true))
+    if (request->hasParam("ssid", true) && request->hasParam("password", true) && request->hasParam("hostname", true) && request->hasParam("id", true))
     {
         String ssid = request->getParam("ssid", true)->value();
         String password = request->getParam("password", true)->value();
@@ -35,6 +36,8 @@ void handle_ap_save(AsyncWebServerRequest *request)
             String hostname = request->getParam("hostname", true)->value();
             strncpy(config.hostname, hostname.c_str(), sizeof(config.hostname) - 1);
             config.hostname[sizeof(config.hostname) - 1] = '\0';
+
+            config.id = request->getParam("id", true)->value().toInt();
 
             if (config_store())
             {

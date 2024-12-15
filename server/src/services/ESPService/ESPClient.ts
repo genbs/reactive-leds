@@ -8,7 +8,7 @@ type ESPClientEvents = {
 }
 
 export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
-	static CHECK_ALIVE_INTERVAL = 5000
+	static CHECK_ALIVE_INTERVAL = 10000
 
 	public name: string
 	public address: string
@@ -23,6 +23,7 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 
 	/**
 	 * The current data of the LEDs.
+	 * [r, g, b, brightness / whiteness, r, g, b, brightness / whiteness, ...]
 	 *
 	 * @private
 	 * @type {Uint8Array}
@@ -45,10 +46,11 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	 */
 	private checkAliveInterval: NodeJS.Timeout
 
-	constructor(name: string, address: string, host: string, checkAlive = true) {
+	constructor(address: string, port: number, name?: string, host?: string, checkAlive = true) {
 		super()
 
 		this.name = name
+		this.port = port
 		this.address = address
 		this.hostname = host
 		this.online = false
@@ -59,7 +61,7 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 		this.checkAliveInterval = setInterval(() => this.isAlive(), ESPClient.CHECK_ALIVE_INTERVAL)
 
 		this.loadConfig().then(() => {
-			this.ledsData = new Uint8Array(this.num_leds * 5)
+			this.ledsData = new Uint8Array(this.num_leds * 4).fill(0)
 			this.ledsDataDiff = new Uint8Array(this.num_leds * 5)
 		})
 	}
@@ -89,7 +91,7 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	async loadConfig() {
 		const config = await proto.getConfig(this.address, this.port)
 		if (!config) return
-
+		console.log(config)
 		this.mergeConfig(this, config)
 	}
 
@@ -122,32 +124,57 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	 *
 	 * @param data [led_index, r, g, b, brightness / whiteness, led_index, r, g, b, brightness / whiteness, ...]
 	 */
-	setLEDs(data: number[]) {
+	setLEDs(data: number[] | Uint8Array) {
 		let differenceLength = 0
 
-		for (let i = 0; i < this.ledsData.length; i++) {
+		/*for (let i = 0; i < data.length; i += 5) {
+			const led_index = data[i]
+
 			if (
-				this.ledsData[i + 1] !== data[i + 1] ||
-				this.ledsData[i + 2] !== data[i + 2] ||
-				this.ledsData[i + 3] !== data[i + 3] ||
-				this.ledsData[i + 4] !== data[i + 4]
+				this.ledsData[led_index] !== data[i + 1] ||
+				this.ledsData[led_index + 1] !== data[i + 2] ||
+				this.ledsData[led_index + 2] !== data[i + 3] ||
+				this.ledsData[led_index + 3] !== data[i + 4]
 			) {
-				this.ledsDataDiff[i] = i
+				this.ledsDataDiff[i] = led_index
 				this.ledsDataDiff[i + 1] = data[i + 1]
 				this.ledsDataDiff[i + 2] = data[i + 2]
 				this.ledsDataDiff[i + 3] = data[i + 3]
 				this.ledsDataDiff[i + 4] = data[i + 4]
 
-				differenceLength++
+				differenceLength += 5
 
-				this.ledsData[i + 1] = data[i + 1]
-				this.ledsData[i + 2] = data[i + 2]
-				this.ledsData[i + 3] = data[i + 3]
-				this.ledsData[i + 4] = data[i + 4]
+				this.ledsData[led_index] = data[i + 1]
+				this.ledsData[led_index + 1] = data[i + 2]
+				this.ledsData[led_index + 2] = data[i + 3]
+				this.ledsData[led_index + 3] = data[i + 4]
 			}
-		}
+		}*/
 
-		proto.setLEDs(this.address, this.port, this.ledsDataDiff.slice(0, differenceLength * 5))
+		// for (let i = 0; i < this.ledsData.length; i++) {
+		// 	if (
+		// 		this.ledsData[i + 1] !== data[i + 1] ||
+		// 		this.ledsData[i + 2] !== data[i + 2] ||
+		// 		this.ledsData[i + 3] !== data[i + 3] ||
+		// 		this.ledsData[i + 4] !== data[i + 4]
+		// 	) {
+		// 		this.ledsDataDiff[i] = i
+		// 		this.ledsDataDiff[i + 1] = data[i + 1]
+		// 		this.ledsDataDiff[i + 2] = data[i + 2]
+		// 		this.ledsDataDiff[i + 3] = data[i + 3]
+		// 		this.ledsDataDiff[i + 4] = data[i + 4]
+
+		// 		differenceLength++
+
+		// 		this.ledsData[i + 1] = data[i + 1]
+		// 		this.ledsData[i + 2] = data[i + 2]
+		// 		this.ledsData[i + 3] = data[i + 3]
+		// 		this.ledsData[i + 4] = data[i + 4]
+		// 	}
+		// }
+
+		//proto.setLEDs(this.address, this.port, this.ledsDataDiff.slice(0, differenceLength * 5))
+		return proto.setLEDs(this.address, this.port, new Uint8Array(data))
 	}
 
 	blink() {
@@ -164,7 +191,7 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	}
 
 	toString() {
-		return `ESPClient ${this.name}@${this.hostname} | ${this.address}:${this.port} | ${
+		return `ESPClient [${this.id}] ${this.name}@${this.hostname} | ${this.address}:${this.port} | ${
 			this.online ? "online" : "offline"
 		}}`
 	}
