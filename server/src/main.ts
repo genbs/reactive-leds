@@ -12,7 +12,7 @@ bridge.on("espConnect", esp => {
 	logger.info(`ESP Connected: ${esp})`)
 	bridge.sendStripesToClients()
 
-	esp.blink()
+	//esp.blink()
 })
 
 bridge.on("espDisconnect", esp => {
@@ -40,10 +40,13 @@ bridge.on("clientRequest", request => {
 			case EWSRequestByteType.SetLEDs:
 				const client = bridge.ESPService.get(request[1])
 				if (client) {
-					console.log("SetLeds", request.subarray(2))
-					client.setLEDs(request.subarray(2)).then(resp => {
-						console.log(resp)
-					})
+					client.setLEDs(request.subarray(2))
+				}
+				break
+			case EWSRequestByteType.Blink:
+				const esp = bridge.ESPService.get(request[1])
+				if (esp) {
+					esp.blink()
 				}
 				break
 		}
@@ -75,4 +78,4 @@ if (mock) {
 	bridge.ESPService.add(client2)
 }
 
-bridge.ESPService.find("192.168.1.142", 4210)
+//bridge.ESPService.find("192.168.1.142", 4210)

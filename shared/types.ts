@@ -27,6 +27,7 @@ export enum EWSPayloadType {
 
 export enum EWSRequestByteType {
 	SetLEDs = 0,
+	Blink = 1,
 }
 
 // Request from browser client to server
@@ -37,11 +38,12 @@ export type TWSRequestUpdateStripe = { type: "update_stripe"; data: Omit<ESP, "a
  * [EWSRequestByteType.SetLEDs, Stripe['id'], led_index, r, g, b, w, led_index, r, g, b, w, ...]
  */
 export type TWSRequestSetLEDs = Uint8Array
+export type TWSRequestBlink = Uint8Array
 
 // Response from server to browser client
 export type TWSResponseGetStripe = { event: "get_stripe"; data: ESP[] }
 
 ////////////////////////////////////////
 
-export type TWSRequest = TWSRequestGetStripe | TWSRequestUpdateStripe | TWSRequestSetLEDs
+export type TWSRequest = TWSRequestGetStripe | TWSRequestUpdateStripe | TWSRequestSetLEDs | TWSRequestBlink
 export type TWSResponse = { event: "get_stripe"; data: ESP[] }

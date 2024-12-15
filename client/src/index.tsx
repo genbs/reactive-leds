@@ -102,26 +102,32 @@ function App() {
 									/>
 
 									<div className="flex gap-m">
-										{chunckArray([...stripe.leds], 4).map((led, i) => (
-											<div key={i} className="flex">
+										{chunckArray([...stripe.leds], 4).map((led, i) => {
+											const color = `rgb(${led[0]}, ${led[1]}, ${led[2]})`
+											const white = `rgba(${led[3]}, ${led[3]}, ${led[3]}, ${led[3] / 255})`
+											return (
 												<div
-													style={{
-														width: "2rem",
-														height: "2rem",
-														background: `rgb(${led[0] * (led[3] / 255)}, ${led[1] * (led[3] / 255)}, ${
-															led[2] * (led[3] / 255)
-														})`,
-													}}
-												></div>
-												<div
-													style={{
-														width: "1rem",
-														height: "2rem",
-														background: `rgba(${led[3]}, ${led[3]}, ${led[3]}, ${led[3] / 255})`,
-													}}
-												></div>
-											</div>
-										))}
+													key={i}
+													className="flex"
+													style={{ border: "1px solid #fff2", borderRadius: "0.25rem", overflow: "hidden" }}
+												>
+													<div
+														style={{
+															width: "2rem",
+															height: "2rem",
+															background: `color-mix(in srgb, ${color}, ${white})`,
+														}}
+													></div>
+													<div
+														style={{
+															width: "1rem",
+															height: "2rem",
+															background: white,
+														}}
+													></div>
+												</div>
+											)
+										})}
 									</div>
 
 									<div>
@@ -134,7 +140,7 @@ function App() {
 
 					<div>
 						<button onClick={runCode}>Run Code</button>
-						<button onClick={stopCode}>Run Code</button>
+						<button onClick={stopCode}>Stop Code</button>
 					</div>
 				</div>
 			)}

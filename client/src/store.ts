@@ -60,7 +60,7 @@ class Store extends EventEmitter<{ update: (state: State) => void }> {
 }
 
 // delete item from localStorage
-//localStorage.removeItem("state")
+localStorage.removeItem("state")
 
 if (!localStorage.getItem("state")) localStorage.setItem("state", JSON.stringify({ stripes: [] }))
 

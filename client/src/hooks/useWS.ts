@@ -34,3 +34,7 @@ export default function useWS(
 
 	return [ws, connected]
 }
+
+export function getWS(): WS {
+	return globalWSInstance!
+}

@@ -10,7 +10,7 @@ bool FS_create(const char *path)
     File file = LittleFS.open(path, "w");
     if (!file)
     {
-        Serial.println("Failed to create file: " + String(path));
+        DEBUG_PRINTLN("Failed to create file: " + String(path));
         return false;
     }
 
@@ -23,7 +23,7 @@ String FS_read(const char *path, const char *key, String defaultValue)
     File file = LittleFS.open(path, "r");
     if (!file)
     {
-        Serial.println("File not found: " + String(path));
+        DEBUG_PRINTLN("File not found: " + String(path));
         return defaultValue;
     }
 
@@ -58,7 +58,7 @@ void FS_print(const char *path)
     File file = LittleFS.open(path, "r");
     if (!file)
     {
-        Serial.println("File not found: " + String(path));
+        DEBUG_PRINTLN("File not found: " + String(path));
         return;
     }
 
@@ -66,7 +66,7 @@ void FS_print(const char *path)
     while (file.available())
     {
         line = file.readStringUntil('\n');
-        Serial.println(line);
+        DEBUG_PRINTLN(line);
     }
 
     file.close();
@@ -88,7 +88,7 @@ bool FS_remove(const char *path, const char *key)
     File tempFile = LittleFS.open(tempPath.c_str(), "w");
     if (!tempFile)
     {
-        Serial.println("Failed to create temporary file");
+        DEBUG_PRINTLN("Failed to create temporary file");
         return false;
     }
 
@@ -144,7 +144,7 @@ bool FS_write(const char *path, const char *key, String value)
     File tempFile = LittleFS.open(tempPath.c_str(), "w");
     if (!tempFile)
     {
-        Serial.println("Failed to create temporary file");
+        DEBUG_PRINTLN("Failed to create temporary file");
         return false;
     }
 
@@ -206,7 +206,7 @@ void FS_begin()
     if (!LittleFS.begin(true))
 #endif
     {
-        Serial.println("LittleFS Mount Failed");
+        DEBUG_PRINTLN("LittleFS Mount Failed");
     }
 
     FS_create("/config");

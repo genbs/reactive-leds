@@ -7,6 +7,7 @@ export type Stripe = ESP & {
 
 	leds: Uint8Array // [r, g, b, w, r, g, b, w, ...]
 	code?: string
+	orientation?: number
 }
 
 export function espToStripe(esp: ESP): Stripe {

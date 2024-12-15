@@ -46,6 +46,8 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	 */
 	private checkAliveInterval: NodeJS.Timeout
 
+	private checkAlive = true
+
 	constructor(address: string, port: number, name?: string, host?: string, checkAlive = true) {
 		super()
 
@@ -54,15 +56,17 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 		this.address = address
 		this.hostname = host
 		this.online = false
+		this.checkAlive = checkAlive
 
 		if (!checkAlive) return
 
-		this.isAlive()
-		this.checkAliveInterval = setInterval(() => this.isAlive(), ESPClient.CHECK_ALIVE_INTERVAL)
+		this.isAlive = this.isAlive.bind(this)
 
 		this.loadConfig().then(() => {
 			this.ledsData = new Uint8Array(this.num_leds * 4).fill(0)
 			this.ledsDataDiff = new Uint8Array(this.num_leds * 5)
+
+			this.isAlive()
 		})
 	}
 
@@ -70,12 +74,16 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	 * Ping the device to check if it's online.
 	 */
 	async isAlive() {
+		if (!this.checkAlive) return
+
 		const online = await this.ping()
 
 		if (this.online !== online) {
 			this.online = online
 			this.emit(this.online ? "onConnect" : "onDisconnect", this)
 		}
+
+		setTimeout(this.isAlive, ESPClient.CHECK_ALIVE_INTERVAL)
 	}
 
 	/**
@@ -125,9 +133,8 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	 * @param data [led_index, r, g, b, brightness / whiteness, led_index, r, g, b, brightness / whiteness, ...]
 	 */
 	setLEDs(data: number[] | Uint8Array) {
-		let differenceLength = 0
-
-		/*for (let i = 0; i < data.length; i += 5) {
+		let diffIndex = 0
+		for (let i = 0; i < data.length; i += 5) {
 			const led_index = data[i]
 
 			if (
@@ -136,45 +143,22 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 				this.ledsData[led_index + 2] !== data[i + 3] ||
 				this.ledsData[led_index + 3] !== data[i + 4]
 			) {
-				this.ledsDataDiff[i] = led_index
-				this.ledsDataDiff[i + 1] = data[i + 1]
-				this.ledsDataDiff[i + 2] = data[i + 2]
-				this.ledsDataDiff[i + 3] = data[i + 3]
-				this.ledsDataDiff[i + 4] = data[i + 4]
+				this.ledsDataDiff[diffIndex * 5] = led_index
+				this.ledsDataDiff[diffIndex * 5 + 1] = data[i + 1]
+				this.ledsDataDiff[diffIndex * 5 + 2] = data[i + 2]
+				this.ledsDataDiff[diffIndex * 5 + 3] = data[i + 3]
+				this.ledsDataDiff[diffIndex * 5 + 4] = data[i + 4]
 
-				differenceLength += 5
+				diffIndex++
 
 				this.ledsData[led_index] = data[i + 1]
 				this.ledsData[led_index + 1] = data[i + 2]
 				this.ledsData[led_index + 2] = data[i + 3]
 				this.ledsData[led_index + 3] = data[i + 4]
 			}
-		}*/
+		}
 
-		// for (let i = 0; i < this.ledsData.length; i++) {
-		// 	if (
-		// 		this.ledsData[i + 1] !== data[i + 1] ||
-		// 		this.ledsData[i + 2] !== data[i + 2] ||
-		// 		this.ledsData[i + 3] !== data[i + 3] ||
-		// 		this.ledsData[i + 4] !== data[i + 4]
-		// 	) {
-		// 		this.ledsDataDiff[i] = i
-		// 		this.ledsDataDiff[i + 1] = data[i + 1]
-		// 		this.ledsDataDiff[i + 2] = data[i + 2]
-		// 		this.ledsDataDiff[i + 3] = data[i + 3]
-		// 		this.ledsDataDiff[i + 4] = data[i + 4]
-
-		// 		differenceLength++
-
-		// 		this.ledsData[i + 1] = data[i + 1]
-		// 		this.ledsData[i + 2] = data[i + 2]
-		// 		this.ledsData[i + 3] = data[i + 3]
-		// 		this.ledsData[i + 4] = data[i + 4]
-		// 	}
-		// }
-
-		//proto.setLEDs(this.address, this.port, this.ledsDataDiff.slice(0, differenceLength * 5))
-		return proto.setLEDs(this.address, this.port, new Uint8Array(data))
+		proto.setLEDs(this.address, this.port, this.ledsDataDiff.slice(0, diffIndex * 5))
 	}
 
 	blink() {

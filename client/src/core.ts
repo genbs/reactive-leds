@@ -74,9 +74,8 @@ class Core {
 					return result
 				}
 
-				console.log(result)
-
 				const evalResult = this.evalResult(result).map(this.sanitize)
+				//console.log(result, evalResult)
 				stripe.leds[i * 4] = evalResult[0]
 				stripe.leds[i * 4 + 1] = evalResult[1]
 				stripe.leds[i * 4 + 2] = evalResult[2]
@@ -119,7 +118,7 @@ class Core {
 	}
 
 	sanitize(value: number) {
-		return Math.floor(value < 0 ? 0 : value > 255 ? 255 : value)
+		return Math.round(value < 0 ? 0 : value > 255 ? 255 : value)
 	}
 
 	start() {

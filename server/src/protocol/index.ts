@@ -1,5 +1,6 @@
 import dgram from "dgram"
 
+import { logger } from "@shared"
 import {
 	Color,
 	EMPTY_MESSAGE_ID,
@@ -11,8 +12,8 @@ import {
 } from "./types"
 
 class Protocol {
-	static PING_TIMEOUT = 1000
-	static GET_CONFIG_TIMEOUT = 5000
+	static PING_TIMEOUT = 100
+	static GET_CONFIG_TIMEOUT = 500
 	static SET_CONFIG_TIMEOUT = 200
 
 	private socket: dgram.Socket
@@ -118,7 +119,7 @@ class Protocol {
 		baseColor: Color = [10, 10, 10, 10],
 		blinkColor: Color = [255, 255, 255, 255],
 		count: number = 3,
-		delay: number = 3000
+		delay: number = 1000
 	) {
 		const data = new Uint8Array([
 			baseColor[0],
@@ -148,7 +149,7 @@ class Protocol {
 	private send(ip: string, port: number, type: ProtocolMessageType, data: number[] | Uint8Array) {
 		const message = new Uint8Array([EMPTY_MESSAGE_ID, type, ...data])
 
-		console.log(`Sending ${type} ${MessageTypeString[type]} to ${ip}:${port}`, message)
+		logger.debug(`Sending ${type} ${MessageTypeString[type]} to ${ip}:${port}`, message)
 
 		this.socket.send(message, 0, message.length, port, ip, err => err && console.error(err))
 	}
@@ -185,7 +186,7 @@ class Protocol {
 			const close = data => {
 				if (!active) return
 
-				console.log(
+				logger.debug(
 					`[Request:${requestID}] Received ${MessageTypeString[type]} from ${ip}:${port} in ${
 						performance.now() - startTime
 					}ms`,

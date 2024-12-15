@@ -1,4 +1,6 @@
+import { EWSRequestByteType } from "@shared"
 import EditableValue from "./components/EditableValue"
+import { getWS } from "./hooks/useWS"
 import { Stripe } from "./Stripe"
 import { classname, hexToColor, style } from "./utils"
 
@@ -51,6 +53,12 @@ export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 		.map(c => c.toString(16).padStart(2, "0"))
 		.join("")}`
 
+	function blink() {
+		console.log("blink")
+
+		getWS().send(new Uint8Array([EWSRequestByteType.Blink, stripe.id]))
+	}
+
 	return (
 		<div
 			style={{
@@ -101,7 +109,7 @@ export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 					/>
 					)
 				</div>
-				<div className="ellipsis">
+				<div className="ellipsis" onClick={blink}>
 					<span className="stripe-box__address">{stripe.address}</span>:
 					<span className="stripe-box__port">{stripe.port}</span>@{stripe.hostname}
 				</div>

@@ -8,13 +8,13 @@ void InitMDNS()
 {
     if (!MDNS.begin(config.hostname))
     {
-        Serial.print("Error starting mDNS with hostname: ");
-        Serial.println(config.hostname);
+        DEBUG_PRINT("Error starting mDNS with hostname: ");
+        DEBUG_PRINTLN(config.hostname);
         return;
     }
 
-    Serial.print("mDNS responder started, hostname: ");
-    Serial.println(config.hostname);
+    DEBUG_PRINT("mDNS responder started, hostname: ");
+    DEBUG_PRINTLN(config.hostname);
 
     MDNS.addService("http", "tcp", 80);
 }

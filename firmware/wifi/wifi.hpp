@@ -8,27 +8,29 @@
 
 bool WiFiConnect(const char *ssid, const char *password)
 {
-    Serial.println("Connecting to WiFi network: " + String(ssid));
+    DEBUG_PRINTLN("Connecting to WiFi network: " + String(ssid));
     WiFi.begin(ssid, password);
 
     unsigned long start = millis();
     while (WiFi.status() != WL_CONNECTED)
     {
         delay(100);
-        Serial.print('.');
+        DEBUG_PRINT('.');
 
         if (millis() > start + 10000)
         {
-            Serial.println("Connection failed");
+            DEBUG_PRINTLN("Connection failed");
             return false;
         }
     }
 
-    Serial.println("");
-    Serial.print("Connected:\t");
-    Serial.println(ssid);
-    Serial.print("IP address:\t");
-    Serial.println(WiFi.localIP());
+    DEBUG_PRINTLN("");
+    DEBUG_PRINT("Connected:\t");
+    DEBUG_PRINTLN(ssid);
+    DEBUG_PRINT("IP address:\t");
+    DEBUG_PRINTLN(WiFi.localIP());
+
+    WiFi.setSleep(false); // "performance" mode
 
     return true;
 }
@@ -37,12 +39,12 @@ bool WiFiAutoConnect()
 {
     WiFi.mode(WIFI_STA);
 
-    Serial.println("Scan Wi-Fi networks...");
+    DEBUG_PRINTLN("Scan Wi-Fi networks...");
 
     int numNetworks = WiFi.scanNetworks();
     if (numNetworks == 0)
     {
-        Serial.println("No networks found");
+        DEBUG_PRINTLN("No networks found");
         return false;
     }
     else
@@ -50,7 +52,7 @@ bool WiFiAutoConnect()
         for (int i = 0; i < numNetworks; i++)
         {
             String ssid = WiFi.SSID(i);
-            Serial.println("SSID: " + ssid + " RSSI: " + String(WiFi.RSSI(i)) + " dBm");
+            DEBUG_PRINTLN("SSID: " + ssid + " RSSI: " + String(WiFi.RSSI(i)) + " dBm");
             String password = FS_read("/wifi", ssid.c_str(), "");
             if (!password.isEmpty())
             {
@@ -60,14 +62,14 @@ bool WiFiAutoConnect()
                 }
                 else
                 {
-                    Serial.println("Failed to connect to network: " + ssid);
+                    DEBUG_PRINTLN("Failed to connect to network: " + ssid);
                     FS_remove("/wifi", ssid.c_str());
                 }
             }
         }
     }
 
-    Serial.println("No saved networks found");
+    DEBUG_PRINTLN("No saved networks found");
 
     return false;
 }

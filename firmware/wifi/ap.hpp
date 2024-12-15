@@ -41,15 +41,15 @@ void handle_ap_save(AsyncWebServerRequest *request)
 
             if (config_store())
             {
-                Serial.println("Configuration saved successfully.");
-                Serial.println("Restarting in 2 seconds.");
+                DEBUG_PRINTLN("Configuration saved successfully.");
+                DEBUG_PRINTLN("Restarting in 2 seconds.");
                 delay(2000);
                 ESP.restart();
                 return;
             }
         }
 
-        Serial.println("Failed to save configuration.");
+        DEBUG_PRINTLN("Failed to save configuration.");
         request->send(500, "text/plain", "Internal Server Error");
     }
     else
@@ -63,23 +63,23 @@ void WiFiConnectAP()
     WiFi.disconnect();
     delay(100);
 
-    Serial.println("");
-    Serial.println("Starting AP mode");
+    DEBUG_PRINTLN("");
+    DEBUG_PRINTLN("Starting AP mode");
 
     WiFi.mode(WIFI_AP);
-    while (!WiFi.softAP(config.hostname, config.ap_password))
+    while (!WiFi.softAP(config.hostname, config.password))
     {
-        Serial.println(".");
+        DEBUG_PRINTLN(".");
         delay(100);
     }
 
     WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
 
-    Serial.println("");
-    Serial.print("Started:\t");
-    Serial.println(config.hostname);
-    Serial.print("IP address:\t");
-    Serial.println(WiFi.softAPIP());
+    DEBUG_PRINTLN("");
+    DEBUG_PRINT("Started:\t");
+    DEBUG_PRINTLN(config.hostname);
+    DEBUG_PRINT("IP address:\t");
+    DEBUG_PRINTLN(WiFi.softAPIP());
 }
 
 void APModeStart()
