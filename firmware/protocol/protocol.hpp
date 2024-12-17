@@ -91,7 +91,7 @@ void protocol_get_config(uint8_t message_id)
     udp.write(config.id);
     udp.write(config.num_leds);
     udp.write(config.brightness);
-    udp.write((uint8_t *)config.hostname, sizeof(config.hostname));
+    udp.write((uint8_t *)config.hostname, strlen(config.hostname));
     udp.endPacket();
 
     DEBUG_PRINTLN("GET_CONFIG");
@@ -109,9 +109,14 @@ void protocol_set_config(uint8_t message_id, byte *packet, int len)
     config.id = packet[4];
     config.num_leds = packet[5];
     config.brightness = packet[6];
-    const char *hostname = (const char *)&packet[7];
-    strncpy(config.hostname, hostname, sizeof(config.hostname) - 1);
-    config.hostname[sizeof(config.hostname) - 1] = '\0';
+
+    uint8_t hostname_length = len - 7;
+    if (hostname_length >= sizeof(config.hostname))
+    {
+        hostname_length = sizeof(config.hostname) - 1;
+    }
+    memcpy(config.hostname, &packet[7], hostname_length);
+    config.hostname[hostname_length] = '\0';
 
     udp.beginPacket(udp.remoteIP(), udp.remotePort());
     udp.write(message_id);

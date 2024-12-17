@@ -1,4 +1,4 @@
-import { Color } from "@shared"
+import { TColor } from "@shared"
 
 export function hash(str: string): string {
 	let hash = 0
@@ -26,7 +26,7 @@ export function classname(...classes: (string | undefined)[]): string {
 	return classes.filter(Boolean).join(" ")
 }
 
-export function colorToHex(color?: Color): string {
+export function colorToHex(color?: TColor): string {
 	if (!color) return "#000000"
 
 	return `#${color
@@ -35,7 +35,7 @@ export function colorToHex(color?: Color): string {
 		.join("")}`
 }
 
-export function hexToColor(hex: string): Color {
+export function hexToColor(hex: string): TColor {
 	const r = parseInt(hex.slice(1, 3), 16)
 	const g = parseInt(hex.slice(3, 5), 16)
 	const b = parseInt(hex.slice(5, 7), 16)

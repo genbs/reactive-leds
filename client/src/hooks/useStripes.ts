@@ -1,13 +1,10 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
-import { TWSResponse } from "@shared"
-import store from "src/store"
+import { TStripe, TWSResponse } from "@shared"
 import WS from "src/ws"
-import { Stripe } from "../Stripe"
-import { useStore } from "./useStore"
 
 export default function useStripes(ws?: WS) {
-	const stripes = useStore().stripes
+	const [stripes, setStripes] = useState<(TStripe & { code: string })[]>([])
 
 	useEffect(() => {
 		if (!ws) return
@@ -16,13 +13,33 @@ export default function useStripes(ws?: WS) {
 			if (typeof message !== "string") return
 
 			const { event, data } = JSON.parse(message) as TWSResponse
-			if (event === "get_stripe") store.fromESPDevices(data)
+			if (event === "get_stripe") {
+				console.log("get_stripe", data)
+				setStripes(
+					data.map(stripe => {
+						return {
+							...stripe,
+							leds: new Uint8Array(Object.values(stripe.leds)),
+							code: "",
+						}
+					})
+				)
+			}
 		})
 	}, [ws])
 
-	function localUpdate(newStripes: Stripe[]) {
-		store.updateStripes(newStripes)
+	function updateStripes(newStripes) {
+		console.log("updateStripes", newStripes)
+		setStripes(
+			stripes.map(stripe => {
+				const newStripe = newStripes.find(newStripe => newStripe.device.id === stripe.device.id)
+				if (newStripe) {
+					return newStripe
+				}
+				return stripe
+			})
+		)
 	}
 
-	return [stripes, localUpdate] as const
+	return [stripes, updateStripes] as const
 }

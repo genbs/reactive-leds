@@ -1,5 +1,5 @@
 import proto from "@protocol"
-import { Color, ESP, EventEmitter } from "@shared"
+import { EventEmitter, TESP } from "@shared"
 import { ProtocolBoardConfig } from "src/protocol/types"
 
 type ESPClientEvents = {
@@ -7,13 +7,13 @@ type ESPClientEvents = {
 	onDisconnect: (self: ESPClient) => void
 }
 
-export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
+export class ESPClient extends EventEmitter<ESPClientEvents> implements TESP {
 	static CHECK_ALIVE_INTERVAL = 10000
+	static MAX_LAST_PING_TIME = 30000
 
 	public name: string
 	public address: string
 	public online = false
-	public color?: Color
 
 	public port: number
 	public id: number
@@ -21,22 +21,7 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	public hostname: string
 	public brightness: number
 
-	/**
-	 * The current data of the LEDs.
-	 * [r, g, b, brightness / whiteness, r, g, b, brightness / whiteness, ...]
-	 *
-	 * @private
-	 * @type {Uint8Array}
-	 */
-	private ledsData: Uint8Array
-
-	/**
-	 * The difference between the current data and the new data.
-	 *
-	 * @private
-	 * @type {Uint8Array}
-	 */
-	private ledsDataDiff: Uint8Array
+	public lastPing: number = 0
 
 	/**
 	 * The interval to check if the device is online.
@@ -48,10 +33,9 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 
 	private checkAlive = true
 
-	constructor(address: string, port: number, name?: string, host?: string, checkAlive = true) {
+	constructor(address: string, port: number, host?: string, checkAlive = true) {
 		super()
 
-		this.name = name
 		this.port = port
 		this.address = address
 		this.hostname = host
@@ -63,9 +47,6 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 		this.isAlive = this.isAlive.bind(this)
 
 		this.loadConfig().then(() => {
-			this.ledsData = new Uint8Array(this.num_leds * 4).fill(0)
-			this.ledsDataDiff = new Uint8Array(this.num_leds * 5)
-
 			this.isAlive()
 		})
 	}
@@ -77,6 +58,8 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 		if (!this.checkAlive) return
 
 		const online = await this.ping()
+
+		if (online) this.lastPing = Date.now()
 
 		if (this.online !== online) {
 			this.online = online
@@ -99,31 +82,33 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	async loadConfig() {
 		const config = await proto.getConfig(this.address, this.port)
 		if (!config) return
-		console.log(config)
-		this.mergeConfig(this, config)
+
+		Object.assign(this, config)
 	}
 
 	/**
 	 * Set the device configuration.
 	 */
 	async setConfig(config: Partial<ProtocolBoardConfig>) {
-		this.mergeConfig(config, this)
+		config.brightness = config.brightness || this.brightness
+		config.num_leds = config.num_leds || this.num_leds
+		config.port = config.port || this.port
+		config.id = config.id || this.id
+		config.hostname = config.hostname || this.hostname
 
 		if (await proto.setConfig(this.address, this.port, config as ProtocolBoardConfig)) {
-			this.mergeConfig(this, config)
+			Object.assign(this, config)
 
-			return true
+			return {
+				port: this.port,
+				id: this.id,
+				num_leds: this.num_leds,
+				hostname: this.hostname,
+				brightness: this.brightness,
+			}
 		}
 
 		return false
-	}
-
-	private mergeConfig(oldConfig: Partial<ProtocolBoardConfig>, newConfig: Partial<ProtocolBoardConfig>) {
-		oldConfig.port = newConfig.port ?? oldConfig.port
-		oldConfig.id = newConfig.id ?? oldConfig.id
-		oldConfig.num_leds = newConfig.num_leds ?? oldConfig.num_leds
-		oldConfig.hostname = newConfig.hostname ?? oldConfig.hostname
-		oldConfig.brightness = newConfig.brightness ?? oldConfig.brightness
 	}
 
 	/**
@@ -132,33 +117,8 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	 *
 	 * @param data [led_index, r, g, b, brightness / whiteness, led_index, r, g, b, brightness / whiteness, ...]
 	 */
-	setLEDs(data: number[] | Uint8Array) {
-		let diffIndex = 0
-		for (let i = 0; i < data.length; i += 5) {
-			const led_index = data[i]
-
-			if (
-				this.ledsData[led_index] !== data[i + 1] ||
-				this.ledsData[led_index + 1] !== data[i + 2] ||
-				this.ledsData[led_index + 2] !== data[i + 3] ||
-				this.ledsData[led_index + 3] !== data[i + 4]
-			) {
-				this.ledsDataDiff[diffIndex * 5] = led_index
-				this.ledsDataDiff[diffIndex * 5 + 1] = data[i + 1]
-				this.ledsDataDiff[diffIndex * 5 + 2] = data[i + 2]
-				this.ledsDataDiff[diffIndex * 5 + 3] = data[i + 3]
-				this.ledsDataDiff[diffIndex * 5 + 4] = data[i + 4]
-
-				diffIndex++
-
-				this.ledsData[led_index] = data[i + 1]
-				this.ledsData[led_index + 1] = data[i + 2]
-				this.ledsData[led_index + 2] = data[i + 3]
-				this.ledsData[led_index + 3] = data[i + 4]
-			}
-		}
-
-		proto.setLEDs(this.address, this.port, this.ledsDataDiff.slice(0, diffIndex * 5))
+	setLEDs(data: Uint8Array) {
+		return proto.setLEDs(this.address, this.port, data)
 	}
 
 	blink() {
@@ -177,20 +137,19 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements ESP {
 	toString() {
 		return `ESPClient [${this.id}] ${this.name}@${this.hostname} | ${this.address}:${this.port} | ${
 			this.online ? "online" : "offline"
-		}}`
+		}`
 	}
 
-	toObject(): ESP {
+	toObject(): TESP {
 		return {
 			id: this.id,
-			name: this.name,
 			address: this.address,
 			hostname: this.hostname,
 			port: this.port,
 			brightness: this.brightness,
 			num_leds: this.num_leds,
 			online: this.online,
-			color: this.color,
+			lastPing: this.lastPing,
 		}
 	}
 }

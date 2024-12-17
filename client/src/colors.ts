@@ -1,13 +1,13 @@
-import { Color } from "@shared"
+import { TColor } from "@shared"
 
 /**
  * Brightness [0-255]
  *
  * @export
- * @param {Color} [r, g, b]
+ * @param {TColor} [r, g, b]
  * @return {*}  {number from 0 to 255}
  */
-export function brightness([r, g, b, a]: Color): number {
+export function brightness([r, g, b, a]: TColor): number {
 	return a && a > 0 ? (r * 299 + g * 587 + b * 114) / 1000 : 0
 }
 
@@ -15,17 +15,17 @@ export function brightness([r, g, b, a]: Color): number {
  * Luminance [0-1]
  *
  * @export
- * @param {Color} [r, g, b]
+ * @param {TColor} [r, g, b]
  * @return {*}  {number from 0 to 1}
  */
-export function luminance([r, g, b, a]: Color): number {
+export function luminance([r, g, b, a]: TColor): number {
 	return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-export function isDark([r, g, b, a]: Color): boolean {
+export function isDark([r, g, b, a]: TColor): boolean {
 	return !isLight([r, g, b, a])
 }
 
-export function isLight([r, g, b, a]: Color): boolean {
+export function isLight([r, g, b, a]: TColor): boolean {
 	return brightness([r, g, b, a]) >= 128
 }

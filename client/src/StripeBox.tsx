@@ -1,12 +1,12 @@
-import { EWSRequestByteType } from "@shared"
+import { EWSRequestByteType, TStripe } from "@shared"
 import EditableValue from "./components/EditableValue"
 import { getWS } from "./hooks/useWS"
-import { Stripe } from "./Stripe"
+
 import { classname, hexToColor, style } from "./utils"
 
 export type StripeProps = {
-	stripe: Stripe
-	onChange: (stripe: Stripe) => void
+	stripe: TStripe
+	onChange: (stripe: TStripe) => void
 	children?: React.ReactNode
 }
 
@@ -56,7 +56,7 @@ export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 	function blink() {
 		console.log("blink")
 
-		getWS().send(new Uint8Array([EWSRequestByteType.Blink, stripe.id]))
+		getWS().send(new Uint8Array([EWSRequestByteType.Blink, stripe.device.id]))
 	}
 
 	return (
@@ -70,8 +70,8 @@ export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 			<div className="flex flex--v-center gap">
 				<div style={{ borderColor: stripe.colorHex }} className="stripe-box__id">
 					<EditableValue
-						value={stripe.id}
-						onChange={id => onChange({ ...stripe, id })}
+						value={stripe.device.id}
+						onChange={id => onChange({ ...stripe, device: { ...stripe.device, id } })}
 						min={0}
 						max={255}
 						type="number"
@@ -84,37 +84,42 @@ export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 						type="color"
 						render={value => <div className="stripe-box__color" style={{ background: value }}></div>}
 					/>
-					<EditableValue
-						value={stripe.name}
-						onChange={name => onChange({ ...stripe, name })}
-						min={0}
-						max={255}
-						type="text"
-					/>
+					{stripe.name}
 					(
 					<EditableValue
-						value={stripe.num_leds}
-						onChange={num_leds => onChange({ ...stripe, num_leds })}
+						value={stripe.device.num_leds}
+						onChange={num_leds => onChange({ ...stripe, device: { ...stripe.device, num_leds } })}
 						type="number"
 						min={0}
 						max={255}
 					/>
 					|
 					<EditableValue
-						value={stripe.brightness}
-						onChange={brightness => onChange({ ...stripe, brightness })}
+						value={stripe.device.brightness}
+						onChange={brightness => onChange({ ...stripe, device: { ...stripe.device, brightness } })}
 						type="number"
 						min={0}
 						max={255}
 					/>
 					)
 				</div>
-				<div className="ellipsis" onClick={blink}>
-					<span className="stripe-box__address">{stripe.address}</span>:
-					<span className="stripe-box__port">{stripe.port}</span>@{stripe.hostname}
+				<div className="ellipsis">
+					<span className="stripe-box__address">{stripe.device.address}</span>:
+					<span className="stripe-box__port">{stripe.device.port}</span>@
+					<EditableValue
+						value={stripe.device.hostname}
+						onChange={hostname => onChange({ ...stripe, device: { ...stripe.device, hostname } })}
+						min={0}
+						max={255}
+						type="text"
+					/>
 				</div>
 				<div
-					className={classname("stripe-box__status", `stripe-box__status--${stripe.online ? "online" : "offline"}`)}
+					onClick={blink}
+					className={classname(
+						"stripe-box__status",
+						`stripe-box__status--${stripe.device.online ? "online" : "offline"}`
+					)}
 				></div>
 			</div>
 

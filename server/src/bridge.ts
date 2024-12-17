@@ -1,13 +1,12 @@
-import ESPService from "@services/ESPService"
-import { ESPClient } from "@services/ESPService/ESPClient"
+import StripeService from "@services/StripeService"
+import Stripe from "@services/StripeService/Stripe"
 import WebSocketService from "@services/WebSocketService"
 
 import { EventEmitter, TWSRequest } from "@shared"
 import WebSocket from "ws"
 
 type BridgeEvents = {
-	espConnect: (client: ESPClient) => void
-	espDisconnect: (client: ESPClient) => void
+	stripeUpdate: (stripe: Stripe) => void
 	clientConnect: (client: WebSocket) => void
 	clientDisconnect: (client: WebSocket) => void
 	clientRequest: (request: TWSRequest, client: WebSocket) => void
@@ -17,13 +16,13 @@ type BridgeEvents = {
  * Comunication between the web client and the ESP devices.
  */
 class Bridge extends EventEmitter<BridgeEvents> {
-	public ESPService: ESPService
+	public stripeService: StripeService
 	public WebSocketService: WebSocketService
 
 	constructor(wsPort: number) {
 		super()
 
-		this.ESPService = new ESPService()
+		this.stripeService = new StripeService()
 		this.WebSocketService = new WebSocketService(wsPort)
 	}
 
@@ -31,12 +30,8 @@ class Bridge extends EventEmitter<BridgeEvents> {
 	 * Start the services.
 	 */
 	start() {
-		this.ESPService.on("espConnect", esp => {
-			this.emit("espConnect", esp)
-		})
-
-		this.ESPService.on("espDisconnect", esp => {
-			this.emit("espDisconnect", esp)
+		this.stripeService.on("onUpdate", stripe => {
+			this.emit("stripeUpdate", stripe)
 		})
 
 		this.WebSocketService.on("onClientConnect", ws => {
@@ -51,14 +46,14 @@ class Bridge extends EventEmitter<BridgeEvents> {
 			this.emit("clientRequest", message, ws)
 		})
 
-		this.ESPService.start()
+		this.stripeService.start()
 		this.WebSocketService.start()
 	}
 
 	sendStripesToClients() {
 		this.WebSocketService.send({
 			event: "get_stripe",
-			data: [...this.ESPService.clients.values()].map(client => client.toObject()),
+			data: this.stripeService.stripes.map(stripe => stripe.toJSON()),
 		})
 	}
 }

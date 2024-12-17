@@ -1,9 +1,10 @@
-import { Color, EWSRequestByteType } from "@shared"
+import { EStripeOrientation, EWSRequestByteType, TColor, TStripe } from "@shared"
+import { useState } from "react"
 import { createRoot } from "react-dom/client"
 import core from "./core"
 import useStripes from "./hooks/useStripes"
-import useWS from "./hooks/useWS"
-import { Stripe } from "./Stripe"
+import useWS, { getWS } from "./hooks/useWS"
+
 import StripeBox from "./StripeBox"
 import StripeEditor from "./StripeEditor"
 import { style } from "./utils"
@@ -23,46 +24,40 @@ style(`
 function App() {
 	const [ws, connected] = useWS("ws://localhost:8080", true, false)
 
-	const [stripes, localStripeUpdate] = useStripes(ws)
+	const [stripes, updateStripes] = useStripes(ws)
 
-	function onChange(stripe: Stripe, color: Color) {
-		const data: Uint8Array = new Uint8Array(1 /* message_type */ + 1 /* stripe_id */ + stripe.num_leds * 5)
+	function onChange(stripe: TStripe, color: TColor) {
+		const data: Uint8Array = new Uint8Array(1 /* message_type */ + 1 /* stripe_id */ + stripe.device.num_leds * 5)
 
 		data[0] = EWSRequestByteType.SetLEDs
-		data[1] = stripe.id
-		for (let i = 0; i < stripe.num_leds; i++) {
+		data[1] = stripe.device.id
+		for (let i = 0; i < stripe.device.num_leds; i++) {
+			stripe.leds[i * 4] = color[0]
+			stripe.leds[i * 4 + 1] = color[1]
+			stripe.leds[i * 4 + 2] = color[2]
+			stripe.leds[i * 4 + 3] = color[3]
+
 			data[i * 5 + 2] = i
 			data[i * 5 + 3] = color[0]
 			data[i * 5 + 4] = color[1]
 			data[i * 5 + 5] = color[2]
 			data[i * 5 + 6] = color[3]
-
-			stripe.leds[i * 4] = color[0]
-			stripe.leds[i * 4 + 1] = color[1]
-			stripe.leds[i * 4 + 2] = color[2]
-			stripe.leds[i * 4 + 3] = color[3]
 		}
 
-		// update stripe color
-		localStripeUpdate([stripe])
+		updateStripes([stripe])
 
 		ws.send(data)
 	}
 
 	core.setWS(ws)
+
 	core.setStripes(stripes)
 
-	function updateStripe(stripe: Stripe) {
+	function updateStripe(stripe_id: TStripe["device"]["id"], stripe: TStripe) {
 		ws.send({
 			type: "update_stripe",
-			data: {
-				id: stripe.id,
-				name: stripe.name,
-				brightness: stripe.brightness,
-				port: stripe.port,
-				num_leds: stripe.num_leds,
-				color: stripe.color,
-			},
+			data: stripe,
+			id: stripe_id,
 		})
 	}
 
@@ -92,32 +87,58 @@ function App() {
 			</p>
 			{connected && (
 				<div>
+					<Find />
 					<div className="flex flex--column gap-m stripes">
 						{stripes.map(stripe => (
-							<StripeBox key={stripe.id} stripe={stripe} onChange={updateStripe}>
+							<StripeBox
+								key={stripe.device.id}
+								stripe={stripe}
+								onChange={update => updateStripe(stripe.device.id, update)}
+							>
 								<div className="flex flex--column gap-m">
 									<Color
 										selected={[stripe.leds[0], stripe.leds[1], stripe.leds[2], stripe.leds[3]]}
 										onChange={color => onChange(stripe, color)}
 									/>
 
-									<div className="flex gap-m">
+									<div
+										className="flex"
+										style={{
+											flexDirection:
+												stripe.orientation === EStripeOrientation.Vertical
+													? "column-reverse"
+													: stripe.orientation === EStripeOrientation.VerticalReverse
+													? "column"
+													: "row",
+										}}
+									>
 										{chunckArray([...stripe.leds], 4).map((led, i) => {
 											const color = `rgb(${led[0]}, ${led[1]}, ${led[2]})`
-											const white = `rgba(${led[3]}, ${led[3]}, ${led[3]}, ${led[3] / 255})`
+											const warm_white = [255, 238, 203]
+											const wp = led[3] / 255
+											const white = `rgba(${warm_white[0] * wp}, ${warm_white[1] * wp}, ${warm_white[2] * wp}, ${wp})`
+											const mix = `color-mix(in srgb, ${color} ${100 - wp * 50}%, ${white} ${wp * 50}%)`
 											return (
 												<div
 													key={i}
 													className="flex"
-													style={{ border: "1px solid #fff2", borderRadius: "0.25rem", overflow: "hidden" }}
+													style={{
+														borderRadius: "0.25rem",
+														width: "3.16rem",
+														height: "2rem",
+														overflow: "hidden",
+													}}
 												>
 													<div
 														style={{
 															width: "2rem",
 															height: "2rem",
-															background: `color-mix(in srgb, ${color}, ${white})`,
+															//background: `color-mix(in srgb, ${color} ${100 - wp * 50}%, ${white} ${wp * 50}%)`,
+															background: color,
 														}}
-													></div>
+													>
+														{i}
+													</div>
 													<div
 														style={{
 															width: "1rem",
@@ -131,7 +152,7 @@ function App() {
 									</div>
 
 									<div>
-										<StripeEditor stripe={stripe} />
+										<StripeEditor stripe={stripe} updateStripe={s => updateStripes([s])} />
 									</div>
 								</div>
 							</StripeBox>
@@ -148,12 +169,12 @@ function App() {
 	)
 }
 
-function Color(props: { selected: Color; onChange: (color: Color) => void }) {
+function Color(props: { selected: TColor; onChange: (color: TColor) => void }) {
 	function colorChange(index: number) {
 		return function (e) {
 			const value = parseInt(e.target.value)
 
-			const color = [...props.selected] as Color
+			const color = [...props.selected] as TColor
 			color[index] = value
 
 			props.onChange(color)
@@ -175,3 +196,21 @@ function Color(props: { selected: Color; onChange: (color: Color) => void }) {
 }
 
 root.render(<App />)
+
+function Find() {
+	const [search, setSearch] = useState("192.168.")
+
+	function find() {
+		getWS()!.send({
+			type: "find",
+			ip: search,
+		})
+	}
+
+	return (
+		<div>
+			FIND: <input type="text" value={search} onChange={e => setSearch(e.target.value)} />
+			<button onClick={find}>OK</button>
+		</div>
+	)
+}

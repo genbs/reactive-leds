@@ -1,14 +1,12 @@
-import { Color, EWSRequestByteType } from "@shared"
-import { mat2, mat3, mat4, vec2, vec3, vec4 } from "gl-matrix"
-import store from "./store"
-import { Stripe } from "./Stripe"
+import { EWSRequestByteType, TColor, TStripe } from "@shared"
+
 import WS from "./ws"
 
 class Core {
 	rafid: number
 	startTimestamp: number
 	global: Record<string, any>
-	stripes: Map<Stripe["id"], Stripe>
+	stripes: Map<TStripe["device"]["id"], TStripe & { code: string }>
 	ws: WS
 
 	constructor() {
@@ -17,15 +15,6 @@ class Core {
 		this.global = {}
 
 		Object.getOwnPropertyNames(Math).forEach(key => (this.global[key] = Math[key]))
-		this.global["vec2"] = vec2
-		this.global["vec3"] = vec3
-		this.global["vec4"] = vec4
-		this.global["mat2"] = mat2
-		this.global["mat3"] = mat3
-		this.global["mat4"] = mat4
-
-		this.global["uvec3"] = (x = 0, y = x, z = y) => vec3.fromValues(x, y, z)
-		this.global["uvec4"] = (x = 0, y = x, z = y, w = z) => vec4.fromValues(x, y, z, w)
 	}
 
 	stop() {
@@ -41,10 +30,8 @@ class Core {
 		const delta = time - this.startTimestamp
 		this.startTimestamp = time
 		const fps = 1000 / delta
-
 		for (const stripe of stripes) {
 			if (!stripe.code) continue
-
 			const code = this.generateCode(stripe.code)
 			let fn: Function
 			try {
@@ -57,45 +44,39 @@ class Core {
 				console.log(fn.toString())
 				return fn
 			}
-
-			const data: Uint8Array = new Uint8Array(1 /* message_type */ + 1 /* stripe_id */ + stripe.num_leds * 5)
+			const data: Uint8Array = new Uint8Array(1 /* message_type */ + 1 /* stripe_id */ + stripe.device.num_leds * 5)
 			data[0] = EWSRequestByteType.SetLEDs
-			data[1] = stripe.id
-			for (let i = 0; i < stripe.num_leds; i++) {
+			data[1] = stripe.device.id
+			for (let i = 0; i < stripe.device.num_leds; i++) {
 				const led = {
 					index: i,
-					offset: (i + 1) / stripe.num_leds,
+					offset: (i + 1) / stripe.device.num_leds,
 					color: stripe.leds.slice(i * 4, i * 4 + 4),
 				}
-
-				const result = fn(led, time, stripe.leds, stripe.num_leds)
+				const result = fn(led, time, stripe.leds, stripe.device.num_leds)
 				if (result instanceof Error) {
 					console.log(result.toString())
 					return result
 				}
-
 				const evalResult = this.evalResult(result).map(this.sanitize)
 				//console.log(result, evalResult)
 				stripe.leds[i * 4] = evalResult[0]
 				stripe.leds[i * 4 + 1] = evalResult[1]
 				stripe.leds[i * 4 + 2] = evalResult[2]
 				stripe.leds[i * 4 + 3] = evalResult[3]
-
 				data[i * 5 + 2] = i
 				data[i * 5 + 3] = evalResult[0]
 				data[i * 5 + 4] = evalResult[1]
 				data[i * 5 + 5] = evalResult[2]
 				data[i * 5 + 6] = evalResult[3]
 			}
-
 			this.ws?.send(data)
 		}
-		store.updateStripes(stripes)
 
 		this.rafid = requestAnimationFrame(this.loop)
 	}
 
-	evalResult(result: any): Color {
+	evalResult(result: any): TColor {
 		// console.log(i, result, led.color, led.offset)
 		if (typeof result === "string") {
 			// string(hex, hsl, rgb) to color [r, g, b, w]
@@ -128,9 +109,9 @@ class Core {
 		this.rafid = requestAnimationFrame(this.loop)
 	}
 
-	setStripes(stripes: Stripe[]) {
+	setStripes(stripes: (TStripe & { code: string })[]) {
 		for (const stripe of stripes) {
-			this.stripes.set(stripe.id, stripe)
+			this.stripes.set(stripe.device.id, stripe)
 		}
 
 		this.start()

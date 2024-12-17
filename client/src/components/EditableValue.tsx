@@ -69,7 +69,7 @@ export default function EditableValue<T extends string | number>(props: Editable
 
 			return () => window.removeEventListener("keydown", handleKeyDown)
 		}
-	}, [editing, ref.current])
+	}, [editing, ref.current, value])
 
 	return (
 		<span className="editable-value-container" ref={ref} onClick={() => !editing && setEditing(true)}>

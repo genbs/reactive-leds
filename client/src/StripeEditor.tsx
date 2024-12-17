@@ -1,10 +1,11 @@
 import { useRef, useState } from "react"
-import useStripes from "./hooks/useStripes"
-import { Stripe } from "./Stripe"
+
+import { TStripe } from "@shared"
 import { style } from "./utils"
 
 interface StripeEditorProps {
-	stripe: Stripe
+	stripe: TStripe & { code: string }
+	updateStripe: (stripe: TStripe & { code: string }) => void
 }
 
 style(`
@@ -32,11 +33,10 @@ style(`
 export default function StripeEditor(props: StripeEditorProps) {
 	const textareaRef = useRef<HTMLTextAreaElement>(null)
 	const [code, setCode] = useState(props.stripe.code)
-	const [stripes, updateStripe] = useStripes()
 
 	function updateCode() {
 		if (isValidCode(code)) {
-			updateStripe([{ ...props.stripe, code: code.trim() }])
+			props.updateStripe({ ...props.stripe, code: code.trim() })
 		}
 	}
 
@@ -62,7 +62,7 @@ export default function StripeEditor(props: StripeEditorProps) {
 	}
 
 	const snippets = [
-		{ label: `index (0-${props.stripe.num_leds})`, code: "led.index" },
+		{ label: `index (0-${props.stripe.device.num_leds})`, code: "led.index" },
 		{ label: "offset (0-1)", code: "led.offset" },
 		{ label: "prev color ([r,g,b,w])", code: "led.color" },
 		{ label: "time", code: "time" },

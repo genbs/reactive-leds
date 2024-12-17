@@ -12,7 +12,7 @@ import {
 } from "./types"
 
 class Protocol {
-	static PING_TIMEOUT = 100
+	static PING_TIMEOUT = 300
 	static GET_CONFIG_TIMEOUT = 500
 	static SET_CONFIG_TIMEOUT = 200
 
@@ -58,7 +58,7 @@ class Protocol {
 			id: data[2],
 			num_leds: data[3],
 			brightness: data[4],
-			hostname: data.slice(5).toString().replace(/\0/g, ""),
+			hostname: String.fromCharCode(...data.slice(5)).replace(/\0/g, ""),
 		}
 	}
 
@@ -81,7 +81,7 @@ class Protocol {
 				config.id,
 				config.num_leds,
 				config.brightness,
-				...Buffer.from(config.hostname),
+				...bufferFromString(config.hostname),
 			],
 			Protocol.SET_CONFIG_TIMEOUT
 		)
@@ -175,6 +175,7 @@ class Protocol {
 		// from 1 to 255 with modulo (0 is reserved for empty message)
 		this.requestID = (this.requestID % 255) + 1
 
+		logger.debug(`[Request:${this.requestID}] Sending ${MessageTypeString[type]} to ${ip}:${port}`, data)
 		const requestID = this.requestID
 		const message = new Uint8Array([requestID, type, ...(data || [])])
 		let closeTimeout: NodeJS.Timeout
@@ -213,3 +214,11 @@ class Protocol {
 const proto = new Protocol()
 
 export default proto
+
+function bufferFromString(str: string): Uint8Array {
+	const buffer = new Uint8Array(str.length)
+	for (let i = 0; i < str.length; i++) {
+		buffer[i] = str.charCodeAt(i)
+	}
+	return buffer
+}
