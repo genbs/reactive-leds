@@ -9,17 +9,15 @@ const webSocketService = new WebSocketService(8080)
 
 stripeService.on("onUpdate", () => {
 	sendStripesToClients()
-
-	//esp.blink()
 })
 
 webSocketService.on("onClientConnect", ws => {
-	logger.info(`Client Connected`)
+	logger.debug(`Client Connected`)
 	sendStripesToClients()
 })
 
 webSocketService.on("onClientDisconnect", ws => {
-	logger.info(`Client Disconnected`)
+	logger.debug(`Client Disconnected`)
 	sendStripesToClients()
 })
 
@@ -38,7 +36,6 @@ webSocketService.on("onMessage", (request, ws) => {
 			case EWSRequestByteType.Blink: {
 				const stripe = stripeService.byID(request[1])
 				if (stripe) stripe.device.blink()
-
 				break
 			}
 		}
@@ -49,8 +46,8 @@ webSocketService.on("onMessage", (request, ws) => {
 				break
 			case "update_stripe":
 				const stripe = stripeService.byID(request.id)
-				logger.info("update_stripe", request.id, stripe)
-				stripe && stripe.update(stripe)
+				logger.debug("update_stripe", request.id, stripe)
+				stripe && stripe.update(request.data)
 				break
 			case "find":
 				logger.info("find", request.ip)

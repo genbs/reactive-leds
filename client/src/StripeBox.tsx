@@ -47,7 +47,6 @@ style(`
 
 export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 	const color = stripe.color ? stripe.color : [120, 120, 120, 255]
-
 	const hex = `#${color
 		.slice(0, 3)
 		.map(c => c.toString(16).padStart(2, "0"))
@@ -62,13 +61,13 @@ export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 	return (
 		<div
 			style={{
-				borderColor: stripe.colorHex,
-				color: stripe.colorHex,
+				borderColor: hex,
+				color: hex,
 			}}
 			className="stripe-box"
 		>
 			<div className="flex flex--v-center gap">
-				<div style={{ borderColor: stripe.colorHex }} className="stripe-box__id">
+				<div style={{ borderColor: hex }} className="stripe-box__id">
 					<EditableValue
 						value={stripe.device.id}
 						onChange={id => onChange({ ...stripe, device: { ...stripe.device, id } })}
@@ -84,7 +83,7 @@ export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 						type="color"
 						render={value => <div className="stripe-box__color" style={{ background: value }}></div>}
 					/>
-					{stripe.name}
+					<EditableValue value={stripe.name} onChange={name => onChange({ ...stripe, name })} type="text" />
 					(
 					<EditableValue
 						value={stripe.device.num_leds}

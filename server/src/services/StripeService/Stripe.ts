@@ -27,7 +27,6 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 
 		this.name = options.name
 		this.color = options.color
-		this.colorHex = options.colorHex
 		this.orientation = options.orientation
 		this.leds = new Uint8Array(device.num_leds * 4)
 
@@ -44,7 +43,6 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 	async update(data: Partial<TStripe>) {
 		this.name = data.name || this.name
 		this.color = data.color || this.color
-		this.colorHex = data.colorHex || this.colorHex
 		this.leds =
 			this.device.num_leds !== data.device?.num_leds ? this.leds.slice(0, data.device.num_leds * 4) : this.leds
 		this.orientation = data.orientation || this.orientation
@@ -74,7 +72,6 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 		return {
 			name: this.name,
 			color: this.color,
-			colorHex: this.colorHex,
 			orientation: this.orientation,
 			device: this.device.toObject(),
 			leds: this.leds,

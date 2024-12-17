@@ -43,7 +43,6 @@ export default class StripeService extends EventEmitter<StripeServiceEvents> {
 			const stripe = new Stripe(device, {
 				name: device.hostname,
 				color: [0, 0, 0, 0],
-				colorHex: "#000000",
 				device,
 			})
 
@@ -67,12 +66,19 @@ export default class StripeService extends EventEmitter<StripeServiceEvents> {
 			loaded++
 		})
 
-		logger.info("Loaded stripes", loaded)
+		logger.info(`${loaded} Stripes loaded.`)
 	}
 
 	save() {
-		fs.writeFileSync("stripes.json", JSON.stringify(this.stripes.map(stripe => stripe.toJSON())))
+		fs.writeFileSync(
+			"stripes.json",
+			JSON.stringify(
+				this.stripes.map(stripe => stripe.toJSON()),
+				null,
+				4
+			)
+		)
 
-		logger.info("Saved stripes")
+		logger.info("Stripes laved.")
 	}
 }

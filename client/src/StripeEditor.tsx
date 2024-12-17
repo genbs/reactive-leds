@@ -68,8 +68,13 @@ export default function StripeEditor(props: StripeEditorProps) {
 		{ label: "time", code: "time" },
 	]
 
+	const hex = `#${props.stripe.color
+		.slice(0, 3)
+		.map(c => c.toString(16).padStart(2, "0"))
+		.join("")}`
+
 	return (
-		<div className="flex flex--column gap editor" style={{ ["--color" as string]: props.stripe.colorHex }}>
+		<div className="flex flex--column gap editor" style={{ ["--color" as string]: hex }}>
 			<div>
 				<div className="flex flex-columns gap">
 					{snippets.map(({ label, code }, i) => (
@@ -83,8 +88,8 @@ export default function StripeEditor(props: StripeEditorProps) {
 			<textarea
 				ref={textareaRef}
 				style={{
-					borderColor: props.stripe.colorHex,
-					color: props.stripe.colorHex,
+					borderColor: hex,
+					color: hex,
 				}}
 				className="editor__textarea"
 				value={code}

@@ -1,1 +1,19 @@
-[{"name":"genbs_v3","color":[0,0,0,0],"colorHex":"#000000","device":{"address":"192.168.1.101","hostname":"genbs_v3","port":4210,"online":false,"lastPing":0},"leds":{}}]
+[
+    {
+        "name": "genbs_v3",
+        "color": [
+            0,
+            0,
+            0,
+            0
+        ],
+        "device": {
+            "address": "192.168.1.101",
+            "hostname": "genbs_v3",
+            "port": 4210,
+            "online": false,
+            "lastPing": 0
+        },
+        "leds": {}
+    }
+]

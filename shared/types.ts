@@ -28,7 +28,6 @@ export enum EStripeOrientation {
 export type TStripe = {
 	name: string
 	color: TColor
-	colorHex: string
 	leds: Uint8Array // [r, g, b, w, r, g, b, w, ...]
 	orientation?: EStripeOrientation
 

@@ -48,7 +48,10 @@ export default function EditableValue<T extends string | number>(props: Editable
 	const [value, setValue] = useState<T>(props.value)
 	const ref = createRef<HTMLSpanElement>()
 
-	useEffect(() => setValue(props.value), [props.value])
+	useEffect(() => {
+		setValue(props.value)
+		setEditing(false)
+	}, [props.value])
 
 	useClickOutside(ref, () => setEditing(false))
 
