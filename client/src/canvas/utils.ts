@@ -1,5 +1,6 @@
 import { EStripeOrientation, TStripe, TStripeMap } from "@shared"
 import { TMap } from "src/context"
+import { stripeToRect } from "src/lib"
 
 export function drawCells(ctx: CanvasRenderingContext2D, gridSize: [number, number]) {
 	const width = ctx.canvas.width
@@ -79,7 +80,7 @@ function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: n
 	const stripeMap = stripe.map
 
 	const { direction } = angleArrowMap[stripeMap.orientation]
-	const rect = stripeRect(stripe)
+	const rect = stripeToRect(stripe)
 
 	ctx.strokeStyle = `rgba(${color.join(",")})`
 	ctx.lineWidth = 2
@@ -108,34 +109,8 @@ function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: n
 	ctx.fillText(direction, (x1 + x2) / 2, (y1 + y2) / 2)
 }
 
-export function stripeRect(stripe: TStripe) {
-	const [scaleX, scaleY] = stripe.map.scale
-	const x = stripe.map.x
-	const y = stripe.map.y
-	const lengthX = stripe.device.num_leds * scaleX
-	const lengthY = stripe.device.num_leds * scaleY
-
-	switch (stripe.map.orientation) {
-		case EStripeOrientation.Horizontal:
-			// Orientamento orizzontale verso destra
-			return { x1: x, y1: y, x2: x + lengthX, y2: y + scaleY }
-
-		case EStripeOrientation.Vertical:
-			// Orientamento verticale verso il basso
-			return { x1: x, y1: y, x2: x + scaleX, y2: y + lengthY }
-
-		case EStripeOrientation.HorizontalReverse:
-			// Orientamento orizzontale verso sinistra
-			return { x1: x - lengthX, y1: y, x2: x, y2: y + scaleY }
-
-		case EStripeOrientation.VerticalReverse:
-			// Orientamento verticale verso l'alto
-			return { x1: x, y1: y - lengthY, x2: x + scaleX, y2: y }
-	}
-}
-
 export function isInsideStripe(cell: number, row: number, stripe: TStripe) {
-	const rect = stripeRect(stripe)
+	const rect = stripeToRect(stripe)
 
 	if (cell >= rect.x1 && cell <= rect.x2 && row >= rect.y1 && row <= rect.y2) {
 		return true
