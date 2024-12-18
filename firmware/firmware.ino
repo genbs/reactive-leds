@@ -40,7 +40,6 @@ void setup()
 
 	FS_begin();
 	config_begin();
-
 	strip_start();
 
 	if (WiFiAutoConnect())
@@ -50,7 +49,8 @@ void setup()
 
 		udp_begin();
 
-		strip_set_color_immediate(0, 0, 255, 0);
+		strip_set_color_immediate(0, 0, 0, 255);
+		strip_set_color_immediate(1, 0, 0, 255);
 
 		ota_begin();
 	}
@@ -65,6 +65,8 @@ void setup()
 
 void loop()
 {
+	ota_loop();
+
 	if (mode == RunMode::AP)
 	{
 		dnsServer.processNextRequest();
@@ -75,8 +77,6 @@ void loop()
 #if ESP8226
 	MDNS.update();
 #endif
-
-	ota_loop();
 
 	udp_read();
 }

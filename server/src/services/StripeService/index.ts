@@ -19,7 +19,9 @@ export default class StripeService extends EventEmitter<StripeServiceEvents> {
 		this.espService = new ESPService()
 
 		this.espService.on("espConnect", client => {
-			this.add(client)
+			this.add({
+				device: client,
+			})
 		})
 	}
 
@@ -33,35 +35,39 @@ export default class StripeService extends EventEmitter<StripeServiceEvents> {
 		return this.stripes.find(stripe => stripe.device.id === id)
 	}
 
-	add(device: ESPClient) {
+	byIP(ip: ESPClient["address"]) {
+		return this.stripes.find(stripe => stripe.device.address === ip)
+	}
+
+	add(stripe: Partial<TStripe> & { device: ESPClient }) {
 		if (
 			!this.stripes.find(
-				stripe =>
-					stripe.device.address === device.address && device.lastPing - Date.now() < ESPClient.MAX_LAST_PING_TIME
+				s =>
+					s.device.address === stripe.device.address &&
+					stripe.device.lastPing - Date.now() < ESPClient.MAX_LAST_PING_TIME
 			)
 		) {
-			const stripe = new Stripe(device, {
-				name: device.hostname,
-				color: [0, 0, 0, 0],
-				device,
-			})
+			const device = this.espService.add(stripe.device)
+			const newStripe = new Stripe(device, stripe)
 
-			this.stripes.push(stripe)
-			stripe.on("onUpdate", stripe => this.emit("onUpdate", stripe))
-			this.save()
+			this.stripes.push(newStripe)
+			newStripe.on("onUpdate", stripe => this.emit("onUpdate", stripe))
 		}
 	}
 
 	load() {
+		if (!fs.existsSync("stripes.json")) {
+			fs.writeFileSync("stripes.json", "[]")
+		}
+
 		const data = fs.readFileSync("stripes.json", "utf8") || "[]"
 		const stripes = JSON.parse(data)
 		let loaded = 0
 
 		stripes.forEach((JSONStripe: TStripe) => {
-			if (JSONStripe.device.lastPing - Date.now() > ESPClient.MAX_LAST_PING_TIME) return
+			// if (JSONStripe.device.lastPing - Date.now() > ESPClient.MAX_LAST_PING_TIME) return
 
-			const device = this.espService.add(JSONStripe.device.address, JSONStripe.device.port, JSONStripe.device.hostname)
-			this.add(device)
+			this.add(JSONStripe as TStripe & { device: ESPClient })
 
 			loaded++
 		})
@@ -73,12 +79,15 @@ export default class StripeService extends EventEmitter<StripeServiceEvents> {
 		fs.writeFileSync(
 			"stripes.json",
 			JSON.stringify(
-				this.stripes.map(stripe => stripe.toJSON()),
+				this.stripes.map(stripe => {
+					const { leds, ...rest } = stripe.toJSON()
+					return rest
+				}),
 				null,
 				4
 			)
 		)
 
-		logger.info("Stripes laved.")
+		logger.info("Stripes saved.")
 	}
 }

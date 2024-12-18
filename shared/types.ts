@@ -14,7 +14,6 @@ export interface TConfig {
 export interface TESP extends TConfig {
 	address: string
 	online: boolean
-	color?: TColor
 	lastPing: number
 }
 
@@ -25,11 +24,20 @@ export enum EStripeOrientation {
 	HorizontalReverse = 3, // from right to left
 }
 
+export type TStripeMap = {
+	orientation?: EStripeOrientation
+	x: number
+	y: number
+	scale: [number, number]
+	visible: boolean
+}
+
 export type TStripe = {
 	name: string
 	color: TColor
 	leds: Uint8Array // [r, g, b, w, r, g, b, w, ...]
-	orientation?: EStripeOrientation
+
+	map: TStripeMap
 
 	device: TESP
 }
@@ -49,7 +57,7 @@ export enum EWSRequestByteType {
 // Request from browser client to server
 export type TWSRequestJSONFindDevice = { type: "find"; ip: string }
 export type TWSRequestJSONGetStripe = { type: "get_stripe" }
-export type TWSRequestJSONUpdateStripe = { type: "update_stripe"; data: Omit<TStripe, "leds">; id: number }
+export type TWSRequestJSONUpdateStripe = { type: "update_stripe"; data: Omit<TStripe, "leds">; ip: TESP["address"] }
 
 /**
  * [EWSRequestByteType.SetLEDs, Stripe['id'], led_index, r, g, b, w, led_index, r, g, b, w, ...]

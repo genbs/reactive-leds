@@ -1,5 +1,5 @@
 import BonjourService from "@services/Bonjur"
-import { EventEmitter, logger } from "@shared"
+import { EventEmitter, logger, TESP } from "@shared"
 
 import { ESPClient } from "./ESPClient"
 
@@ -28,25 +28,26 @@ export default class ESPService extends EventEmitter<ESPServiceEvents> {
 
 			const port = await ESPService.findDeviceUDPPort(device.address)
 			if (port) {
-				this.add(device.address, port, device.host)
+				this.add({
+					address: device.address,
+					port,
+					hostname: device.name,
+				})
 			}
 		})
 
 		logger.info("ESPService started")
 	}
 
-	public add(address: string, port: number, host?: string) {
-		if (this.clients.has(address)) return this.clients.get(address)
+	public add(esp: Partial<TESP> & { address: TESP["address"] }) {
+		if (this.clients.has(esp.address)) return this.clients.get(esp.address)
 
-		const client = new ESPClient(address, port, host)
+		const client = new ESPClient(esp)
 		client.on("onConnect", () => this.emit("espConnect", client))
 		client.on("onDisconnect", () => this.emit("espDisconnect", client))
-		this.clients.set(address, client)
-		return client
-	}
+		this.clients.set(esp.address, client)
 
-	public get(id: ESPClient["id"]) {
-		return this.clients.values().find(client => client.id === id)
+		return client
 	}
 
 	async find(address: string, port?: number) {
@@ -61,7 +62,11 @@ export default class ESPService extends EventEmitter<ESPServiceEvents> {
 			return
 		}
 
-		return this.add(address, openPort, address)
+		return this.add({
+			address,
+			port: openPort,
+			hostname: address,
+		})
 	}
 
 	static async findDeviceUDPPort(

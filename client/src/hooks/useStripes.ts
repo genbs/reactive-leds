@@ -14,7 +14,6 @@ export default function useStripes(ws?: WS) {
 
 			const { event, data } = JSON.parse(message) as TWSResponse
 			if (event === "get_stripe") {
-				console.log("get_stripe", data)
 				setStripes(
 					data.map(stripe => {
 						return {
@@ -29,16 +28,19 @@ export default function useStripes(ws?: WS) {
 	}, [ws])
 
 	function updateStripes(newStripes) {
-		console.log("updateStripes", newStripes)
-		setStripes(
-			stripes.map(stripe => {
-				const newStripe = newStripes.find(newStripe => newStripe.device.id === stripe.device.id)
-				if (newStripe) {
-					return newStripe
-				}
-				return stripe
-			})
-		)
+		const updated = [...stripes]
+
+		for (const newStripe of newStripes) {
+			const index = updated.findIndex(stripe => stripe.device.id === newStripe.device.id)
+
+			if (index === -1) {
+				updated.push(newStripe)
+			} else {
+				updated[index] = newStripe
+			}
+		}
+
+		setStripes(updated)
 	}
 
 	return [stripes, updateStripes] as const

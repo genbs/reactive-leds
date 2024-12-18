@@ -39,6 +39,7 @@ type EditableValueProps<T> = {
 	onChange: (value: T) => void
 	min?: number
 	max?: number
+	step?: number
 	type: "number" | "text" | "color"
 	render?(value: T): React.ReactNode
 }
@@ -82,9 +83,15 @@ export default function EditableValue<T extends string | number>(props: Editable
 						className="editable-value editable-value--editing"
 						type={props.type}
 						value={value}
-						onChange={e => setValue((typeof props.value === "number" ? parseInt(e.target.value) : e.target.value) as T)}
+						onChange={e =>
+							setValue((typeof props.value === "number" ? parseFloat(e.target.value) : e.target.value) as T)
+						}
 						min={props.min}
 						max={props.max}
+						step={props.step}
+						style={{
+							width: `${value.toString().length + 3}ch`,
+						}}
 					/>
 
 					<span className="editable-button" onClick={() => props.onChange(value)}>

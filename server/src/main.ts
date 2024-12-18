@@ -9,6 +9,8 @@ const webSocketService = new WebSocketService(8080)
 
 stripeService.on("onUpdate", () => {
 	sendStripesToClients()
+
+	stripeService.save()
 })
 
 webSocketService.on("onClientConnect", ws => {
@@ -45,8 +47,8 @@ webSocketService.on("onMessage", (request, ws) => {
 				sendStripesToClients()
 				break
 			case "update_stripe":
-				const stripe = stripeService.byID(request.id)
-				logger.debug("update_stripe", request.id, stripe)
+				const stripe = stripeService.byIP(request.ip)
+				logger.debug("update_stripe", request.ip, stripe)
 				stripe && stripe.update(request.data)
 				break
 			case "find":
@@ -70,9 +72,3 @@ function sendStripesToClients() {
 		data: stripeService.stripes.map(stripe => stripe.toJSON()),
 	})
 }
-
-const mock = false
-if (mock) {
-}
-
-//bridge.ESPService.find("192.168.1.142", 4210)

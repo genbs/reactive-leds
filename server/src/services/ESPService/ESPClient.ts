@@ -11,10 +11,8 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements TESP {
 	static CHECK_ALIVE_INTERVAL = 10000
 	static MAX_LAST_PING_TIME = 30000
 
-	public name: string
 	public address: string
 	public online = false
-
 	public port: number
 	public id: number
 	public num_leds: number
@@ -33,12 +31,16 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements TESP {
 
 	private checkAlive = true
 
-	constructor(address: string, port: number, host?: string, checkAlive = true) {
+	constructor(device: Partial<TESP>, checkAlive = true) {
 		super()
 
-		this.port = port
-		this.address = address
-		this.hostname = host
+		this.address = device.address
+		this.port = device.port
+		this.id = device.id
+		this.num_leds = device.num_leds
+		this.hostname = device.hostname
+		this.brightness = device.brightness
+
 		this.online = false
 		this.checkAlive = checkAlive
 
@@ -90,11 +92,11 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements TESP {
 	 * Set the device configuration.
 	 */
 	async setConfig(config: Partial<ProtocolBoardConfig>) {
-		config.brightness = config.brightness || this.brightness
-		config.num_leds = config.num_leds || this.num_leds
-		config.port = config.port || this.port
-		config.id = config.id || this.id
-		config.hostname = config.hostname || this.hostname
+		config.brightness = config.brightness ?? this.brightness
+		config.num_leds = config.num_leds ?? this.num_leds
+		config.port = config.port ?? this.port
+		config.id = config.id ?? this.id
+		config.hostname = config.hostname ?? this.hostname
 
 		if (await proto.setConfig(this.address, this.port, config as ProtocolBoardConfig)) {
 			Object.assign(this, config)
@@ -135,7 +137,7 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements TESP {
 	}
 
 	toString() {
-		return `ESPClient [${this.id}] ${this.name}@${this.hostname} | ${this.address}:${this.port} | ${
+		return `ESPClient [${this.id}] ${this.hostname} | ${this.address}:${this.port} | ${
 			this.online ? "online" : "offline"
 		}`
 	}

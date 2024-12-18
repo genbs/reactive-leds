@@ -46,6 +46,8 @@ void config_begin()
     config.id = FS_read_uint("/config", "id", config.id);
     config.num_leds = FS_read_uint("/config", "num_leds", config.num_leds);
     config.brightness = FS_read_uint("/config", "brightness", config.brightness);
+
+    config_print();
 }
 
 bool config_store()

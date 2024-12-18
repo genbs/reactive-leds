@@ -1,6 +1,6 @@
 import { EWSRequestByteType, TColor, TStripe } from "@shared"
 
-import WS from "./ws"
+import WS from "../ws"
 
 class Core {
 	rafid: number

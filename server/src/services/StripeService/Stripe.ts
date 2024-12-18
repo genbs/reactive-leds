@@ -1,14 +1,22 @@
 import { ESPClient } from "@services/ESPService/ESPClient"
-import { EventEmitter, TColor, TStripe } from "@shared"
+import { EStripeOrientation, EventEmitter, TColor, TStripe, TStripeMap } from "@shared"
 
 type StripeServiceEvents = {
 	onUpdate: (stripe: Stripe) => void
 }
 
+const default_map: TStripeMap = {
+	x: 0,
+	y: 0,
+	scale: [1, 1],
+	visible: true,
+	orientation: EStripeOrientation.VerticalReverse,
+}
+
 export default class Stripe extends EventEmitter<StripeServiceEvents> implements TStripe {
 	name: string
 	colorHex: string
-	orientation?: number
+	map: TStripeMap
 	color: TColor
 	device: ESPClient
 
@@ -20,21 +28,22 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 	 */
 	leds: Uint8Array
 
-	constructor(device: ESPClient, options: Omit<TStripe, "leds">) {
+	constructor(device: ESPClient, options: Partial<Omit<TStripe, "leds">>) {
 		super()
 
 		this.device = device
 
 		this.name = options.name
 		this.color = options.color
-		this.orientation = options.orientation
+		this.map = { ...default_map, ...(options.map || {}) }
+
 		this.leds = new Uint8Array(device.num_leds * 4)
 
 		this.device.on("onConnect", () => {
-			const num_leds = this.device.num_leds
-			const new_leds = new Uint8Array(num_leds * 4)
+			const new_leds = new Uint8Array(this.device.num_leds * 4)
 			new_leds.set(this.leds)
 			this.leds = new_leds
+
 			this.emit("onUpdate", this)
 		})
 		this.device.on("onDisconnect", () => this.emit("onUpdate", this))
@@ -45,7 +54,8 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 		this.color = data.color || this.color
 		this.leds =
 			this.device.num_leds !== data.device?.num_leds ? this.leds.slice(0, data.device.num_leds * 4) : this.leds
-		this.orientation = data.orientation || this.orientation
+		this.map = { ...this.map, ...data.map }
+
 		if (data.device && (await this.device.setConfig(data.device))) {
 			this.emit("onUpdate", this)
 			return true
@@ -72,9 +82,9 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 		return {
 			name: this.name,
 			color: this.color,
-			orientation: this.orientation,
 			device: this.device.toObject(),
 			leds: this.leds,
+			map: this.map,
 		}
 	}
 

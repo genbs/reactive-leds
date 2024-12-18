@@ -2,18 +2,59 @@
     {
         "name": "genbs_v3",
         "color": [
-            0,
-            0,
-            0,
-            0
+            226,
+            151,
+            64,
+            255
         ],
         "device": {
+            "id": 1,
             "address": "192.168.1.101",
             "hostname": "genbs_v3",
             "port": 4210,
+            "num_leds": 16,
             "online": false,
             "lastPing": 0
         },
-        "leds": {}
+        "map": {
+            "x": 31,
+            "y": 32,
+            "scale": [
+                1,
+                1
+            ],
+            "visible": true,
+            "orientation": 2,
+            "rotation": 3
+        }
+    },
+    {
+        "name": "genbs_v4",
+        "color": [
+            203,
+            21,
+            197,
+            255
+        ],
+        "device": {
+            "id": 2,
+            "address": "192.168.1.102",
+            "hostname": "genbs_v4",
+            "port": 4210,
+            "num_leds": 16,
+            "online": false,
+            "lastPing": 0
+        },
+        "map": {
+            "x": 8,
+            "y": 20,
+            "scale": [
+                1,
+                1
+            ],
+            "visible": true,
+            "orientation": 2,
+            "rotation": 3
+        }
     }
 ]
