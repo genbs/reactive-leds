@@ -45,6 +45,7 @@ const initialState = localStorage.getItem("state")
 
 export default function Root() {
 	const [stripes, setStripes] = useState<TStripe[]>([])
+	const [lastStripes, setLastStripes] = useState<TStripe[]>([])
 	const [map, setMap] = useState<TMap>(initialState.map)
 	const [connected, setConnected] = useState(false)
 
@@ -62,7 +63,12 @@ export default function Root() {
 	const context: TAppContext = {
 		stripes,
 		updateStripe: (stripe: TStripe) => {
-			setStripes(prev => prev.map(s => (s.device.address === stripe.device.address ? stripe : s)))
+			setStripes(prev => {
+				const newStripes = prev.map(s => (s.device.id === stripe.device.id ? stripe : s))
+				if (newStripes !== prev) return newStripes
+
+				return prev
+			})
 		},
 		map,
 		updateMap: map => {
@@ -75,6 +81,8 @@ export default function Root() {
 
 	useEffect(() => {
 		const timeout = setTimeout(() => {
+			if (JSON.stringify(stripes) === JSON.stringify(lastStripes)) return
+			setLastStripes(stripes)
 			stripes.forEach(stripe => {
 				ws.send({
 					type: "update_stripe",
@@ -85,7 +93,7 @@ export default function Root() {
 		}, 300)
 
 		return () => clearTimeout(timeout)
-	}, [stripes])
+	}, [stripes, lastStripes])
 
 	const handleWsMessage = useCallback((message: any) => {
 		if (typeof message !== "string") return

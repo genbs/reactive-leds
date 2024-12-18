@@ -17,14 +17,14 @@
             "lastPing": 0
         },
         "map": {
-            "x": 20,
+            "x": 4,
             "y": 19,
             "scale": [
                 1,
                 1
             ],
             "visible": true,
-            "orientation": 3,
+            "orientation": 1,
             "rotation": 3
         }
     },
@@ -46,14 +46,14 @@
             "lastPing": 0
         },
         "map": {
-            "x": 19,
-            "y": 20,
+            "x": 17,
+            "y": 0,
             "scale": [
-                1,
-                1
+                1.5,
+                1.5
             ],
             "visible": true,
-            "orientation": 2,
+            "orientation": 0,
             "rotation": 3
         }
     }
