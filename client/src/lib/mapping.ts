@@ -1,5 +1,9 @@
 import { EStripeOrientation, TStripe } from "@shared"
 
+/**
+ * return oriented and scaled bounding
+ * @param stripe TStripe
+ */
 export function stripeToRect(stripe: TStripe) {
 	const [scaleX, scaleY] = stripe.map.scale
 	const x = stripe.map.x
@@ -22,6 +26,15 @@ export function stripeToRect(stripe: TStripe) {
 	}
 }
 
+/**
+ *
+ * @param data Uint8Array (image)
+ * @param dataSize [number, number] image size
+ * @param mpaGrid [number, number] pixelation
+ * @param stripe TStripe
+ *
+ * @returns {pixels, width, height}
+ */
 export function mapStripeOnData(
 	data: Uint8Array,
 	dataSize: [number, number],

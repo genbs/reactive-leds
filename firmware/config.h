@@ -4,7 +4,7 @@ struct Config
     char password[32]; // hidden in the web interface, use for AP / OTA
     unsigned int port;
     unsigned short id;
-    unsigned short num_leds;
+    unsigned short num_leds; // max 60
     unsigned short brightness;
 };
 

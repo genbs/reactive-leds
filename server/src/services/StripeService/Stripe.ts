@@ -41,7 +41,7 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 
 		this.device.on("onConnect", () => {
 			const new_leds = new Uint8Array(this.device.num_leds * 4)
-			new_leds.set(this.leds)
+			new_leds.set(this.leds.subarray(0, this.device.num_leds * 4))
 			this.leds = new_leds
 
 			this.emit("onUpdate", this)

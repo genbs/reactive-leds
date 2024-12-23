@@ -18,6 +18,7 @@ void handle_ap_config(AsyncWebServerRequest *request)
                 Password: <input type="password" name="password"><br>
                 Hostname: <input type="text" name="hostname" value="genbs_led"><br>
                 Id: <input type="number" name="id" value="0"><br>
+                numLeds: <input type="number" name="numLeds" value="16"><br>
                 <input type="submit" value="Salva">
             </form>
         </html>
@@ -26,7 +27,7 @@ void handle_ap_config(AsyncWebServerRequest *request)
 
 void handle_ap_save(AsyncWebServerRequest *request)
 {
-    if (request->hasParam("ssid", true) && request->hasParam("password", true) && request->hasParam("hostname", true) && request->hasParam("id", true))
+    if (request->hasParam("ssid", true) && request->hasParam("password", true) && request->hasParam("hostname", true) && request->hasParam("id", true) && request->hasParam("numLeds", true))
     {
         String ssid = request->getParam("ssid", true)->value();
         String password = request->getParam("password", true)->value();
@@ -38,6 +39,7 @@ void handle_ap_save(AsyncWebServerRequest *request)
             config.hostname[sizeof(config.hostname) - 1] = '\0';
 
             config.id = request->getParam("id", true)->value().toInt();
+            config.num_leds = request->getParam("numLeds", true)->value().toInt();
 
             if (config_store())
             {
@@ -91,7 +93,8 @@ void APModeStart()
     webServer.on("/", HTTP_GET, handle_ap_config);
     webServer.on("/save", HTTP_POST, handle_ap_save);
     webServer.onNotFound([](AsyncWebServerRequest *request)
-                         { request->redirect("http://192.168.4.1"); });
+                         { request->redirect(
+                               "http://" + WiFi.softAPIP().toString() + "/"); });
 
     webServer.begin();
 }

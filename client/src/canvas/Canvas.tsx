@@ -1,15 +1,16 @@
 import { TStripe, TStripeMap } from "@shared"
 import { useEffect, useRef } from "react"
+import { render } from "src/lib/rendering"
 import { TMap } from "../context"
 import useClientRect from "../hooks/useClientRect"
 import { style } from "../utils"
 import { useMap } from "./useMap"
-import { render } from "./utils"
 
 interface CanvasProps {
 	map: TMap
 	stripes: TStripe[]
 	updateStripe: (stripe: TStripe) => void
+	image: { data: Uint8Array; size: [number, number] } | null
 }
 
 style(`
@@ -45,7 +46,7 @@ export default function Canvas(props: CanvasProps) {
 		canvasRef.current.addEventListener("mouseup", mapEvents.onMouseUp)
 		canvasRef.current.addEventListener("click", mapEvents.onClick)
 
-		rid = requestAnimationFrame(() => render(ctx, props.map, props.stripes))
+		rid = requestAnimationFrame(() => render(ctx, props.map, props.stripes, props.image))
 
 		return () => {
 			cancelAnimationFrame(rid)
@@ -54,11 +55,11 @@ export default function Canvas(props: CanvasProps) {
 			canvasRef.current?.removeEventListener("mousemove", mapEvents.onMouseMove)
 			canvasRef.current?.removeEventListener("mouseup", mapEvents.onMouseUp)
 		}
-	}, [canvasRef.current, ref.current, rect, props.stripes, props.map.gridSize, mapEvents])
+	}, [canvasRef.current, ref.current, rect, props.stripes, props.map.gridSize, mapEvents, props.image])
 
 	return (
-		<div ref={ref} className="canvas" style={{ height: "50vh" }}>
-			{rect && <canvas ref={canvasRef} width={rect.width} height={rect.height} />}
+		<div ref={ref} className="canvas">
+			{rect && <canvas className="expand" ref={canvasRef} width={rect.width} height={rect.height} />}
 		</div>
 	)
 }

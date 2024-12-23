@@ -1,10 +1,8 @@
 #pragma GCC optimize("O3")
 #pragma GCC optimize("unroll-loops")
 #pragma GCC optimize("fast-math")
-// #pragma GCC optimize("-fno-exceptions")
-// #pragma GCC optimize ("-fexceptions")
 
-#define SERIAL_DEBUG true
+#define SERIAL_DEBUG
 
 #ifdef SERIAL_DEBUG
 #define DEBUG_PRINT(x) Serial.print(x)
@@ -16,12 +14,12 @@
 #define DEBUG_PRINTF(x, y)
 #endif
 
-#include "./fs.hpp"
+#include "fs.hpp"
 #include "config.h"
-#include "./wifi/wifi.hpp"
+#include "wifi/wifi.hpp"
 #include "mDNS.hpp"
-#include "./strip.hpp"
-#include "./protocol/protocol.hpp"
+#include "strip.hpp"
+#include "protocol/protocol.hpp"
 #include "ota.hpp"
 
 enum RunMode
@@ -49,8 +47,8 @@ void setup()
 
 		udp_begin();
 
-		strip_set_color_immediate(0, 0, 0, 255);
-		strip_set_color_immediate(1, 0, 0, 255);
+		strip_set_color_immediate(0, 0, 255, 0);
+		strip_set_color_immediate(1, 0, 255, 0);
 
 		ota_begin();
 	}
@@ -65,14 +63,14 @@ void setup()
 
 void loop()
 {
-	ota_loop();
-
 	if (mode == RunMode::AP)
 	{
 		dnsServer.processNextRequest();
 
 		return;
 	}
+  
+  ota_loop();
 
 #if ESP8226
 	MDNS.update();

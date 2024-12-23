@@ -1,4 +1,4 @@
-import { EventEmitter, EWSPayloadType } from "@shared"
+import { EventEmitter, EWSPayloadType, TWSRequest, TWSResponse } from "@shared"
 
 const WS_RECONNECTION_TIMEOUT = 5000
 const WS_RECONNECTION_MAX_RETRIES = 5
@@ -21,7 +21,7 @@ const defaultSettings: Partial<WSSettings> = {
 	shouldReconnect: true,
 }
 
-export default class WS<TRecv = any, TSend = Uint8Array | object> extends EventEmitter<WSEvents<TRecv>> {
+export default class WS extends EventEmitter<WSEvents<TWSResponse>> {
 	private retries = 0
 	public settings: WSSettings
 	public connected: boolean
@@ -84,7 +84,7 @@ export default class WS<TRecv = any, TSend = Uint8Array | object> extends EventE
 		this.socket?.close()
 	}
 
-	public send(payload: Uint8Array | TSend) {
+	public send(payload: TWSRequest) {
 		if (!this.socket) {
 			this.log("Error: not connected, can't send message")
 			return

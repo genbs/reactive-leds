@@ -10,7 +10,11 @@ echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210
 Print result in hex
 
 ```bash
+# blink
 echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210 | hexdump -C
+
+# set led 1 to red
+echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210 | hexdump -C
 ```
 
 or
@@ -24,3 +28,12 @@ echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210 | xxd -p
 ```bash
 dns-sd -B _http._tcp local
 ```
+
+### Problems
+
+```
+assert failed: tcp_alloc /IDF/components/lwip/lwip/src/core/tcp.c:1851 (Required to lock TCPIP core functionality!)
+```
+
+resolved with install 3.0.7 version of ESP32 core:
+https://forum.arduino.cc/t/asyncwebserver-is-no-longer-working-crashing-with-esp32-s3-wroom/1334021/5

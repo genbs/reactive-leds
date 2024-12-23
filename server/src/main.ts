@@ -48,8 +48,13 @@ webSocketService.on("onMessage", (request, ws) => {
 				break
 			case "update_stripe":
 				const stripe = stripeService.byIP(request.ip)
-				logger.debug("update_stripe", request.ip, stripe)
-				stripe && stripe.update(request.data)
+				//logger.debug("update_stripe", request.ip, stripe)
+				console.log("update_stripe", request.ip, stripe)
+				// stripe.device.setConfig({
+				// 	...stripe.device,
+				// 	num_leds: 30,
+				// })
+				//stripe && stripe.update(request.data)
 				break
 			case "find":
 				logger.info("find", request.ip)

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { TStripe, TWSResponse } from "@shared"
-import WS from "src/ws"
+import WS from "src/lib/websocket"
 
 export default function useStripes(ws?: WS) {
 	const [stripes, setStripes] = useState<(TStripe & { code: string })[]>([])

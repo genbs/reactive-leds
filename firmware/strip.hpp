@@ -1,8 +1,12 @@
 #include <Adafruit_NeoPixel.h>
-Adafruit_NeoPixel strip(16, 4, NEO_WRGB + NEO_KHZ800);
+
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(config.num_leds, 4, NEO_WRGB + NEO_KHZ800);
 
 void strip_start()
 {
+    strip.setPin(4);
+    strip.updateLength(config.num_leds);
+    strip.updateType(NEO_WRGB + NEO_KHZ800);
     strip.begin();
     strip.setBrightness(config.brightness);
 

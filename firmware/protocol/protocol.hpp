@@ -155,7 +155,7 @@ void protocol_set_leds(uint8_t message_id, byte *packet, int len)
                                 g,
                                 b, w);
 
-            DEBUG_PRINTLN("Set color " + String(u) + " = r: " + String(r) + ", g: " + String(g) + ", b:" + String(b) + ", w:" + String(w));
+            // DEBUG_PRINTLN("Set color " + String(u) + " = r: " + String(r) + ", g: " + String(g) + ", b:" + String(b) + ", w:" + String(w));
         }
     }
 

@@ -1,36 +1,19 @@
-import { TStripe, TWSRequest, TWSResponse } from "@shared"
+import { TStripe, TWSResponse } from "@shared"
 import { useCallback, useEffect, useRef, useState } from "react"
 import Canvas from "./canvas/Canvas"
 import AppContext, { TAppContext, TMap } from "./context"
-import Preview from "./preview/Preview"
+import Debug from "./Debug"
+import WS from "./lib/websocket"
 import Sidebar from "./sidebar/Sidebar"
 import { hslToColor } from "./utils"
-import WS from "./ws"
 
 function App(props: TAppContext) {
-	const width = 100
-	const height = 100
-	const data = new Uint8Array(width * height * 4)
-
-	for (let i = 0; i < height; i++) {
-		for (let j = 0; j < width; j++) {
-			const index = (i * width + j) * 4
-
-			const [r, g, b, a] = hslToColor(i + j, (i * j) / (width * height), 0.5)
-
-			data[index] = r
-			data[index + 1] = g
-			data[index + 2] = b
-			data[index + 3] = a
-		}
-	}
+	return <Debug ws={props.ws} />
 
 	return (
 		<main style={{ display: "grid", gridTemplateColumns: "3fr 1fr", height: "100%" }}>
-			<div style={{ display: "grid", gridTemplateRows: "1fr 1fr", height: "100%" }}>
-				<Canvas map={props.map} stripes={props.stripes} updateStripe={props.updateStripe} />
-				<Preview map={props.map} stripes={props.stripes} data={data} dataSize={[width, height]} />
-			</div>
+			<Canvas {...props} />
+			{/* {props.data && <Preview map={props.map} stripes={props.stripes} data={data} dataSize={[width, height]} />} */}
 
 			<Sidebar {...props} />
 		</main>
@@ -44,6 +27,7 @@ const initialState = localStorage.getItem("state")
 	  }
 
 export default function Root() {
+	const [image, setImage] = useState<{ data: Uint8Array; size: [number, number] } | null>(null)
 	const [stripes, setStripes] = useState<TStripe[]>([])
 	const [lastStripes, setLastStripes] = useState<TStripe[]>([])
 	const [map, setMap] = useState<TMap>(initialState.map)
@@ -51,7 +35,7 @@ export default function Root() {
 
 	// Usa un useRef per mantenere una singola istanza di WS
 	const wsRef = useRef(
-		new WS<TWSResponse, TWSRequest>({
+		new WS({
 			url: "ws://localhost:8080",
 			debug: false,
 			autoConnect: false,
@@ -77,6 +61,7 @@ export default function Root() {
 		},
 		ws,
 		connected,
+		image,
 	}
 
 	useEffect(() => {
@@ -123,6 +108,58 @@ export default function Root() {
 			ws.off("connectionChange", handleConnectionChange)
 		}
 	}, [ws, handleWsMessage, handleConnectionChange])
+
+	////////////////////////
+
+	useEffect(() => {
+		let rid = 0
+		const width = 500
+		const height = 500
+
+		function createImage(time) {
+			const data = new Uint8Array(width * height * 4)
+
+			for (let i = 0; i < height; i++) {
+				for (let j = 0; j < width; j++) {
+					const index = (i * width + j) * 4
+					const iOffset = (i + 1) / height
+					const jOffset = (j + 1) / width
+
+					const angle = Math.atan2(iOffset, jOffset)
+					const angle2 = Math.atan(jOffset / iOffset)
+					let center = [Math.sin(time * 0.001), Math.cos(time * 0.001)]
+					let distance = Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2)
+
+					center = [Math.sin(time * 0.0008), Math.cos(time * 0.0008)]
+					distance = distance + Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2) * 2
+
+					const [r, g, b, a] = hslToColor(
+						i + j / angle + distance * 20,
+						//((i * j) / (width * height)) * Math.cos(time * 0.001) ** 2,
+						1,
+						0.5
+					)
+
+					data[index] = r
+					data[index + 1] = g
+					data[index + 2] = b
+					data[index + 3] = a
+				}
+			}
+
+			setImage({ data, size: [width, height] })
+
+			rid = requestAnimationFrame(createImage)
+		}
+
+		rid = requestAnimationFrame(createImage)
+
+		return () => {
+			cancelAnimationFrame(rid)
+		}
+	}, [])
+
+	////////////////////////
 
 	return (
 		<AppContext.Provider value={context}>
