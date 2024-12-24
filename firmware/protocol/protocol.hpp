@@ -9,6 +9,12 @@ const unsigned long updateInterval = 1000 / 120; // milliseconds, 120Hz
 uint8_t *packet;
 int max_packet_size = 1 + 1 + 5 * config.num_leds;
 
+size_t buffer_size = config.num_leds * 5;
+uint8_t *led_buffer;
+uint8_t *new_led_buffer;
+volatile bool update_in_progress = false;
+volatile bool new_data_available = false;
+
 void udp_begin()
 {
     if (udp.begin(config.port) != 1)
@@ -24,51 +30,61 @@ void udp_begin()
     max_packet_size = 1 + 1 + 5 * config.num_leds;
     packet = (uint8_t *)malloc(max_packet_size);
 
-    udp.setTimeout(updateInterval);
+    buffer_size = config.num_leds * 5;
+    led_buffer = (uint8_t *)ps_malloc(buffer_size);
+    new_led_buffer = (uint8_t *)ps_malloc(buffer_size);
+    if (!led_buffer || !new_led_buffer)
+    {
+        DEBUG_PRINTLN("Failed to allocate memory for LED buffer");
+    }
+
+    memset(led_buffer, 0, buffer_size);
+    memset(new_led_buffer, 0, buffer_size);
+
+    // udp.setTimeout(updateInterval);
 }
 
 void udp_read()
 {
-    while (true)
+    int packetSize = udp.parsePacket();
+    if (packetSize)
     {
-        int packetSize = udp.parsePacket();
-        if (packetSize)
+        int len = udp.read(packet, max_packet_size);
+
+        if (len >= 2)
         {
-            int len = udp.read(packet, max_packet_size);
+            uint8_t message_id = packet[0];
+            uint8_t message_type = packet[1];
 
-            if (len >= 2)
+            switch (message_type)
             {
-                uint8_t message_id = packet[0];
-                uint8_t message_type = packet[1];
+            case PING:
+                protocol_ping(message_id);
+                break;
+            case GET_CONFIG:
+                protocol_get_config(message_id);
+                break;
+            case SET_CONFIG:
+                protocol_set_config(message_id, packet, len);
+                break;
+            case SET_LEDS:
+                protocol_set_leds(message_id, packet, len);
+                break;
+            case BLINK:
+                protocol_blink(message_id, packet, len);
+                break;
 
-                switch (message_type)
-                {
-                case PING:
-                    protocol_ping(message_id);
-                    break;
-                case GET_CONFIG:
-                    protocol_get_config(message_id);
-                    break;
-                case SET_CONFIG:
-                    protocol_set_config(message_id, packet, len);
-                    break;
-                case SET_LEDS:
-                    protocol_set_leds(message_id, packet, len);
-                    break;
-                case BLINK:
-                    protocol_blink(message_id, packet, len);
-                    break;
-
-                default:
-                    DEBUG_PRINTLN("Unknown message type");
-                    break;
-                }
+            default:
+                DEBUG_PRINTLN("Unknown message type");
+                break;
             }
-
-            vTaskDelay(1 / portTICK_PERIOD_MS);
-            // udp.clear();
         }
+
+        // vTaskDelay(1 / portTICK_PERIOD_MS);
+        //  udp.clear();
     }
+
+    update_leds();
 }
 
 void protocol_ping(uint8_t message_id)
@@ -138,45 +154,49 @@ void protocol_set_config(uint8_t message_id, byte *packet, int len)
 
 void protocol_set_leds(uint8_t message_id, byte *packet, int len)
 {
-    for (int i = 2; i < len; i += 5)
+    if (len < 2 + buffer_size)
     {
-        uint8_t u = packet[i];
-
-        if (u < config.num_leds)
-        {
-
-            uint8_t r = packet[i + 1];
-            uint8_t g = packet[i + 2];
-            uint8_t b = packet[i + 3];
-            float w = packet[i + 4];
-
-            strip.setPixelColor(u,
-                                r,
-                                g,
-                                b, w);
-
-            // DEBUG_PRINTLN("Set color " + String(u) + " = r: " + String(r) + ", g: " + String(g) + ", b:" + String(b) + ", w:" + String(w));
-        }
+        DEBUG_PRINTLN("Invalid SET_LEDS packet");
+        return;
     }
 
-    uint8_t status = 0;
-    if (millis() - lastUpdateTime >= updateInterval)
-    {
-        strip.show();
-        lastUpdateTime = millis();
-        status = 1;
-        DEBUG_PRINTLN("SET_LEDS: Updated");
-    }
-    else
-    {
-        DEBUG_PRINTLN("SET_LEDS: Skip update");
-    }
+    memcpy(new_led_buffer, &packet[2], buffer_size);
+
+    new_data_available = true;
 
     udp.beginPacket(udp.remoteIP(), udp.remotePort());
     udp.write(message_id);
     udp.write(SET_LEDS);
-    udp.write(status);
+    udp.write(1);
     udp.endPacket();
+}
+
+void update_leds()
+{
+    if (update_in_progress)
+        return;
+
+    update_in_progress = true;
+
+    if (new_data_available)
+    {
+        memcpy(led_buffer, new_led_buffer, buffer_size);
+        new_data_available = false;
+    }
+
+    for (int i = 0; i < buffer_size; i += 5)
+    {
+        uint8_t pi = led_buffer[i];
+        uint8_t r = led_buffer[i + 1];
+        uint8_t g = led_buffer[i + 2];
+        uint8_t b = led_buffer[i + 3];
+        uint8_t w = led_buffer[i + 4];
+
+        strip.setPixelColor(pi, r, g, b, w);
+    }
+
+    strip.show();
+    update_in_progress = false;
 }
 
 void protocol_blink(uint8_t message_id, byte *packet, int len)

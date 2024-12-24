@@ -1,14 +1,14 @@
 [
     {
         "device": {
-            "id": 1,
-            "address": "192.168.1.121",
-            "hostname": "genbs_led_1",
+            "id": 3,
+            "address": "192.168.1.4",
+            "hostname": "genbs_led_v1",
             "port": 4210,
             "brightness": 255,
-            "num_leds": 30,
-            "online": false,
-            "lastPing": 1734921795785
+            "num_leds": 15,
+            "online": true,
+            "lastPing": 1734998531174
         },
         "map": {
             "x": 0,
@@ -18,7 +18,7 @@
                 1
             ],
             "visible": true,
-            "orientation": 0
+            "orientation": 2
         }
     }
 ]

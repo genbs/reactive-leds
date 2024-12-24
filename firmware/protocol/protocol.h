@@ -13,6 +13,7 @@ enum ProtocolMessageType
 void udp_begin();
 void udp_read();
 
+void update_leds();
 void protocol_ping(uint8_t message_id);
 void protocol_get_config(uint8_t message_id);
 void protocol_set_config(uint8_t message_id, byte *packet, int len);
