@@ -9,7 +9,7 @@
 DNSServer dnsServer;
 AsyncWebServer webServer(80);
 
-void handle_ap_config(AsyncWebServerRequest *request)
+void handle_ap_index(AsyncWebServerRequest *request)
 {
     request->send(200, "text/html", R"rawliteral(
         <html>
@@ -77,11 +77,12 @@ void WiFiConnectAP()
 
     WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
 
-    DEBUG_PRINTLN("");
-    DEBUG_PRINT("Started:\t");
+    DEBUG_PRINT("\nStarted:\t");
     DEBUG_PRINTLN(config.hostname);
     DEBUG_PRINT("IP address:\t");
     DEBUG_PRINTLN(WiFi.softAPIP());
+    DEBUG_PRINT("MAC address:\t");
+    DEBUG_PRINTLN(WiFi.softAPmacAddress());
 }
 
 void APModeStart()
@@ -90,7 +91,7 @@ void APModeStart()
 
     dnsServer.start(53, "*", WiFi.softAPIP());
 
-    webServer.on("/", HTTP_GET, handle_ap_config);
+    webServer.on("/", HTTP_GET, handle_ap_index);
     webServer.on("/save", HTTP_POST, handle_ap_save);
     webServer.onNotFound([](AsyncWebServerRequest *request)
                          { request->redirect(

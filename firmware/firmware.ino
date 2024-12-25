@@ -1,6 +1,10 @@
-#pragma GCC optimize("O3")
+#pragma GCC optimize("Ofast")
 #pragma GCC optimize("unroll-loops")
 #pragma GCC optimize("fast-math")
+
+// #pragma GCC optimize("no-exceptions")
+
+///////////////////////////
 
 #define SERIAL_DEBUG
 
@@ -14,21 +18,22 @@
 #define DEBUG_PRINTF(x, y)
 #endif
 
+///////////////////////////
+
 #include "fs.hpp"
 #include "config.h"
-#include "wifi/wifi.hpp"
+
+#include "wifi/WiFi.hpp"
+#include "wifi/AP.hpp"
 #include "mDNS.hpp"
+#include "OTA.hpp"
+
 #include "strip.hpp"
 #include "protocol/protocol.hpp"
-#include "ota.hpp"
 
-enum RunMode
-{
-	AP = 0,
-	NORMAL = 1
-};
+///////////////////////////
 
-RunMode mode = RunMode::NORMAL;
+bool apMode = false;
 
 void setup()
 {
@@ -38,43 +43,61 @@ void setup()
 
 	FS_begin();
 	config_begin();
-	strip_start();
+	strip_begin();
 
+	/**
+	 * Find wifi networks and connect to the first one that has a password stored in the FS
+	 */
 	if (WiFiAutoConnect())
 	{
-		mode = RunMode::NORMAL;
+		apMode = false;
+
+		strip.setPixelColor(0, 0, 255, 0);
+		strip.setPixelColor(1, 0, 255, 0);
+		strip.setPixelColor(2, 0, 255, 0);
+		strip.show();
+
+		OTA_begin();
 		InitMDNS();
 
-		udp_begin();
+		if (!protocol_begin())
+		{
+			strip.setPixelColor(0, 255, 127, 0);
+			strip.setPixelColor(1, 255, 127, 0);
+			strip.setPixelColor(2, 255, 127, 0);
+			strip.setPixelColor(4, 255, 127, 0);
+			strip.setPixelColor(5, 255, 127, 0);
+			strip.show();
 
-		strip_set_color_immediate(0, 0, 255, 0);
-		strip_set_color_immediate(1, 0, 255, 0);
-
-		ota_begin();
+			delay(2000);
+			ESP.restart();
+		}
 	}
 	else
 	{
-		mode = RunMode::AP;
-		APModeStart();
+		apMode = true;
 
-		strip_set_color_immediate(0, 255, 0, 0);
+		strip.setPixelColor(0, 255, 0, 0);
+		strip.show();
+
+		APModeStart();
 	}
 }
 
 void loop()
 {
-	if (mode == RunMode::AP)
+	if (apMode)
 	{
 		dnsServer.processNextRequest();
 
 		return;
 	}
-  
-  ota_loop();
 
-#if ESP8226
+	OTA_loop();
+
+#if ESP8266
 	MDNS.update();
 #endif
 
-	udp_read();
+	protocol_loop();
 }

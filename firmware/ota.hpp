@@ -1,11 +1,11 @@
-#ifdef ESP32
-#include "SPIFFS.h"
-#elif defined(ESP8266)
-#include <FS.h>
-#endif
+// #ifdef ESP32
+// #include "SPIFFS.h"
+// #elif defined(ESP8266)
+// #include <FS.h>
+// #endif
 #include <ArduinoOTA.h>
 
-void ota_begin()
+void OTA_begin()
 {
     ArduinoOTA.setHostname(config.hostname);
     ArduinoOTA.setPassword(config.password);
@@ -24,6 +24,7 @@ void ota_begin()
     ArduinoOTA.onError([](ota_error_t error)
                        {
         DEBUG_PRINTF("Error[%u]: ", error);
+        
         if (error == OTA_AUTH_ERROR) DEBUG_PRINTLN("Auth Failed");
         else if (error == OTA_BEGIN_ERROR) DEBUG_PRINTLN("Begin Failed");
         else if (error == OTA_CONNECT_ERROR) DEBUG_PRINTLN("Connect Failed");
@@ -31,10 +32,11 @@ void ota_begin()
         else if (error == OTA_END_ERROR) DEBUG_PRINTLN("End Failed"); });
 
     ArduinoOTA.begin();
+
     DEBUG_PRINTLN("OTA Ready");
 }
 
-void ota_loop()
+void OTA_loop()
 {
     ArduinoOTA.handle();
 }

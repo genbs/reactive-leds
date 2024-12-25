@@ -1,60 +1,55 @@
-#include <sys/_stdint.h>
+// #include <sys/_stdint.h>
 #include <WiFiUdp.h>
 #include "protocol.h"
 
-WiFiUDP udp;
-unsigned long lastUpdateTime = 0;
-const unsigned long updateInterval = 1000 / 120; // milliseconds, 120Hz
+#include "ping.hpp"
+#include "config.hpp"
+#include "leds.hpp"
+#include "blink.hpp"
 
-uint8_t *packet;
-int max_packet_size = 1 + 1 + 5 * config.num_leds;
+// const unsigned long updateInterval = 1000 / 144; // milliseconds, 144Hz
 
-size_t buffer_size = config.num_leds * 5;
-uint8_t *led_buffer;
-uint8_t *new_led_buffer;
-volatile bool update_in_progress = false;
-volatile bool new_data_available = false;
+size_t udp_packet_size = 1 + 1 + config.num_leds * 5; // message_id + message_type + max_message_size
+uint8_t *udp_packet;
 
-void udp_begin()
+bool protocol_begin()
 {
     if (udp.begin(config.port) != 1)
     {
         DEBUG_PRINTLN("Failed to bind UDP port");
-        return;
+        return false;
     }
     else
     {
         DEBUG_PRINTLN("Listen on UDP port: " + String(config.port));
     }
 
-    max_packet_size = 1 + 1 + 5 * config.num_leds;
-    packet = (uint8_t *)malloc(max_packet_size);
+    udp_packet_size = 1 + 1 + config.num_leds * 5;
+    udp_packet = (uint8_t *)malloc(udp_packet_size);
 
-    buffer_size = config.num_leds * 5;
-    led_buffer = (uint8_t *)ps_malloc(buffer_size);
-    new_led_buffer = (uint8_t *)ps_malloc(buffer_size);
-    if (!led_buffer || !new_led_buffer)
-    {
-        DEBUG_PRINTLN("Failed to allocate memory for LED buffer");
-    }
+    led_buffer_size = config.num_leds * 5;
+    led_buffer = (uint8_t *)malloc(led_buffer_size);
+    led_buffer_update = (uint8_t *)malloc(led_buffer_size);
 
-    memset(led_buffer, 0, buffer_size);
-    memset(new_led_buffer, 0, buffer_size);
+    memset(led_buffer, 0, led_buffer_size);
+    memset(led_buffer_update, 0, led_buffer_size);
 
     // udp.setTimeout(updateInterval);
+
+    return true;
 }
 
-void udp_read()
+void protocol_loop()
 {
-    int packetSize = udp.parsePacket();
+    // check for incoming data
+    size_t packetSize = udp.parsePacket();
     if (packetSize)
     {
-        int len = udp.read(packet, max_packet_size);
-
-        if (len >= 2)
+        size_t read_len = udp.read(udp_packet, udp_packet_size);
+        if (read_len >= 2)
         {
-            uint8_t message_id = packet[0];
-            uint8_t message_type = packet[1];
+            uint8_t message_id = udp_packet[0];
+            uint8_t message_type = udp_packet[1];
 
             switch (message_type)
             {
@@ -65,174 +60,22 @@ void udp_read()
                 protocol_get_config(message_id);
                 break;
             case SET_CONFIG:
-                protocol_set_config(message_id, packet, len);
+                protocol_set_config(message_id, udp_packet, read_len);
                 break;
             case SET_LEDS:
-                protocol_set_leds(message_id, packet, len);
+                protocol_set_leds(message_id, udp_packet, read_len);
                 break;
             case BLINK:
-                protocol_blink(message_id, packet, len);
+                protocol_blink(message_id, udp_packet, read_len);
                 break;
-
             default:
                 DEBUG_PRINTLN("Unknown message type");
                 break;
             }
         }
 
-        // vTaskDelay(1 / portTICK_PERIOD_MS);
-        //  udp.clear();
+        udp.clear();
     }
 
     update_leds();
-}
-
-void protocol_ping(uint8_t message_id)
-{
-    udp.beginPacket(udp.remoteIP(), udp.remotePort());
-    udp.write(message_id);
-    udp.write(PING);
-    udp.endPacket();
-
-    DEBUG_PRINTLN("PING");
-}
-
-void protocol_get_config(uint8_t message_id)
-{
-    udp.beginPacket(udp.remoteIP(), udp.remotePort());
-    udp.write(message_id);
-    udp.write(GET_CONFIG);
-    udp.write((config.port >> 8) & 0xFF);
-    udp.write(config.port & 0xFF);
-    udp.write(config.id);
-    udp.write(config.num_leds);
-    udp.write(config.brightness);
-    udp.write((uint8_t *)config.hostname, strlen(config.hostname));
-    udp.endPacket();
-
-    DEBUG_PRINTLN("GET_CONFIG");
-}
-
-void protocol_set_config(uint8_t message_id, byte *packet, int len)
-{
-    if (len < 3)
-    {
-        DEBUG_PRINTLN("Invalid SET_CONFIG packet");
-        return;
-    }
-
-    config.port = (packet[2] << 8) | packet[3];
-    config.id = packet[4];
-    config.num_leds = packet[5];
-    config.brightness = packet[6];
-
-    uint8_t hostname_length = len - 7;
-    if (hostname_length >= sizeof(config.hostname))
-    {
-        hostname_length = sizeof(config.hostname) - 1;
-    }
-    memcpy(config.hostname, &packet[7], hostname_length);
-    config.hostname[hostname_length] = '\0';
-
-    udp.beginPacket(udp.remoteIP(), udp.remotePort());
-    udp.write(message_id);
-    udp.write(SET_CONFIG);
-    if (config_store())
-    {
-        udp.write(1);
-        DEBUG_PRINTLN("SET_CONFIG: Configuration saved successfully. Restarting in 2 seconds.");
-        delay(2000);
-        ESP.restart();
-    }
-    else
-    {
-        udp.write(0);
-        DEBUG_PRINTLN("SET_CONFIG: Configuration save failed.");
-    }
-    udp.endPacket();
-}
-
-void protocol_set_leds(uint8_t message_id, byte *packet, int len)
-{
-    if (len < 2 + buffer_size)
-    {
-        DEBUG_PRINTLN("Invalid SET_LEDS packet");
-        return;
-    }
-
-    memcpy(new_led_buffer, &packet[2], buffer_size);
-
-    new_data_available = true;
-
-    udp.beginPacket(udp.remoteIP(), udp.remotePort());
-    udp.write(message_id);
-    udp.write(SET_LEDS);
-    udp.write(1);
-    udp.endPacket();
-}
-
-void update_leds()
-{
-    if (update_in_progress)
-        return;
-
-    update_in_progress = true;
-
-    if (new_data_available)
-    {
-        memcpy(led_buffer, new_led_buffer, buffer_size);
-        new_data_available = false;
-    }
-
-    for (int i = 0; i < buffer_size; i += 5)
-    {
-        uint8_t pi = led_buffer[i];
-        uint8_t r = led_buffer[i + 1];
-        uint8_t g = led_buffer[i + 2];
-        uint8_t b = led_buffer[i + 3];
-        uint8_t w = led_buffer[i + 4];
-
-        strip.setPixelColor(pi, r, g, b, w);
-    }
-
-    strip.show();
-    update_in_progress = false;
-}
-
-void protocol_blink(uint8_t message_id, byte *packet, int len)
-{
-    if (len < 13)
-    {
-        DEBUG_PRINTLN("Invalid BLINK packet");
-        return;
-    }
-
-    DEBUG_PRINTLN("BLINK");
-
-    uint8_t count = config.id;
-    uint8_t base_color[4] = {packet[2], packet[3], packet[4], packet[5]};
-    uint8_t blink_color[4] = {packet[6], packet[7], packet[8], packet[9]};
-    uint8_t blink_count = packet[10];
-    uint8_t blink_delay = packet[11] << 8 | packet[12];
-
-    for (int repeat = 0; repeat < blink_count; repeat++)
-    {
-        for (int i = 0; i < config.num_leds; i++)
-        {
-            if (i < count)
-                strip.setPixelColor(i, base_color[0], base_color[1], base_color[2], base_color[3]);
-            else
-                strip.setPixelColor(i, 0, 0, 0, 0);
-        }
-        strip.show();
-        delay(blink_delay);
-
-        for (int i = 0; i < count; i++)
-        {
-            strip.setPixelColor(i, blink_color[0], blink_color[1], blink_color[2], blink_color[3]);
-            strip.show();
-            delay(500);
-        }
-        delay(blink_delay);
-    }
 }

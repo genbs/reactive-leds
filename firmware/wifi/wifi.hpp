@@ -4,7 +4,7 @@
 #include <WiFi.h>
 #endif
 
-#include "ap.hpp"
+#define WIFI_CONNECT_TIMEOUT 20000
 
 bool WiFiConnect(const char *ssid, const char *password)
 {
@@ -17,18 +17,19 @@ bool WiFiConnect(const char *ssid, const char *password)
         delay(100);
         DEBUG_PRINT('.');
 
-        if (millis() > start + 10000)
+        if (millis() > start + WIFI_CONNECT_TIMEOUT)
         {
-            DEBUG_PRINTLN("Connection failed");
+            DEBUG_PRINTLN("WiFi Connection failed");
             return false;
         }
     }
 
-    DEBUG_PRINTLN("");
-    DEBUG_PRINT("Connected:\t");
+    DEBUG_PRINTF("\nConnected to network: %s\n", ssid);
     DEBUG_PRINTLN(ssid);
     DEBUG_PRINT("IP address:\t");
     DEBUG_PRINTLN(WiFi.localIP());
+    DEBUG_PRINT("MAC address:\t");
+    DEBUG_PRINTLN(WiFi.macAddress());
 
     WiFi.setSleep(false); // "performance" mode
 
