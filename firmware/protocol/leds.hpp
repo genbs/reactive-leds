@@ -1,19 +1,19 @@
 
-size_t led_buffer_size = config.num_leds * 5;
-uint8_t *led_buffer;
 uint8_t *led_buffer_update;
-
 bool led_update_available = false;
 
-void protocol_set_leds(uint8_t message_id, uint8_t *packet, size_t len)
+void protocol_set_leds(AsyncUDPPacket *packet)
 {
+    uint8_t *data = packet->data();
+    size_t len = packet->length();
+
     if (len < 2 + led_buffer_size)
     {
         DEBUG_PRINTLN("Invalid SET_LEDS packet");
         return;
     }
 
-    memcpy(led_buffer_update, &packet[2], led_buffer_size);
+    memcpy(led_buffer_update, &data[2], led_buffer_size);
 
     led_update_available = true;
 }
@@ -53,6 +53,8 @@ void update_leds()
 
     if (leds_updated > 0)
     {
+        DEBUG_PRINTF("Updated %d LEDs\n", leds_updated);
+
         strip.show();
     }
 

@@ -61,7 +61,7 @@ export default class WebSocketService extends EventEmitter<WebSocketServiceEvent
 	 * @returns
 	 */
 	send(data: TWSResponse, client?: WebSocket) {
-		logger.debug("[WebSocketService] Sending message", data)
+		// logger.debug("[WebSocketService] Sending message", data)
 		const message: string | Uint8Array = data instanceof Uint8Array ? data : JSON.stringify(data)
 
 		if (client) return client.send(message)

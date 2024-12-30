@@ -30,7 +30,7 @@ export function stripeToRect(stripe: TStripe) {
  *
  * @param data Uint8Array (image)
  * @param dataSize [number, number] image size
- * @param mpaGrid [number, number] pixelation
+ * @param mapGrid [number, number] pixelation
  * @param stripe TStripe
  *
  * @returns {pixels, width, height}
@@ -38,11 +38,11 @@ export function stripeToRect(stripe: TStripe) {
 export function mapStripeOnData(
 	data: Uint8Array,
 	dataSize: [number, number],
-	mpaGrid: [number, number],
+	mapGrid: [number, number],
 	stripe: TStripe
 ): { pixels: Uint8Array; width: number; height: number } {
 	const [imgWidth, imgHeight] = dataSize
-	const [cells, rows] = mpaGrid
+	const [cells, rows] = mapGrid
 	const { x1, y1, x2, y2 } = stripeToRect(stripe)
 
 	const cellCountX = (x2 - x1) / stripe.map.scale[0]

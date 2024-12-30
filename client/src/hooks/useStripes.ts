@@ -31,7 +31,7 @@ export default function useStripes(ws?: WS) {
 		const updated = [...stripes]
 
 		for (const newStripe of newStripes) {
-			const index = updated.findIndex(stripe => stripe.device.id === newStripe.device.id)
+			const index = updated.findIndex(stripe => stripe.device.address === newStripe.device.address)
 
 			if (index === -1) {
 				updated.push(newStripe)

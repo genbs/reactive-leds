@@ -6,8 +6,6 @@
 
 ///////////////////////////
 
-#define SERIAL_DEBUG
-
 #ifdef SERIAL_DEBUG
 #define DEBUG_PRINT(x) Serial.print(x)
 #define DEBUG_PRINTLN(x) Serial.println(x)
@@ -27,6 +25,7 @@
 #include "wifi/AP.hpp"
 #include "mDNS.hpp"
 #include "OTA.hpp"
+#include "bluetooth.hpp"
 
 #include "strip.hpp"
 #include "protocol/protocol.hpp"
@@ -45,6 +44,9 @@ void setup()
 	config_begin();
 	strip_begin();
 
+	strip.setPixelColor(0, 0, 0, 255);
+  strip.show();
+  
 	/**
 	 * Find wifi networks and connect to the first one that has a password stored in the FS
 	 */
@@ -62,15 +64,17 @@ void setup()
 
 		if (!protocol_begin())
 		{
-			strip.setPixelColor(0, 255, 127, 0);
-			strip.setPixelColor(1, 255, 127, 0);
-			strip.setPixelColor(2, 255, 127, 0);
-			strip.setPixelColor(4, 255, 127, 0);
-			strip.setPixelColor(5, 255, 127, 0);
+			strip.setPixelColor(0, 255, 0, 0);
+			strip.setPixelColor(1, 255, 0, 0);
+			strip.setPixelColor(2, 255, 0, 0);
 			strip.show();
 
 			delay(2000);
 			ESP.restart();
+		}
+		else
+		{
+			DEBUG_PRINTLN("Start successfully.");
 		}
 	}
 	else
@@ -81,6 +85,7 @@ void setup()
 		strip.show();
 
 		APModeStart();
+		bluetooth_begin();
 	}
 }
 

@@ -1,3 +1,4 @@
+#include "esp32-hal.h"
 #ifdef ESP8266
 #include <ESP8266WiFi.h>
 #else
@@ -12,7 +13,7 @@ bool WiFiConnect(const char *ssid, const char *password)
     WiFi.begin(ssid, password);
 
     unsigned long start = millis();
-    while (WiFi.status() != WL_CONNECTED)
+    while (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
         delay(100);
         DEBUG_PRINT('.');
@@ -39,6 +40,7 @@ bool WiFiConnect(const char *ssid, const char *password)
 bool WiFiAutoConnect()
 {
     WiFi.mode(WIFI_STA);
+    delay(200);
 
     DEBUG_PRINTLN("Scan Wi-Fi networks...");
 
@@ -64,7 +66,7 @@ bool WiFiAutoConnect()
                 else
                 {
                     DEBUG_PRINTLN("Failed to connect to network: " + ssid);
-                    FS_remove("/wifi", ssid.c_str());
+                    //FS_remove("/wifi", ssid.c_str());
                 }
             }
         }

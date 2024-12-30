@@ -26,8 +26,17 @@ echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210 | xxd -p
 ### Show host on network
 
 ```bash
-dns-sd -B _http._tcp local
+dns-sd -B _http._tcp local # mdns
+nmap -sn 192.168.1.0/24 # arp
+
 ```
+
+### Arduino Conf
+
+per l'esp32s3 selezionare
+
+- PSRAM: OPI PSRAM
+- Partition Scheme: 8MB
 
 ### Problems
 

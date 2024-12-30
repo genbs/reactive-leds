@@ -140,7 +140,7 @@ function drawStripe(
 			const g = leds.pixels[i + 1]
 			const b = leds.pixels[i + 2]
 
-			const x0 = x * cellWidth + x1
+			const x0 = reverse ? (leds.width - x - 1) * cellWidth + x1 : x * cellWidth + x1
 			const y0 = reverse ? (leds.height - y - 1) * cellHeight + y1 : y * cellHeight + y1
 
 			ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 255)`
@@ -150,7 +150,6 @@ function drawStripe(
 
 			// draw pixel index
 			ctx.fillStyle = "black"
-			//const index = reverse ? leds.pixels.length / 4 - i / 4 : i / 4
 			const index = i / 4
 			ctx.fillText(`${index}`, x0 + 5 + pd, y0 + 5 + pd)
 		}

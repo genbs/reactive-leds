@@ -30,6 +30,9 @@
         "webpack-dev-server": "^5.1.0"
     },
     "dependencies": {
+        "@types/react": "19.0.2",
+        "@types/react-dom": "19.0.2",
+        "@types/web-bluetooth": "^0.0.20",
         "bonjour": "^3.5.0",
         "gl-matrix": "^3.4.3",
         "react": "^19.0.0",

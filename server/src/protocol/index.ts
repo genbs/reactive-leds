@@ -12,9 +12,9 @@ import {
 } from "./types"
 
 class Protocol {
-	static PING_TIMEOUT = 300
-	static GET_CONFIG_TIMEOUT = 500
-	static SET_CONFIG_TIMEOUT = 200
+	static PING_TIMEOUT = 100
+	static GET_CONFIG_TIMEOUT = 200
+	static SET_CONFIG_TIMEOUT = 1000
 
 	private socket: dgram.Socket
 	private requestID: ProtocolRequestID = 1
@@ -85,7 +85,6 @@ class Protocol {
 			],
 			Protocol.SET_CONFIG_TIMEOUT
 		)
-
 		return response && response.length >= 2 && response[2] === 1
 	}
 
@@ -149,7 +148,7 @@ class Protocol {
 	private send(ip: string, port: number, type: ProtocolMessageType, data: number[] | Uint8Array) {
 		const message = new Uint8Array([EMPTY_MESSAGE_ID, type, ...data])
 
-		logger.debug(`Sending ${type} ${MessageTypeString[type]} to ${ip}:${port}`, message)
+		logger.debug(`\x1b[90m[Request (not sync)] Sending ${MessageTypeString[type]} to ${ip}:${port}\x1b[0m`, data)
 
 		this.socket.send(message, 0, message.length, port, ip, err => err && console.error(err))
 	}
@@ -174,8 +173,8 @@ class Protocol {
 	): Promise<ProtocolResponse | null> {
 		// from 1 to 255 with modulo (0 is reserved for empty message)
 		this.requestID = (this.requestID % 255) + 1
-
-		logger.debug(`[Request:${this.requestID}] Sending ${MessageTypeString[type]} to ${ip}:${port}`, data)
+		// grey text color
+		logger.debug(`\x1b[90m[Request:${this.requestID}] Sending ${MessageTypeString[type]} to ${ip}:${port}\x1b[0m`, data)
 		const requestID = this.requestID
 		const message = new Uint8Array([requestID, type, ...(data || [])])
 		let closeTimeout: NodeJS.Timeout
@@ -187,12 +186,22 @@ class Protocol {
 			const close = data => {
 				if (!active) return
 
-				logger.debug(
-					`[Request:${requestID}] Received ${MessageTypeString[type]} from ${ip}:${port} in ${
-						performance.now() - startTime
-					}ms`,
-					data
-				)
+				if (data) {
+					logger.debug(
+						// green text color
+						`\x1b[32m[Request:${requestID}] Received ${MessageTypeString[type]} from ${ip}:${port} in ${
+							performance.now() - startTime
+						}ms\x1b[0m`,
+						data
+					)
+				} else {
+					// yellow text color
+					logger.debug(
+						`\x1b[33m[Request:${requestID}] Timeout for ${MessageTypeString[type]} from ${ip}:${port} in ${
+							performance.now() - startTime
+						}ms\x1b[0m`
+					)
+				}
 				active = false
 				clearTimeout(closeTimeout)
 				this.socket.off("message", onMessage)

@@ -1,18 +1,24 @@
 [
     {
+        "color": [
+            55,
+            255,
+            0,
+            255
+        ],
         "device": {
-            "id": 3,
-            "address": "192.168.1.4",
-            "hostname": "genbs_led_v1",
+            "id": 0,
+            "address": "192.168.1.104",
+            "hostname": "esp32device-3",
             "port": 4210,
             "brightness": 255,
             "num_leds": 15,
-            "online": true,
-            "lastPing": 1734998531174
+            "online": false,
+            "lastPing": 1735523171301
         },
         "map": {
             "x": 0,
-            "y": 0,
+            "y": 15,
             "scale": [
                 1,
                 1

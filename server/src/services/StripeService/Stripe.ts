@@ -56,9 +56,13 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 			this.device.num_leds !== data.device?.num_leds ? this.leds.slice(0, data.device.num_leds * 4) : this.leds
 		this.map = { ...this.map, ...data.map }
 
-		if (data.device && (await this.device.setConfig(data.device))) {
-			this.emit("onUpdate", this)
-			return true
+		if (data.device) {
+			if (await this.device.setConfig(data.device)) {
+				this.emit("onUpdate", this)
+				return true
+			} else {
+				return false
+			}
 		}
 
 		this.emit("onUpdate", this)

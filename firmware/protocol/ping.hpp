@@ -1,9 +1,12 @@
-void protocol_ping(uint8_t message_id)
+void protocol_ping(AsyncUDPPacket *packet)
 {
-    udp.beginPacket(udp.remoteIP(), udp.remotePort());
-    udp.write(message_id);
-    udp.write(PING);
-    udp.endPacket();
+    uint8_t *data = packet->data();
+    size_t len = packet->length();
+
+    udp_response[0] = data[0];
+    udp_response[1] = PING;
+
+    packet->write(udp_response, 2);
 
     DEBUG_PRINTLN("PING");
 }

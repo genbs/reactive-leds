@@ -3,7 +3,7 @@ import EditableValue from "src/components/EditableValue"
 import { drawGrid } from "src/lib/rendering"
 import Stripe from "./Stripe"
 
-export default function Sidebar({ stripes, connected, updateStripe, map, updateMap, image }) {
+export default function Sidebar({ stripes, connected, ws, updateStripe, map, updateMap, image }) {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 
 	useEffect(() => {
@@ -47,7 +47,14 @@ export default function Sidebar({ stripes, connected, updateStripe, map, updateM
 					/>
 				</div>
 				{stripes.map(stripe => (
-					<Stripe map={map} key={stripe.device.address} stripe={stripe} updateStripe={updateStripe} />
+					<Stripe
+						map={map}
+						key={stripe.device.address}
+						stripe={stripe}
+						updateStripe={updateStripe}
+						ws={ws}
+						image={image}
+					/>
 				))}
 			</section>
 			<section style={{ marginTop: "auto" }}>

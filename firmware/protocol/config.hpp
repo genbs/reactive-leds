@@ -1,54 +1,62 @@
-void protocol_get_config(uint8_t message_id)
+void protocol_get_config(AsyncUDPPacket *packet)
 {
-    udp.beginPacket(udp.remoteIP(), udp.remotePort());
-    udp.write(message_id);
-    udp.write(GET_CONFIG);
-    udp.write((config.port >> 8) & 0xFF);
-    udp.write(config.port & 0xFF);
-    udp.write(config.id);
-    udp.write(config.num_leds);
-    udp.write(config.brightness);
-    udp.write((uint8_t *)config.hostname, strlen(config.hostname));
-    udp.endPacket();
+    uint8_t *data = packet->data();
+
+    udp_response[0] = data[0];
+    udp_response[1] = GET_CONFIG;
+    udp_response[2] = (config.port >> 8) & 0xFF;
+    udp_response[3] = config.port & 0xFF;
+    udp_response[4] = config.id;
+    udp_response[5] = config.num_leds;
+    udp_response[6] = config.brightness;
+
+    size_t hostname_len = strlen(config.hostname);
+    memcpy(&udp_response[7], config.hostname, hostname_len);
+
+    packet->write(udp_response, 7 + hostname_len);
 
     DEBUG_PRINTLN("GET_CONFIG");
 }
 
-void protocol_set_config(uint8_t message_id, uint8_t *packet, size_t len)
+void protocol_set_config(AsyncUDPPacket *packet)
 {
+    uint8_t *data = packet->data();
+    size_t len = packet->length();
+
     if (len < 3)
     {
         DEBUG_PRINTLN("Invalid SET_CONFIG packet");
         return;
     }
 
-    config.port = (packet[2] << 8) | packet[3];
-    config.id = packet[4];
-    config.num_leds = packet[5];
-    config.brightness = packet[6];
+    config.port = (data[2] << 8) | data[3]; // TODO: if port changes, restart the server
+    config.id = data[4];
+    config.num_leds = data[5];
+    config.brightness = data[6];
 
     uint8_t hostname_length = len - 7;
     if (hostname_length >= sizeof(config.hostname))
     {
         hostname_length = sizeof(config.hostname) - 1;
     }
-    memcpy(config.hostname, &packet[7], hostname_length);
+    memcpy(config.hostname, &data[7], hostname_length);
     config.hostname[hostname_length] = '\0';
 
-    udp.beginPacket(udp.remoteIP(), udp.remotePort());
-    udp.write(message_id);
-    udp.write(SET_CONFIG);
+    udp_response[0] = data[0];
+    udp_response[1] = SET_CONFIG;
+
     if (config_store())
     {
-        udp.write(1);
-        DEBUG_PRINTLN("SET_CONFIG: Configuration saved successfully. Restarting in 2 seconds.");
-        delay(2000);
-        ESP.restart();
+        udp_response[2] = 1;
+        DEBUG_PRINTLN("SET_CONFIG: Configuration saved successfullyå");
+
+        strip_update(config.num_leds, config.brightness);
     }
     else
     {
-        udp.write(0);
+        udp_response[2] = 0;
         DEBUG_PRINTLN("SET_CONFIG: Configuration save failed.");
     }
-    udp.endPacket();
+
+    packet->write(udp_response, 3);
 }

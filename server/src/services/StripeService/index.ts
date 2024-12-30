@@ -52,6 +52,9 @@ export default class StripeService extends EventEmitter<StripeServiceEvents> {
 
 			this.stripes.push(newStripe)
 			newStripe.on("onUpdate", stripe => this.emit("onUpdate", stripe))
+		} else {
+			const _stripe = this.byIP(stripe.device.address)
+			_stripe.update(stripe)
 		}
 	}
 

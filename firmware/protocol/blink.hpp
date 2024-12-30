@@ -1,8 +1,11 @@
 #define BLINK_DELAY 1000
 #define BLINK_COUNT 3
 
-void protocol_blink(uint8_t message_id, uint8_t *packet, size_t len)
+void protocol_blink(AsyncUDPPacket *packet)
 {
+    uint8_t *data = packet->data();
+    size_t len = packet->length();
+
     if (len < 13)
     {
         DEBUG_PRINTLN("Invalid BLINK packet");
@@ -12,10 +15,10 @@ void protocol_blink(uint8_t message_id, uint8_t *packet, size_t len)
     DEBUG_PRINTLN("BLINK");
 
     uint8_t count = config.id;
-    uint8_t base_color[4] = {packet[2], packet[3], packet[4], packet[5]};
-    uint8_t blink_color[4] = {packet[6], packet[7], packet[8], packet[9]};
-    uint8_t blink_count = packet[10];
-    uint8_t blink_delay = packet[11] << 8 | packet[12];
+    uint8_t base_color[4] = {data[2], data[3], data[4], data[5]};
+    uint8_t blink_color[4] = {data[6], data[7], data[8], data[9]};
+    uint8_t blink_count = data[10];
+    uint8_t blink_delay = data[11] << 8 | data[12];
 
     for (int repeat = 0; repeat < blink_count; repeat++)
     {

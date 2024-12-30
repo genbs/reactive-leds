@@ -98,6 +98,15 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements TESP {
 		config.id = config.id ?? this.id
 		config.hostname = config.hostname ?? this.hostname
 
+		if (
+			config.brightness === this.brightness &&
+			config.num_leds === this.num_leds &&
+			config.port === this.port &&
+			config.id === this.id &&
+			config.hostname === this.hostname
+		)
+			return true
+
 		if (await proto.setConfig(this.address, this.port, config as ProtocolBoardConfig)) {
 			Object.assign(this, config)
 

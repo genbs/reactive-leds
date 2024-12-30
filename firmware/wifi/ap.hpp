@@ -60,22 +60,21 @@ void handle_ap_save(AsyncWebServerRequest *request)
     }
 }
 
-void WiFiConnectAP()
+bool WiFiConnectAP()
 {
     WiFi.disconnect();
-    delay(100);
+    delay(200);
 
     DEBUG_PRINTLN("");
     DEBUG_PRINTLN("Starting AP mode");
 
     WiFi.mode(WIFI_AP);
-    while (!WiFi.softAP(config.hostname, config.password))
+    WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
+    while (!WiFi.softAP(config.hostname, config.password, 1, 0, 4))
     {
         DEBUG_PRINTLN(".");
         delay(100);
     }
-
-    WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
 
     DEBUG_PRINT("\nStarted:\t");
     DEBUG_PRINTLN(config.hostname);
@@ -83,6 +82,8 @@ void WiFiConnectAP()
     DEBUG_PRINTLN(WiFi.softAPIP());
     DEBUG_PRINT("MAC address:\t");
     DEBUG_PRINTLN(WiFi.softAPmacAddress());
+
+    return true;
 }
 
 void APModeStart()

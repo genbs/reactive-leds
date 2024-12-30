@@ -1,7 +1,7 @@
 /**
  * Color is an array of 4 numbers: [r, g, b, brightness/whiteness]
  */
-export type TColor = [number, number, number, number]
+export type TColor = [number, number, number, number] | Uint8Array
 
 export interface TConfig {
 	id: number

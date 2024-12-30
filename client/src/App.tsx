@@ -1,22 +1,25 @@
 import { TStripe, TWSResponse } from "@shared"
 import { useCallback, useEffect, useRef, useState } from "react"
 import Canvas from "./canvas/Canvas"
+import Connection from "./connection/Connection"
 import AppContext, { TAppContext, TMap } from "./context"
-import Debug from "./Debug"
 import WS from "./lib/websocket"
 import Sidebar from "./sidebar/Sidebar"
 import { hslToColor } from "./utils"
 
 function App(props: TAppContext) {
-	return <Debug ws={props.ws} />
+	//return <Debug ws={props.ws} />
 
 	return (
-		<main style={{ display: "grid", gridTemplateColumns: "3fr 1fr", height: "100%" }}>
-			<Canvas {...props} />
-			{/* {props.data && <Preview map={props.map} stripes={props.stripes} data={data} dataSize={[width, height]} />} */}
+		<>
+			<Connection />
+			<main style={{ display: "grid", gridTemplateColumns: "3fr 1fr", height: "100%" }}>
+				<Canvas {...props} />
+				{/* {props.data && <Preview map={props.map} stripes={props.stripes} data={data} dataSize={[width, height]} />} */}
 
-			<Sidebar {...props} />
-		</main>
+				<Sidebar {...props} />
+			</main>
+		</>
 	)
 }
 
@@ -48,10 +51,7 @@ export default function Root() {
 		stripes,
 		updateStripe: (stripe: TStripe) => {
 			setStripes(prev => {
-				const newStripes = prev.map(s => (s.device.id === stripe.device.id ? stripe : s))
-				if (newStripes !== prev) return newStripes
-
-				return prev
+				return prev.map(s => (s.device.address === stripe.device.address ? stripe : s))
 			})
 		},
 		map,
@@ -68,6 +68,7 @@ export default function Root() {
 		const timeout = setTimeout(() => {
 			if (JSON.stringify(stripes) === JSON.stringify(lastStripes)) return
 			setLastStripes(stripes)
+
 			stripes.forEach(stripe => {
 				ws.send({
 					type: "update_stripe",
@@ -130,14 +131,14 @@ export default function Root() {
 					let center = [Math.sin(time * 0.001), Math.cos(time * 0.001)]
 					let distance = Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2)
 
-					center = [Math.sin(time * 0.0008), Math.cos(time * 0.0008)]
-					distance = distance + Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2) * 2
+					center = [0.5, 0.5]
+					distance = distance + Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2) * 0.9
 
 					const [r, g, b, a] = hslToColor(
-						i + j / angle + distance * 20,
+						distance * 0,
 						//((i * j) / (width * height)) * Math.cos(time * 0.001) ** 2,
-						1,
-						0.5
+						0,
+						distance ** 5
 					)
 
 					data[index] = r

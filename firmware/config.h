@@ -1,8 +1,10 @@
+#define HOSTNAME "esp32device-3"
+
 struct Config
 {
     char hostname[32];
     char password[32]; // hidden in the web interface, use for AP / OTA
-    unsigned int port;
+    uint16_t port;
     unsigned short id;
     unsigned short num_leds; // max 60
     unsigned short brightness;
@@ -10,16 +12,16 @@ struct Config
 
 #ifdef ESP8266
 Config config = {
-    "genbs_led",
-    "genbs_led_xyz",
+    HOSTNAME,
+    "12345678",
     4210,
     0,
     16,
     255};
 #else
 Config config = {
-    .hostname = "genbs_led",
-    .password = "genbs_led_xyz",
+    .hostname = HOSTNAME,
+    .password = "12345678",
     .port = 4210, // from 4100 4300
     .id = 0,
     .num_leds = 16,
