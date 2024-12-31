@@ -69,6 +69,10 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 		return Promise.resolve()
 	}
 
+	destroy() {
+		this.device.destroy()
+	}
+
 	updateLEDs(data: Uint8Array) {
 		for (let i = 0; i < data.length; i += 5) {
 			const led_index = data[i] * 4

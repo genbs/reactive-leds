@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { TStripe, TWSResponse } from "@shared"
-import WS from "src/lib/websocket"
+import WS from "src/lib/worker/websocket"
 
 export default function useStripes(ws?: WS) {
 	const [stripes, setStripes] = useState<(TStripe & { code: string })[]>([])
@@ -13,7 +13,7 @@ export default function useStripes(ws?: WS) {
 			if (typeof message !== "string") return
 
 			const { event, data } = JSON.parse(message) as TWSResponse
-			if (event === "get_stripe") {
+			if (event === "get_stripes") {
 				setStripes(
 					data.map(stripe => {
 						return {

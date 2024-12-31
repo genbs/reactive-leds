@@ -67,7 +67,11 @@ export default class WebSocketService extends EventEmitter<WebSocketServiceEvent
 		if (client) return client.send(message)
 
 		this.clients.forEach(client => {
-			client.send(message)
+			if (client.readyState === WebSocket.OPEN) {
+				client.send(message)
+			} else {
+				this.clients.delete(client)
+			}
 		})
 	}
 }

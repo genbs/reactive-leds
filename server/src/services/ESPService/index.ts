@@ -50,7 +50,7 @@ export default class ESPService extends EventEmitter<ESPServiceEvents> {
 		return client
 	}
 
-	async find(address: string, port?: number) {
+	async connect(address: string, port?: number) {
 		if (this.clients.has(address)) {
 			const client = this.clients.get(address)!
 			if (await client.ping()) return client

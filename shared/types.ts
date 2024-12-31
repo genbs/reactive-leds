@@ -55,25 +55,40 @@ export enum EWSRequestByteType {
 }
 
 // Request from browser client to server
-export type TWSRequestJSONFindDevice = { type: "find"; ip: string }
-export type TWSRequestJSONGetStripe = { type: "get_stripe" }
+export type TWSRequestJSONConnectDevice = { type: "connect"; ip: string }
+export type TWSRequestJSONGetStripes = { type: "get_stripes" }
 export type TWSRequestJSONUpdateStripe = { type: "update_stripe"; data: Omit<TStripe, "leds">; ip: TESP["address"] }
+export type TWSRequestJSONGetClients = { type: "get_clients" }
+export type TWSRequestJSONDeleteStripe = { type: "delete_stripe"; ip: TESP["address"] }
+export type TWSRequestJSON =
+	| TWSRequestJSONConnectDevice
+	| TWSRequestJSONGetStripes
+	| TWSRequestJSONUpdateStripe
+	| TWSRequestJSONGetClients
+	| TWSRequestJSONDeleteStripe
 
-/**
- * [EWSRequestByteType.SetLEDs, Stripe['id'], led_index, r, g, b, w, led_index, r, g, b, w, ...]
- */
-export type TWSRequestSetLEDs = Uint8Array
-export type TWSRequestBlink = Uint8Array
+export type TWSRequestSetLEDs = Uint8Array // [EWSRequestByteType.SetLEDs, Stripe['id'], led_index, r, g, b, w, led_index, r, g, b, w, ...]
+export type TWSRequestBlink = Uint8Array // [EWSRequestByteType.Blink, Stripe['id']]
 
 // Response from server to browser client
-export type TWSResponseGetStripe = { event: "get_stripe"; data: TStripe[] }
+export type TWSResponseGetStripes = { event: "get_stripes"; data: TStripe[] }
+export type TWSResponseGetClients = { event: "get_clients"; data: TNetClient[] }
 
 ////////////////////////////////////////
 
 export type TWSRequest =
-	| TWSRequestJSONGetStripe
+	| TWSRequestJSONGetStripes
 	| TWSRequestJSONUpdateStripe
-	| TWSRequestJSONFindDevice
+	| TWSRequestJSONConnectDevice
+	| TWSRequestJSONGetClients
 	| TWSRequestSetLEDs
 	| TWSRequestBlink
-export type TWSResponse = TWSResponseGetStripe
+	| TWSRequestJSONDeleteStripe
+export type TWSResponse = TWSResponseGetStripes | TWSResponseGetClients
+
+export type TNetClient = {
+	ip: string
+	mac: string
+	vendor: string
+	hostname?: string
+}

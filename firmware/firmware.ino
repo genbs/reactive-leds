@@ -6,6 +6,8 @@
 
 ///////////////////////////
 
+#define SERIAL_DEBUG
+
 #ifdef SERIAL_DEBUG
 #define DEBUG_PRINT(x) Serial.print(x)
 #define DEBUG_PRINTLN(x) Serial.println(x)

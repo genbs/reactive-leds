@@ -8,9 +8,12 @@ module.exports = {
 		app: "./src/index.tsx",
 	},
 
+	output: {
+		libraryTarget: "umd", // Supporta sia CommonJS che ES6
+		filename: "[name].js",
+		path: __dirname + "/build",
+	},
 	// output: {
-	// 	filename: "[name].js",
-	// 	path: __dirname + "/build",
 	// 	library: {
 	// 		name: "GydraLED",
 	// 		type: "this",
@@ -18,12 +21,29 @@ module.exports = {
 	// 	},
 	// },
 	devtool: "source-map",
+	module: {
+		rules: [
+			{
+				test: /\.worker\.ts$/,
+				use: [
+					{
+						loader: "worker-loader",
+						options: {
+							esModule: true, // Questo garantisce l'export di default
+							inline: "fallback", // (Opzionale) Per gestione fallback
+						},
+					},
+				],
+			},
+			{
+				test: /\.tsx?$/,
+				loader: "ts-loader",
+			},
+		],
+	},
 	resolve: {
 		extensions: [".ts", ".tsx", ".js", ".json"],
 		plugins: [new TsconfigPathsPlugin()],
-	},
-	module: {
-		rules: [{ test: /\.tsx?$/, loader: "ts-loader" }],
 	},
 	plugins: [
 		new HtmlWebpackPlugin({

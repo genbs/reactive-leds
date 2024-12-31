@@ -1,5 +1,5 @@
 import { EWSRequestByteType, TColor, TStripe } from "@shared"
-import WS from "src/lib/websocket"
+import WS from "src/lib/worker/websocket"
 
 class Core {
 	rafid: number

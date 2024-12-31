@@ -1,6 +1,6 @@
 import { EStripeOrientation, TStripe, TStripeMap } from "@shared"
-import { TMap } from "src/context"
-import { stripeToRect } from "src/lib/mapping"
+
+import { stripeToRect, TMap } from "src/lib/worker/mapping"
 
 export function isInsideStripe(cell: number, row: number, stripe: TStripe) {
 	const rect = stripeToRect(stripe)

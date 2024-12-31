@@ -1,12 +1,12 @@
-import { EWSRequestByteType, TStripe, TStripeMap } from "@shared"
+import { TStripe, TStripeMap } from "@shared"
 import { updateStripeMap } from "src/canvas/utils"
 import Dropdown from "src/components/Dropdown"
 import EditableValue from "src/components/EditableValue"
-import { TAppContext, TMap } from "src/context"
+import { TAppContext } from "src/context"
 
 import { useEffect, useState } from "react"
-import { mapStripeOnData } from "src/lib/mapping"
-import WS from "src/lib/websocket"
+import * as gydraLed from "src/lib"
+import { mapStripeOnData, TMap } from "src/lib/worker/mapping"
 import { colorToHex, hexToColor } from "src/utils"
 import Debug from "./Debug"
 import Scale from "./Scale"
@@ -15,17 +15,20 @@ interface StripeProps {
 	stripe: TStripe
 	updateStripe: (stripe: TStripe) => void
 	map: TMap
-	ws: WS
 	image: TAppContext["image"]
 }
 
-export default function Stripe({ stripe, updateStripe, map, ws, image }: StripeProps) {
+export default function Stripe({ stripe, updateStripe, map, image }: StripeProps) {
 	const [prevPixel, setPrevPixel] = useState<Uint8Array>(new Uint8Array(0))
 	const [prevUpdate, setPrevUpdate] = useState(0)
 
+	const [imageLeds, setImageLeds] = useState<boolean>(false)
+
 	useEffect(() => {
+		if (!imageLeds) return
+
 		const now = performance.now()
-		if (!stripe || !image || now - prevUpdate < 1000) return
+		if (!stripe || !image || now - prevUpdate < 1000 / 60) return
 
 		const { pixels } = mapStripeOnData(image.data, image.size, map.gridSize, stripe)
 
@@ -37,34 +40,32 @@ export default function Stripe({ stripe, updateStripe, map, ws, image }: StripeP
 
 		setPrevPixel(pixels)
 		setPrevUpdate(now)
+
 		setLeds(pixels)
-	}, [stripe, image, prevPixel, prevUpdate])
+	}, [imageLeds, stripe, image, prevPixel, prevUpdate])
 
 	function setLeds(colors: Uint8Array) {
-		const data = new Uint8Array(1 /* message_type */ + 1 /* stripe_id */ + stripe.device.num_leds * 5)
-		data[0] = EWSRequestByteType.SetLEDs
-		data[1] = stripe.device.id
-		for (let i = 0; i < stripe.device.num_leds; i++) {
-			stripe.leds[i * 4] = colors[i * 4]
-			stripe.leds[i * 4 + 1] = colors[i * 4 + 1]
-			stripe.leds[i * 4 + 2] = colors[i * 4 + 2]
-			stripe.leds[i * 4 + 3] = colors[i * 4 + 3]
-			stripe.leds[i * 4 + 3] = 0
+		const data = new Uint8Array(stripe.device.num_leds * 5)
 
-			data[i * 5 + 2] = i
-			data[i * 5 + 3] = colors[i * 4]
-			data[i * 5 + 4] = colors[i * 4 + 1]
-			data[i * 5 + 5] = colors[i * 4 + 2]
-			data[i * 5 + 6] = colors[i * 4 + 3]
-			data[i * 5 + 6] = 0
+		for (let i = 0; i < stripe.device.num_leds; i++) {
+			data[i * 5] = i
+			data[i * 5 + 1] = colors[i * 4]
+			data[i * 5 + 2] = colors[i * 4 + 1]
+			data[i * 5 + 3] = colors[i * 4 + 2]
+			data[i * 5 + 4] = colors[i * 4 + 3]
+
+			stripe.leds[i * 4] = data[i * 5 + 1]
+			stripe.leds[i * 4 + 1] = data[i * 5 + 2]
+			stripe.leds[i * 4 + 2] = data[i * 5 + 3]
+			stripe.leds[i * 4 + 3] = data[i * 5 + 4]
 		}
 
-		ws.send(data)
-
-		//updateStripe(stripe)
+		gydraLed.setLEDs(stripe.device.id, data)
 	}
 
 	function sendColor(stripe: TStripe) {
+		if (imageLeds) return
+
 		const colors = new Uint8Array(stripe.device.num_leds * 4)
 		for (let i = 0; i < stripe.device.num_leds; i++) {
 			colors[i * 4] = stripe.leds[0]
@@ -78,13 +79,8 @@ export default function Stripe({ stripe, updateStripe, map, ws, image }: StripeP
 
 	function onChangeBrightness(b) {
 		const v = parseInt(b.target.value)
-		console.log(v)
 
-		ws.send({
-			type: "update_stripe",
-			data: { ...stripe, device: { ...stripe.device, brightness: v } },
-			ip: stripe.device.address,
-		})
+		gydraLed.updateStripe(stripe.device.address, { ...stripe, device: { ...stripe.device, brightness: v } })
 	}
 
 	return (
@@ -167,6 +163,10 @@ export default function Stripe({ stripe, updateStripe, map, ws, image }: StripeP
 							</div>
 
 							<div>
+								<div>
+									<span>{imageLeds ? "Image mode" : "Color mode"}</span>
+									<input type="checkbox" checked={imageLeds} onChange={() => setImageLeds(!imageLeds)} />
+								</div>
 								<Debug stripe={stripe} updateStripe={sendColor} />
 
 								<div>

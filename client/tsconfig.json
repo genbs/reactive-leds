@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		"baseUrl": ".",
 		"outDir": "./dist",
-		"module": "CommonJS",
+		"module": "ESNext",
 		"jsx": "react-jsx",
 		"target": "ESNext",
 		"moduleResolution": "node",

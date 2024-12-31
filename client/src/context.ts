@@ -1,15 +1,10 @@
 import { TStripe } from "@shared"
 import { createContext } from "react"
-import WS from "./lib/websocket"
-
-export type TMap = {
-	gridSize: [number, number]
-}
+import { TMap } from "./lib/worker/mapping"
 
 export type TAppContext = {
 	stripes: TStripe[]
 	updateStripe: (stripe: TStripe) => void
-	ws: WS
 	connected: boolean
 	map: TMap
 	updateMap: (map: TMap) => void

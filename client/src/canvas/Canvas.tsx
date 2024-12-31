@@ -1,7 +1,8 @@
 import { TStripe, TStripeMap } from "@shared"
 import { useEffect, useRef } from "react"
-import { render } from "src/lib/rendering"
-import { TMap } from "../context"
+
+import { TMap } from "src/lib/worker/mapping"
+import { render } from "src/lib/worker/rendering"
 import useClientRect from "../hooks/useClientRect"
 import { style } from "../utils"
 import { useMap } from "./useMap"

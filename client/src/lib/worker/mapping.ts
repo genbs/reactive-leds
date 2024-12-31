@@ -1,5 +1,9 @@
 import { EStripeOrientation, TStripe } from "@shared"
 
+export type TMap = {
+	gridSize: [number, number]
+}
+
 /**
  * return oriented and scaled bounding
  * @param stripe TStripe

@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react"
 import EditableValue from "src/components/EditableValue"
-import { drawGrid } from "src/lib/rendering"
+import { drawGrid } from "src/lib/worker/rendering"
 import Stripe from "./Stripe"
 
-export default function Sidebar({ stripes, connected, ws, updateStripe, map, updateMap, image }) {
+export default function Sidebar({ stripes, connected, updateStripe, map, updateMap, image }) {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 
 	useEffect(() => {
@@ -47,14 +47,7 @@ export default function Sidebar({ stripes, connected, ws, updateStripe, map, upd
 					/>
 				</div>
 				{stripes.map(stripe => (
-					<Stripe
-						map={map}
-						key={stripe.device.address}
-						stripe={stripe}
-						updateStripe={updateStripe}
-						ws={ws}
-						image={image}
-					/>
+					<Stripe map={map} key={stripe.device.address} stripe={stripe} updateStripe={updateStripe} image={image} />
 				))}
 			</section>
 			<section style={{ marginTop: "auto" }}>

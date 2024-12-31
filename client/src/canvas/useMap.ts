@@ -1,6 +1,6 @@
 import { TStripe, TStripeMap } from "@shared"
 import { useCallback, useState } from "react"
-import { TMap } from "src/context"
+import { TMap } from "src/lib/worker/mapping"
 import { isInsideStripe, updateStripeMap } from "./utils"
 
 interface DragState {
@@ -70,11 +70,15 @@ export function useMap(
 
 			for (const stripe of stripes) {
 				if (stripe.map?.visible === false) continue
+				console.log("stripe", stripe)
 				if (isInsideStripe(Math.floor(localX / cellWidth), Math.floor(localY / cellHeight), stripe)) {
+					console.log("isInsideStripe")
 					newState.isDragging = true
 					newState.dragStripe = stripe
 					newState.dragMapInitial = { ...stripe.map }
 					break
+				} else {
+					console.log("notInsideStripe")
 				}
 			}
 

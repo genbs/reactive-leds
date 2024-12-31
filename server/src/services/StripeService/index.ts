@@ -5,7 +5,7 @@ import fs from "fs"
 import Stripe from "./Stripe"
 
 export type StripeServiceEvents = {
-	onUpdate: (stripe: Stripe) => void
+	onUpdate: (stripes: Stripe[]) => void
 }
 
 export default class StripeService extends EventEmitter<StripeServiceEvents> {
@@ -51,10 +51,21 @@ export default class StripeService extends EventEmitter<StripeServiceEvents> {
 			const newStripe = new Stripe(device, stripe)
 
 			this.stripes.push(newStripe)
-			newStripe.on("onUpdate", stripe => this.emit("onUpdate", stripe))
+			newStripe.on("onUpdate", stripe => {
+				this.emit("onUpdate", this.stripes)
+			})
 		} else {
 			const _stripe = this.byIP(stripe.device.address)
 			_stripe.update(stripe)
+		}
+	}
+
+	delete(ip: ESPClient["address"]) {
+		const stripe = this.byIP(ip)
+		if (stripe) {
+			stripe.device.destroy()
+			this.stripes = this.stripes.filter(s => s !== stripe)
+			this.emit("onUpdate", this.stripes)
 		}
 	}
 

@@ -1,6 +1,5 @@
 import { EStripeOrientation, TStripe } from "@shared"
-import { TMap } from "../context"
-import { mapStripeOnData, stripeToRect } from "./mapping"
+import { stripeToRect, TMap } from "./mapping"
 
 /**
  * Draw pixelation grid in canvas
@@ -72,6 +71,7 @@ export function render(
 	for (const stripe of stripes) {
 		// if (stripe.map && stripe.map.visible === false) continue
 
+		//drawStripe(ctx, stripe, cellWidth, cellHeight, map.gridSize, image)
 		drawStripe(ctx, stripe, cellWidth, cellHeight, map.gridSize, image)
 	}
 }
@@ -126,24 +126,49 @@ function drawStripe(
 	ctx.font = "16px Arial"
 	ctx.textAlign = "left"
 	ctx.textBaseline = "top"
-	if (image && stripe.map.visible) {
-		const leds = mapStripeOnData(image.data, image.size, gridSize, stripe)
+	if (stripe.map.visible) {
+		//const mapping = mapStripeOnData(image.data, image.size, gridSize, stripe)
+		// const leds = mapping.pixels
+		// const width = mapping.width
+		// const height = mapping.height
+		const leds = stripe.leds
+		const width =
+			stripe.map.orientation === EStripeOrientation.Horizontal ||
+			stripe.map.orientation === EStripeOrientation.HorizontalReverse
+				? stripe.device.num_leds
+				: 1
+		const height =
+			stripe.map.orientation === EStripeOrientation.Vertical ||
+			stripe.map.orientation === EStripeOrientation.VerticalReverse
+				? stripe.device.num_leds
+				: 1
+
 		const reverse =
 			stripe.map.orientation === EStripeOrientation.HorizontalReverse ||
 			stripe.map.orientation === EStripeOrientation.VerticalReverse
 
-		for (let i = 0; i < leds.pixels.length; i += 4) {
-			const x = (i / 4) % leds.width
-			const y = Math.floor(i / 4 / leds.width)
+		for (let i = 0; i < leds.length; i += 4) {
+			const x = (i / 4) % width
+			const y = Math.floor(i / 4 / width)
 
-			const r = leds.pixels[i]
-			const g = leds.pixels[i + 1]
-			const b = leds.pixels[i + 2]
+			const r = leds[i]
+			const g = leds[i + 1]
+			const b = leds[i + 2]
+			const w = leds[i + 3]
 
-			const x0 = reverse ? (leds.width - x - 1) * cellWidth + x1 : x * cellWidth + x1
-			const y0 = reverse ? (leds.height - y - 1) * cellHeight + y1 : y * cellHeight + y1
+			const color = [r, g, b]
+			const warm_white = [255, 238, 203]
+			const wp = w / 255
+			const white = [warm_white[0] * wp, warm_white[1] * wp, warm_white[2] * wp, wp]
+			const maxC = Math.max(...color)
+			const mo = maxC / 255
+			//const mix = [(color[0] + white[0] * wp) / 2, (color[1] + white[1] * wp) / 2, (color[2] + white[2] * wp) / 2, wp]
+			const mix = [r, g, b, w]
 
-			ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 255)`
+			const x0 = reverse ? (width - x - 1) * cellWidth + x1 : x * cellWidth + x1
+			const y0 = reverse ? (height - y - 1) * cellHeight + y1 : y * cellHeight + y1
+
+			ctx.fillStyle = `rgba(${mix[0]}, ${mix[1]}, ${mix[2]}, 255)`
 			//ctx.fillRect(x0, y0, cellWidth * stripeMap.scale[0], cellHeight * stripeMap.scale[1])
 			const pd = 5
 			ctx.fillRect(x0 + pd, y0 + pd, cellWidth * stripeMap.scale[0] - pd * 2, cellHeight * stripeMap.scale[1] - pd * 2)

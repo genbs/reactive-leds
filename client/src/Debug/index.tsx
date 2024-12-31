@@ -1,11 +1,11 @@
-import { EStripeOrientation, EWSRequestByteType, TColor, TStripe } from "@shared"
+import { EStripeOrientation, TColor, TStripe } from "@shared"
 import { useState } from "react"
 import useStripes from "../hooks/useStripes"
 
-import core from "./core"
-
-import WS from "src/lib/websocket"
+import WS from "src/lib/worker/websocket"
+import * as gydraLEDs from "../lib"
 import { style } from "../utils"
+import core from "./core"
 import StripeBox from "./StripeBox"
 import StripeEditor from "./StripeEditor"
 
@@ -27,37 +27,31 @@ export default function Debug({ ws }: DebugProps) {
 	const [stripes, updateStripes] = useStripes(ws)
 
 	function onChange(stripe: TStripe, color: TColor) {
-		const data: Uint8Array = new Uint8Array(1 /* message_type */ + 1 /* stripe_id */ + stripe.device.num_leds * 5)
+		const data: Uint8Array = new Uint8Array(stripe.device.num_leds * 5)
 
-		data[0] = EWSRequestByteType.SetLEDs
-		data[1] = stripe.device.id
 		for (let i = 0; i < stripe.device.num_leds; i++) {
 			stripe.leds[i * 4] = color[0]
 			stripe.leds[i * 4 + 1] = color[1]
 			stripe.leds[i * 4 + 2] = color[2]
 			stripe.leds[i * 4 + 3] = color[3]
 
-			data[i * 5 + 2] = i
-			data[i * 5 + 3] = color[0]
-			data[i * 5 + 4] = color[1]
-			data[i * 5 + 5] = color[2]
-			data[i * 5 + 6] = color[3]
+			data[i * 5] = i
+			data[i * 5 + 1] = color[0]
+			data[i * 5 + 2] = color[1]
+			data[i * 5 + 3] = color[2]
+			data[i * 5 + 4] = color[3]
 		}
 
 		updateStripes([stripe])
 
-		ws.send(data)
+		gydraLEDs.setLEDs(stripe.device.id, data)
 	}
 
 	core.setWS(ws)
 	core.setStripes(stripes)
 
-	function updateStripe(stripe_id: TStripe["device"]["id"], stripe: TStripe) {
-		ws.send({
-			type: "update_stripe",
-			data: stripe,
-			ip: stripe.device.address,
-		})
+	function updateStripe(stripe_address: TStripe["device"]["address"], stripe: TStripe) {
+		gydraLEDs.updateStripe(stripe_address, stripe)
 	}
 
 	function chunckArray<T>(arr: T[], size: number): T[][] {
@@ -93,7 +87,7 @@ export default function Debug({ ws }: DebugProps) {
 								ws={ws}
 								key={stripe.device.id}
 								stripe={stripe}
-								onChange={update => updateStripe(stripe.device.id, update)}
+								onChange={update => updateStripe(stripe.device.address, update)}
 							>
 								<div className="flex flex--column gap-m">
 									<Color
@@ -199,10 +193,11 @@ function Find({ ws }: { ws: WS }) {
 	const [search, setSearch] = useState("192.168.")
 
 	function find() {
-		ws.send({
-			type: "find",
-			ip: search,
-		})
+		// ws.send({
+		// 	type: "connect",
+		// 	ip: search,
+		// })
+		gydraLEDs.connect(search)
 	}
 
 	return (

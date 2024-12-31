@@ -1,7 +1,8 @@
-import { EWSRequestByteType, TStripe } from "@shared"
+import { TStripe } from "@shared"
 import EditableValue from "../components/EditableValue"
 
-import WS from "src/lib/websocket"
+import WS from "src/lib/worker/websocket"
+import * as gydraLeds from "../lib"
 import { classname, hexToColor, style } from "../utils"
 
 export type StripeProps = {
@@ -56,7 +57,8 @@ export default function StripeBox({ stripe, onChange, children, ws }: StripeProp
 	function blink() {
 		console.log("blink")
 
-		ws.send(new Uint8Array([EWSRequestByteType.Blink, stripe.device.id]))
+		// ws.send(new Uint8Array([EWSRequestByteType.Blink, stripe.device.id]))
+		gydraLeds.blink(stripe.device.id)
 	}
 
 	return (
