@@ -1,6 +1,6 @@
+import { TMap } from "@lib"
 import { TStripe } from "@shared"
 import { createContext } from "react"
-import { TMap } from "./lib/worker/mapping"
 
 export type TAppContext = {
 	stripes: TStripe[]
@@ -8,10 +8,7 @@ export type TAppContext = {
 	connected: boolean
 	map: TMap
 	updateMap: (map: TMap) => void
-	image: {
-		data: Uint8Array
-		size: [number, number]
-	} | null
+	canvas: HTMLCanvasElement | OffscreenCanvas
 }
 
 const AppContext = createContext<TAppContext>(null)

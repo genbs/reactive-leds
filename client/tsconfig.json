@@ -16,7 +16,8 @@
 		"lib": ["DOM", "ESNext"],
 		"resolveJsonModule": true,
 		"paths": {
-			"@shared": ["../shared/index"]
+			"@shared": ["../shared/index"],
+			"@lib": ["./src/lib/index"]
 		}
 	},
 	"include": ["src/**/*"],

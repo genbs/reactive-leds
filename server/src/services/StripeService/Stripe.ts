@@ -28,6 +28,8 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 	 */
 	leds: Uint8Array
 
+	lastSend: number = 0
+
 	constructor(device: ESPClient, options: Partial<Omit<TStripe, "leds">>) {
 		super()
 
@@ -74,6 +76,9 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 	}
 
 	updateLEDs(data: Uint8Array) {
+		const now = performance.now()
+		if (now - this.lastSend < 1000 / 24) return
+
 		for (let i = 0; i < data.length; i += 5) {
 			const led_index = data[i] * 4
 
@@ -82,6 +87,8 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 			this.leds[led_index + 2] = data[i + 3]
 			this.leds[led_index + 3] = data[i + 4]
 		}
+
+		this.lastSend = now
 
 		this.device.setLEDs(data)
 	}

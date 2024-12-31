@@ -1,5 +1,5 @@
 import { EStripeOrientation, TStripe } from "@shared"
-import { stripeToRect, TMap } from "./mapping"
+import { stripeToRect, TMap } from "./mapping/utils"
 
 /**
  * Draw pixelation grid in canvas
@@ -52,12 +52,7 @@ export function drawGrid(ctx: CanvasRenderingContext2D, gridSize: [number, numbe
 	return [cellWidth, cellHeight]
 }
 
-export function render(
-	ctx: CanvasRenderingContext2D,
-	map: TMap,
-	stripes: TStripe[],
-	image: { data: Uint8Array; size: [number, number] } | null = null
-) {
+export function mappingUIRender(ctx: CanvasRenderingContext2D, map: TMap, stripes: TStripe[]) {
 	const width = ctx.canvas.width
 	const height = ctx.canvas.height
 
@@ -69,10 +64,8 @@ export function render(
 	drawGrid(ctx, map.gridSize)
 
 	for (const stripe of stripes) {
-		// if (stripe.map && stripe.map.visible === false) continue
-
-		//drawStripe(ctx, stripe, cellWidth, cellHeight, map.gridSize, image)
-		drawStripe(ctx, stripe, cellWidth, cellHeight, map.gridSize, image)
+		if (stripe.map && stripe.map.visible === false) continue
+		drawStripe(ctx, stripe, cellWidth, cellHeight)
 	}
 }
 
@@ -83,14 +76,7 @@ const angleArrowMap = {
 	[EStripeOrientation.VerticalReverse]: { angle: 270, direction: "↑" },
 }
 
-function drawStripe(
-	ctx: CanvasRenderingContext2D,
-	stripe: TStripe,
-	cellWidth: number,
-	cellHeight: number,
-	gridSize: [number, number],
-	image: { data: Uint8Array; size: [number, number] } | null = null
-) {
+function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: number, cellHeight: number) {
 	const color = stripe.map.visible ? stripe.color || [120, 120, 120, 255] : [120, 120, 120, 255]
 	const stripeMap = stripe.map
 
@@ -156,14 +142,15 @@ function drawStripe(
 			const b = leds[i + 2]
 			const w = leds[i + 3]
 
-			const color = [r, g, b]
-			const warm_white = [255, 238, 203]
-			const wp = w / 255
-			const white = [warm_white[0] * wp, warm_white[1] * wp, warm_white[2] * wp, wp]
-			const maxC = Math.max(...color)
-			const mo = maxC / 255
-			//const mix = [(color[0] + white[0] * wp) / 2, (color[1] + white[1] * wp) / 2, (color[2] + white[2] * wp) / 2, wp]
-			const mix = [r, g, b, w]
+			const warmWhite = [255, 238, 203]
+
+			const wp = (w / 255) * 0
+
+			const mix = [
+				Math.round(r * (1 - wp) + warmWhite[0] * wp), // Miscelazione del rosso
+				Math.round(g * (1 - wp) + warmWhite[1] * wp), // Miscelazione del verde
+				Math.round(b * (1 - wp) + warmWhite[2] * wp), // Miscelazione del blu
+			]
 
 			const x0 = reverse ? (width - x - 1) * cellWidth + x1 : x * cellWidth + x1
 			const y0 = reverse ? (height - y - 1) * cellHeight + y1 : y * cellHeight + y1

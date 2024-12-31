@@ -3,11 +3,17 @@ import WS from "./websocket"
 
 export type WorkerEvents = {
 	begin: { serverUrl: string; debug: boolean }
+	watch: { canvas: OffscreenCanvas }
 }
-export type WorkerRequest = {
-	type: keyof WorkerEvents
-	data: WorkerEvents[keyof WorkerEvents]
-}
+export type WorkerRequest =
+	| {
+			type: "begin"
+			data: WorkerEvents["begin"]
+	  }
+	| {
+			type: "watch"
+			data: WorkerEvents["watch"]
+	  }
 
 export type WorkerResponse =
 	| {
@@ -47,11 +53,20 @@ self.addEventListener("message", async (e: any) => {
 		case "connect":
 			globalWs?.send({ type: "connect", ip: message.ip })
 			break
+		case "watch":
+			watchCanvas(message.data.canvas)
+			break
 		default:
 			console.error("Unknown event", e)
 			break
 	}
 })
+
+/////////////////////////////////////
+
+function watchCanvas(canvas: OffscreenCanvas) {
+	console.log(canvas)
+}
 
 /////////////////////////////////////
 

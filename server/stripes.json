@@ -17,14 +17,14 @@
             "lastPing": 0
         },
         "map": {
-            "x": 16,
-            "y": 20,
+            "x": 6,
+            "y": 0,
             "scale": [
                 1,
                 1
             ],
             "visible": true,
-            "orientation": 2
+            "orientation": 0
         }
     }
 ]

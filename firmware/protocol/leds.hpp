@@ -14,7 +14,6 @@ void protocol_set_leds(AsyncUDPPacket *packet)
     }
 
     memcpy(led_buffer_update, &data[2], led_buffer_size);
-
     led_update_available = true;
 }
 

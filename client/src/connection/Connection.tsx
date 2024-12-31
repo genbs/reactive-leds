@@ -1,7 +1,7 @@
 import { style } from "src/utils"
 
+import gydraLEDs from "@lib"
 import { useActionState, useState } from "react"
-import { sendCredential } from "src/lib/bluetooth"
 
 style(`
     .modal-container {
@@ -30,7 +30,7 @@ export default function Connection() {
 		const ssid = formData.get("ssid")
 		const password = formData.get("password")
 
-		const error = sendCredential(ssid, password)
+		const error = gydraLEDs.sendCredentialBT(ssid, password)
 
 		if (error) {
 			return error

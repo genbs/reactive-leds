@@ -1,7 +1,6 @@
+import { TMap, updateStripeMap } from "@lib"
 import { TStripe, TStripeMap } from "@shared"
-import { updateStripeMap } from "src/canvas/utils"
 import EditableValue from "src/components/EditableValue"
-import { TMap } from "src/lib/worker/mapping"
 
 interface ScaleProps {
 	stripe: TStripe

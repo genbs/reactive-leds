@@ -40,4 +40,8 @@ void protocol_blink(AsyncUDPPacket *packet)
         }
         delay(blink_delay);
     }
+
+    // udp_response[0] = data[0];
+    // udp_response[1] = BLINK;
+    // packet->write(udp_response, 2);
 }

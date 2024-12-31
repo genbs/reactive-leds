@@ -1,10 +1,9 @@
+import gydraLEDs, { TMap } from "@lib"
 import { TStripe } from "@shared"
 import { useEffect, useState } from "react"
 import Canvas from "./canvas/Canvas"
 import Connection from "./connection/Connection"
 import AppContext, { TAppContext } from "./context"
-import * as gydraLEDs from "./lib"
-import { TMap } from "./lib/worker/mapping"
 import Sidebar from "./sidebar/Sidebar"
 import { hslToColor } from "./utils"
 
@@ -29,8 +28,10 @@ const initialState = localStorage.getItem("state")
 			map: { gridSize: [10, 10] },
 	  }
 
+const globalCanvas = document.createElement("canvas")
+globalCanvas.width = 400
+globalCanvas.height = 400
 export default function Root() {
-	const [image, setImage] = useState<{ data: Uint8Array; size: [number, number] } | null>(null)
 	const [stripes, setStripes] = useState<TStripe[]>([])
 	const [lastStripes, setLastStripes] = useState<TStripe[]>([])
 	const [map, setMap] = useState<TMap>(initialState.map)
@@ -38,19 +39,24 @@ export default function Root() {
 
 	useEffect(() => {
 		gydraLEDs.begin("ws://localhost:8080")
-		return gydraLEDs.onChangeState(state => {
-			console.log("onChangeState", state)
+
+		const unbindWatch = gydraLEDs.watch(globalCanvas, map.gridSize)
+
+		const unbindCS = gydraLEDs.onChangeState(state => {
 			setStripes(state.stripes)
 			setConnected(state.connected)
 		})
+
+		return () => {
+			unbindWatch()
+			unbindCS()
+		}
 	}, [])
 
 	const context: TAppContext = {
 		stripes,
 		updateStripe: (stripe: TStripe) => {
-			setStripes(prev => {
-				return prev.map(s => (s.device.address === stripe.device.address ? stripe : s))
-			})
+			setStripes(prev => prev.map(s => (s.device.address === stripe.device.address ? stripe : s)))
 		},
 		map,
 		updateMap: map => {
@@ -58,18 +64,20 @@ export default function Root() {
 			localStorage.setItem("state", JSON.stringify({ map }))
 		},
 		connected,
-		image,
+		canvas: globalCanvas,
 	}
 
 	useEffect(() => {
-		const timeout = setTimeout(() => {
-			if (JSON.stringify(stripes) === JSON.stringify(lastStripes)) return
-			setLastStripes(stripes)
+		const stripeWithoutLeds = stripes.map(stripe => {
+			const { leds, ...rest } = stripe
+			return rest
+		}) as TStripe[]
 
-			stripes.forEach(stripe => {
-				console.log("updateStripe", stripe.device.address, stripe)
-				gydraLEDs.updateStripe(stripe.device.address, stripe)
-			})
+		if (JSON.stringify(stripeWithoutLeds) === JSON.stringify(lastStripes)) return
+
+		const timeout = setTimeout(() => {
+			setLastStripes(stripeWithoutLeds)
+			stripeWithoutLeds.forEach(stripe => gydraLEDs.updateStripe(stripe.device.address, stripe))
 		}, 300)
 
 		return () => clearTimeout(timeout)
@@ -79,11 +87,11 @@ export default function Root() {
 
 	useEffect(() => {
 		let rid = 0
-		const width = 500
-		const height = 500
+		const width = context.canvas.width
+		const height = context.canvas.height
 
 		function createImage(time) {
-			const data = new Uint8Array(width * height * 4)
+			const data = new Uint8ClampedArray(width * height * 4)
 
 			for (let i = 0; i < height; i++) {
 				for (let j = 0; j < width; j++) {
@@ -113,7 +121,8 @@ export default function Root() {
 				}
 			}
 
-			setImage({ data, size: [width, height] })
+			const ctx = context.canvas.getContext("2d") as OffscreenCanvasRenderingContext2D
+			ctx.putImageData(new ImageData(data, width, height), 0, 0)
 
 			rid = requestAnimationFrame(createImage)
 		}

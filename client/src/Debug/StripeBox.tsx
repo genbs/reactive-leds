@@ -1,15 +1,13 @@
 import { TStripe } from "@shared"
 import EditableValue from "../components/EditableValue"
 
-import WS from "src/lib/worker/websocket"
-import * as gydraLeds from "../lib"
+import gydraLeds from "@lib"
 import { classname, hexToColor, style } from "../utils"
 
 export type StripeProps = {
 	stripe: TStripe
 	onChange: (stripe: TStripe) => void
 	children?: React.ReactNode
-	ws: WS
 }
 
 style(`
@@ -47,7 +45,7 @@ style(`
 	}
 `)
 
-export default function StripeBox({ stripe, onChange, children, ws }: StripeProps) {
+export default function StripeBox({ stripe, onChange, children }: StripeProps) {
 	const color = stripe.color ? stripe.color : [120, 120, 120, 255]
 	const hex = `#${color
 		.slice(0, 3)
