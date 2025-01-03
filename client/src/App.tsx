@@ -40,18 +40,14 @@ export default function Root() {
 	useEffect(() => {
 		gydraLEDs.begin("ws://localhost:8080")
 
-		const unbindWatch = gydraLEDs.watch(globalCanvas, map.gridSize)
-
-		const unbindCS = gydraLEDs.onChangeState(state => {
+		return gydraLEDs.onChangeState(state => {
 			setStripes(state.stripes)
 			setConnected(state.connected)
 		})
-
-		return () => {
-			unbindWatch()
-			unbindCS()
-		}
 	}, [])
+	useEffect(() => {
+		return gydraLEDs.watch(globalCanvas, map.gridSize)
+	}, [stripes])
 
 	const context: TAppContext = {
 		stripes,
@@ -78,7 +74,7 @@ export default function Root() {
 		const timeout = setTimeout(() => {
 			setLastStripes(stripeWithoutLeds)
 			stripeWithoutLeds.forEach(stripe => gydraLEDs.updateStripe(stripe.device.address, stripe))
-		}, 300)
+		}, 0)
 
 		return () => clearTimeout(timeout)
 	}, [stripes, lastStripes])
@@ -102,15 +98,16 @@ export default function Root() {
 					const angle = Math.atan2(iOffset, jOffset)
 					const angle2 = Math.atan(jOffset / iOffset)
 					let center = [Math.sin(time * 0.001), Math.cos(time * 0.001)]
+					//let center = [0.5, 0.5]
 					let distance = Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2)
 
 					center = [0.5, 0.5]
 					distance = distance + Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2) * 0.9
 
 					const [r, g, b, a] = hslToColor(
-						distance * 360,
+						-time * 0.25 + jOffset * 50,
 						//((i * j) / (width * height)) * Math.cos(time * 0.001) ** 2,
-						0.5,
+						1,
 						0.5
 					)
 

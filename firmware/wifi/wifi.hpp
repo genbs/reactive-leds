@@ -10,13 +10,14 @@
 bool WiFiConnect(const char *ssid, const char *password)
 {
     DEBUG_PRINTLN("Connecting to WiFi network: " + String(ssid));
+
     WiFi.begin(ssid, password);
 
     unsigned long start = millis();
-    while (WiFi.waitForConnectResult() != WL_CONNECTED)
+    while (WiFi.status() != WL_CONNECTED)
     {
         delay(100);
-        DEBUG_PRINT('.');
+        DEBUG_PRINT(".");
 
         if (millis() > start + WIFI_CONNECT_TIMEOUT)
         {
@@ -66,7 +67,7 @@ bool WiFiAutoConnect()
                 else
                 {
                     DEBUG_PRINTLN("Failed to connect to network: " + ssid);
-                    //FS_remove("/wifi", ssid.c_str());
+                    // FS_remove("/wifi", ssid.c_str());
                 }
             }
         }

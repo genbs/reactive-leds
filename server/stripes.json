@@ -1,30 +1,24 @@
 [
     {
-        "color": [
-            4,
-            0,
-            255,
-            255
-        ],
         "device": {
             "id": 0,
-            "address": "192.168.1.105",
+            "address": "192.168.0.6",
             "hostname": "esp32device-3",
             "port": 4210,
             "brightness": 255,
             "num_leds": 15,
-            "online": false,
-            "lastPing": 0
+            "online": true,
+            "lastPing": 1735862916668
         },
         "map": {
-            "x": 6,
+            "x": 0,
             "y": 0,
             "scale": [
                 1,
                 1
             ],
             "visible": true,
-            "orientation": 0
+            "orientation": 1
         }
     }
 ]

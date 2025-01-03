@@ -29,6 +29,16 @@ export default class StripeService extends EventEmitter<StripeServiceEvents> {
 		this.espService.start()
 
 		this.load()
+
+		this.tick()
+	}
+
+	tick() {
+		this.stripes.forEach(stripe => {
+			stripe.tick()
+		})
+
+		setTimeout(() => this.tick(), 1000 / 60)
 	}
 
 	byID(id: ESPClient["id"]) {
@@ -40,13 +50,7 @@ export default class StripeService extends EventEmitter<StripeServiceEvents> {
 	}
 
 	add(stripe: Partial<TStripe> & { device: ESPClient }) {
-		if (
-			!this.stripes.find(
-				s =>
-					s.device.address === stripe.device.address &&
-					stripe.device.lastPing - Date.now() < ESPClient.MAX_LAST_PING_TIME
-			)
-		) {
+		if (!this.stripes.find(s => s.device.address === stripe.device.address)) {
 			const device = this.espService.add(stripe.device)
 			const newStripe = new Stripe(device, stripe)
 

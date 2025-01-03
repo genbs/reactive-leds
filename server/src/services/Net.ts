@@ -96,14 +96,27 @@ export default class NetService extends EventEmitter<NetServiceEvents> {
 		}
 
 		let changes = false
-		for (const client of clients) {
-			if (!this.clients.has(client.ip)) {
-				this.clients.set(client.ip, client)
-				changes = true
+		const oldClients = [...this.clients.values()]
+
+		if (oldClients.length !== clients.length) {
+			changes = true
+		} else {
+			for (const client of clients) {
+				const oldClient = oldClients.find(c => c.mac === client.mac)
+				if (!oldClient) {
+					changes = true
+					break
+				}
+
+				if (oldClient.vendor !== client.vendor || oldClient.hostname !== client.hostname) {
+					changes = true
+					break
+				}
 			}
 		}
 
 		if (changes) {
+			this.clients = new Map(clients.map(client => [client.mac, client]))
 			this.emit("clients", [...this.clients.values()])
 		}
 	}

@@ -6,7 +6,7 @@
 
 ///////////////////////////
 
-#define SERIAL_DEBUG
+
 
 #ifdef SERIAL_DEBUG
 #define DEBUG_PRINT(x) Serial.print(x)
@@ -18,10 +18,10 @@
 #define DEBUG_PRINTF(x, y)
 #endif
 
-///////////////////////////
+//////////////////////////
 
 #include "fs.hpp"
-#include "config.h"
+#include "config.hpp"
 
 #include "wifi/WiFi.hpp"
 #include "wifi/AP.hpp"
@@ -47,8 +47,10 @@ void setup()
 	strip_begin();
 
 	strip.setPixelColor(0, 0, 0, 255);
-  strip.show();
-  
+	strip.show();
+
+	delay(2000);
+
 	/**
 	 * Find wifi networks and connect to the first one that has a password stored in the FS
 	 */
@@ -60,6 +62,8 @@ void setup()
 		strip.setPixelColor(1, 0, 255, 0);
 		strip.setPixelColor(2, 0, 255, 0);
 		strip.show();
+
+		esp_bt_controller_disable();
 
 		OTA_begin();
 		InitMDNS();

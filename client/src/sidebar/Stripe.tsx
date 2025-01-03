@@ -180,6 +180,9 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 									/>
 								</div>
 							</div>
+							<div>
+								<button onClick={() => gydraLed.deleteStripe(stripe.device.address)}>Delete</button>
+							</div>
 						</div>
 					)}
 				</div>

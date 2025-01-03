@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import EditableValue from "src/components/EditableValue"
 import { drawGrid } from "src/lib/ui/rendering"
+import NetClients from "./NetClients"
 import Stripe from "./Stripe"
 
 export default function Sidebar({ stripes, connected, updateStripe, map, updateMap, canvas }) {
@@ -55,7 +56,11 @@ export default function Sidebar({ stripes, connected, updateStripe, map, updateM
 					<Stripe map={map} key={stripe.device.address} stripe={stripe} updateStripe={updateStripe} />
 				))}
 			</section>
+
 			<section style={{ marginTop: "auto" }}>
+				<NetClients />
+			</section>
+			<section>
 				<canvas ref={canvasRef} />
 			</section>
 		</aside>

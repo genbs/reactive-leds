@@ -20,6 +20,9 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 	color: TColor
 	device: ESPClient
 
+	queue: Uint8Array = new Uint8Array(0)
+	hasUpdate: boolean = false
+
 	/**
 	 * The current data of the LEDs.
 	 * [r, g, b, brightness / whiteness, r, g, b, brightness / whiteness, ...]
@@ -57,6 +60,7 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 		this.leds =
 			this.device.num_leds !== data.device?.num_leds ? this.leds.slice(0, data.device.num_leds * 4) : this.leds
 		this.map = { ...this.map, ...data.map }
+		this.queue = new Uint8Array(this.device.num_leds * 5)
 
 		if (data.device) {
 			if (await this.device.setConfig(data.device)) {
@@ -76,8 +80,15 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 	}
 
 	updateLEDs(data: Uint8Array) {
-		const now = performance.now()
-		if (now - this.lastSend < 1000 / 24) return
+		this.queue = data
+
+		this.hasUpdate = true
+	}
+
+	tick() {
+		if (!this.hasUpdate) return
+
+		const data = this.queue
 
 		for (let i = 0; i < data.length; i += 5) {
 			const led_index = data[i] * 4
@@ -88,9 +99,11 @@ export default class Stripe extends EventEmitter<StripeServiceEvents> implements
 			this.leds[led_index + 3] = data[i + 4]
 		}
 
-		this.lastSend = now
-
 		this.device.setLEDs(data)
+
+		this.hasUpdate = false
+
+		this.emit("onUpdate", this)
 	}
 
 	toJSON(): TStripe {

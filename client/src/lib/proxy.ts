@@ -103,6 +103,7 @@ export function deleteStripe(ip: string) {
 
 export function watch(canvas: HTMLCanvasElement, gridSize: [number, number]) {
 	checkConnected()
+
 	const canvasImage = new ImageData(canvas.width, canvas.height)
 	const ctx = canvas.getContext("2d")
 	if (!ctx) return
@@ -118,8 +119,8 @@ export function watch(canvas: HTMLCanvasElement, gridSize: [number, number]) {
 		for (const stripe of stripes) {
 			const { pixels } = mapStripeOnData(canvasImage.data, size, gridSize, stripe)
 
-			for (let i = 0; i < stripe.device.num_leds; i += 4) {
-				pixels[i + 3] = 0
+			for (let i = 0; i < stripe.device.num_leds; i++) {
+				pixels[i * 4 + 3] = 0
 			}
 
 			if (stripe.leds.every((v, i) => v === pixels[i])) return
@@ -137,7 +138,7 @@ export function watch(canvas: HTMLCanvasElement, gridSize: [number, number]) {
 			setLEDs(stripe.device.id, data)
 		}
 
-		updateState({ stripes })
+		// updateState({ stripes })
 
 		rid = requestAnimationFrame(clock)
 	}
