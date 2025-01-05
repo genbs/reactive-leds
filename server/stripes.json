@@ -2,17 +2,17 @@
     {
         "device": {
             "id": 1,
-            "address": "192.168.1.113",
+            "address": "192.168.0.112",
             "hostname": "esp32s3-1",
             "port": 4210,
             "brightness": 255,
             "num_leds": 15,
-            "online": false,
-            "lastPing": 1736088857043
+            "online": true,
+            "lastPing": 1736097460312
         },
         "map": {
-            "x": 0,
-            "y": 0,
+            "x": 5,
+            "y": 16,
             "scale": [
                 1,
                 1

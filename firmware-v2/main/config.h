@@ -6,7 +6,7 @@
 
 #define HOSTNAME "esp32s3-1"
 #define PORT 4210
-#define NUM_LEDS 15
+#define NUM_LEDS 14
 #define ID 1
 #define LED_PIN 18
 

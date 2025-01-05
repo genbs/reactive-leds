@@ -1,6 +1,7 @@
 #include "udp_con.h"
 
 static int sock;
+static udp_packet packet;
 
 bool udp_con_begin(uint16_t port) {
     ESP_LOGV(UDP_TAG, "Starting UDP server on port %d", port);
@@ -22,6 +23,15 @@ bool udp_con_begin(uint16_t port) {
         return 0;
     }
 
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = (1000 / 60) * 1000; // 60Hz refresh rate
+
+    if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        ESP_LOGE(UDP_TAG, "Failed to set socket timeout: errno %d", errno);
+        return NULL;
+    }
+
     ESP_LOGI(UDP_TAG, "Socket bound, port %d", port);
     return 1;
 }
@@ -30,7 +40,6 @@ udp_packet* udp_con_read()
 {
     ESP_LOGV(UDP_TAG, "Starting UDP read");
 
-    static udp_packet packet;
     packet.source_addr = (struct sockaddr_storage) {0};
     packet.socklen = sizeof(packet.source_addr);
 
@@ -41,9 +50,8 @@ udp_packet* udp_con_read()
 
     ESP_LOGV(UDP_TAG, "Waiting for data");
     packet.len = recvfrom(sock, packet.data, sizeof(packet.data) - 1, 0, (struct sockaddr *)&packet.source_addr, &packet.socklen);
-
     if (packet.len < 0) {
-        ESP_LOGE(UDP_TAG, "recvfrom failed: errno %d", errno);
+        //ESP_LOGE(UDP_TAG, "recvfrom failed: errno %d", errno);
         return NULL;
     }
             

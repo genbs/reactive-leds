@@ -45,9 +45,10 @@ export default function Root() {
 			setConnected(state.connected)
 		})
 	}, [])
-	// useEffect(() => {
-	// 	return gydraLEDs.watch(globalCanvas, map.gridSize)
-	// }, [stripes])
+
+	useEffect(() => {
+		return gydraLEDs.watch(globalCanvas, map.gridSize)
+	}, [stripes])
 
 	const context: TAppContext = {
 		stripes,
@@ -105,10 +106,10 @@ export default function Root() {
 					distance = distance + Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2) * 0.9
 
 					const [r, g, b, a] = hslToColor(
-						-time * 0.25 + jOffset * 50 + iOffset * 100,
+						-time * 0.1 + iOffset * 420,
 						//((i * j) / (width * height)) * Math.cos(time * 0.001) ** 2,
 						1,
-						0.5
+						Math.round(time * 0.01 + iOffset * 3) % 2 === 0 ? 0.5 : 0
 					)
 
 					data[index] = r

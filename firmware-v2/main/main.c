@@ -28,8 +28,11 @@ void app_main(void)
     wifi_init_sta();
 
     wifi_connect(
-        "TP-Link_B229",
-        "41156888"
+        // "TP-Link_B229",
+        // "41156888"
+        "Delgado Recording Studio",
+        "neumannu67"
+
     );
 
     ESP_LOGI(TAG, "Connecting to WiFi");
@@ -52,8 +55,10 @@ void app_main(void)
             ESP_LOGI(TAG, "Reconnecting to WiFi");
 
             wifi_connect(
-                "TP-Link_B229",
-                "41156888"
+               // "TP-Link_B229",
+               // "41156888"
+               "Delgado Recording Studio",
+                "neumannu67"
             );
         }
     }

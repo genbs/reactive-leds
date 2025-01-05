@@ -52,10 +52,6 @@ void leds_update(uint8_t pixel_index, uint8_t r, uint8_t g, uint8_t b, uint8_t w
         return;
     }
 
-    printf("Updating pixel %d: %d %d %d %d\n", pixel_index, r, g, b, w);
-    printf("Size of leds: %d\n", NUM_LEDS * 4);
-
-
     leds[pixel_index * 4] = w;
     leds[pixel_index * 4 + 1] = r;
     leds[pixel_index * 4 + 2] = g;
@@ -73,38 +69,6 @@ void leds_show()
 {
     ESP_ERROR_CHECK(rmt_transmit(led_chan, led_encoder, leds, NUM_LEDS * 4, &tx_config));
     ESP_ERROR_CHECK(rmt_tx_wait_all_done(led_chan, portMAX_DELAY));
-    // vTaskDelay(pdMS_TO_TICKS(EXAMPLE_CHASE_SPEED_MS));
-    
-    // size_t led_index = 0;
-
-    // for (int i = 0; i < NUM_LEDS; i++) {
-    //     uint8_t color[4] = {leds[i].w, leds[i].r, leds[i].g, leds[i].b};
-        
-    //     for (int byte = 0; byte < 4; byte++) { // W, R, G, B
-    //         for (int bit = 7; bit >= 0; bit--) {
-    //             if (color[byte] & (1 << bit)) {
-    //                 // '1' bit
-    //                 leds_data[led_index].duration0 = RMT_TICK_10_US * 7; // High for 700 ns
-    //                 leds_data[led_index].level0 = 1;
-    //                 leds_data[led_index].duration1 = RMT_TICK_10_US * 3; // Low for 300 ns
-    //                 leds_data[led_index].level1 = 0;
-    //             } else {
-    //                 // '0' bit
-    //                 leds_data[led_index].duration0 = RMT_TICK_10_US * 3; // High for 300 ns
-    //                 leds_data[led_index].level0 = 1;
-    //                 leds_data[led_index].duration1 = RMT_TICK_10_US * 7; // Low for 700 ns
-    //                 leds_data[led_index].level1 = 0;
-    //             }
-    //             led_index++;
-    //         }
-    //     }
-    // }
-
-    // // Invio degli items tramite RMT
-    // esp_err_t err = rmt_write_items(RMT_TX_CHANNEL, leds_data, led_index, portMAX_DELAY);
-    // if (err != ESP_OK) {
-    //     ESP_LOGE(LEDS_TAG, "Failed to send RMT items: %s", esp_err_to_name(err));
-    // }
 }
 
 

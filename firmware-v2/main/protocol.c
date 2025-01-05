@@ -51,8 +51,7 @@ void protocol_loop()
 {
     udp_packet *packet = udp_con_read();
     if (packet != NULL) {
-        ESP_LOGI(PROTOCOL_TAG, "Received %d bytes from %s:", packet->len, packet->address);
-        ESP_LOGI(PROTOCOL_TAG, "%s", packet->data);
+        ESP_LOGV(PROTOCOL_TAG, "Received %d bytes from %s:", packet->len, packet->address);
         
         protocol_process_packet(packet);
     }
@@ -158,9 +157,5 @@ void protocol_set_leds(udp_packet *packet)
         leds_update(pixel_index, r, g, b, w);
     }
 
-    leds_show();
-
-    protocol_response[0] = data[0];
-    protocol_response[1] = SET_LEDS;
-    udp_con_send(protocol_response, 2, &packet->source_addr);
+    leds_show(); 
 }
