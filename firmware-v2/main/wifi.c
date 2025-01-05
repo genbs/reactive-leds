@@ -43,7 +43,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 
 void wifi_init_sta()
 {
-    ESP_LOGI(WIFI_TAG, "init.");
+    ESP_LOGV(WIFI_TAG, "Starting WiFi Station");
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -55,6 +55,8 @@ void wifi_init_sta()
 
 void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
 {
+    ESP_LOGV(WIFI_TAG, "Connecting to WiFi network: %s", WIFI_SSID);
+
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
     esp_event_handler_instance_register(WIFI_EVENT,
@@ -69,7 +71,6 @@ void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
                                         &instance_got_ip);
 
     wifi_config_t wifi_config = {0}; 
-
     strcpy((char *)wifi_config.sta.ssid, (char *)WIFI_SSID);
     strcpy((char *)wifi_config.sta.password, (char *)WIFI_PASS);
     wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
@@ -84,8 +85,6 @@ void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
     uint8_t mac[6];
     esp_wifi_get_mac(ESP_IF_WIFI_STA, mac);
     snprintf(mac_address_str, sizeof(mac_address_str), "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-    ESP_LOGI(WIFI_TAG, "wifi_init_ap finished.");
 }
 
 bool wifi_connected()

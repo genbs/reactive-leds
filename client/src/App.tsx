@@ -45,9 +45,9 @@ export default function Root() {
 			setConnected(state.connected)
 		})
 	}, [])
-	useEffect(() => {
-		return gydraLEDs.watch(globalCanvas, map.gridSize)
-	}, [stripes])
+	// useEffect(() => {
+	// 	return gydraLEDs.watch(globalCanvas, map.gridSize)
+	// }, [stripes])
 
 	const context: TAppContext = {
 		stripes,

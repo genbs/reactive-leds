@@ -22,5 +22,6 @@ typedef struct {
 bool udp_con_begin(uint16_t port);
 udp_packet* udp_con_read();
 void udp_con_send(uint8_t *data, size_t len, struct sockaddr_storage *dest_addr);
+void udp_con_close();
 
 #endif

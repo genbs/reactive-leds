@@ -1,6 +1,6 @@
 #include "config.h"
 
-static Config config = {
+static config_t config = {
     HOSTNAME,
     PORT,
     ID,
@@ -9,7 +9,7 @@ static Config config = {
     255
 };
 
-Config config_get()
+config_t config_get()
 {
     return config;
 }

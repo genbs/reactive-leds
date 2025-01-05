@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/projdefs.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
+#include "esp_log.h"
 #include "wifi.h"
 #include "config.h"
 #include "protocol.h"
@@ -33,7 +35,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Connecting to WiFi");
 
     while (!wifi_connected()) {
-        ESP_LOGI(TAG, "Waiting for WiFi connection...");
+        ESP_LOGV(TAG, "Waiting for WiFi connection...");
         delay(1000);
     }
 

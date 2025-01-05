@@ -5,6 +5,7 @@
 
 #include "config.h"
 #include "udp_con.h"
+#include "leds.h"
 
 enum ProtocolMessageType
 {

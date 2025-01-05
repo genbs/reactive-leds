@@ -18,5 +18,6 @@
 		"vector": "cpp",
 		"istream": "cpp",
 		"cstddef": "cpp"
-	}
+	},
+	"cmake.sourceDirectory": "/Users/genbs/My Drive/Repositories/gydra/packages/gydra-led/firmware-v2"
 }

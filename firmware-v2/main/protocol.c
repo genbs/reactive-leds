@@ -1,11 +1,18 @@
 #include "protocol.h"
 
 
-
-uint8_t protocol_response[1 + 1 + NUM_LEDS * 5];
+uint8_t *protocol_response = NULL;
 
 bool protocol_begin() {
-    return udp_con_begin(4210);
+    protocol_response = (uint8_t *)malloc(1 + 1 + config_get().num_leds * 5);
+
+    if (udp_con_begin(4210)) {
+        leds_begin();
+
+        return 1;
+    }
+
+    return 0;
 }
 
 void protocol_process_packet(udp_packet *packet)
@@ -28,9 +35,9 @@ void protocol_process_packet(udp_packet *packet)
     case SET_CONFIG:
         protocol_set_config(packet);
         break;
-    // case SET_LEDS:
-    //     protocol_set_leds(packet);
-    //     break;
+    case SET_LEDS:
+        protocol_set_leds(packet);
+        break;
     // case BLINK:
     //     protocol_blink(packet);
     //     break;
@@ -67,7 +74,7 @@ void protocol_get_config(udp_packet *packet)
 {
     uint8_t *data = packet->data;
 
-    Config config = config_get();
+    config_t config = config_get();
     protocol_response[0] = data[0];
     protocol_response[1] = GET_CONFIG;
     protocol_response[2] = (config.port >> 8) & 0xFF;
@@ -95,7 +102,7 @@ void protocol_set_config(udp_packet *packet)
         return;
     }
 
-    Config config = config_get();
+    config_t config = config_get();
     config.port = (data[2] << 8) | data[3]; // TODO: if port changes, restart the server
     config.id = data[4];
     config.num_leds = data[5];
@@ -126,4 +133,34 @@ void protocol_set_config(udp_packet *packet)
     }
 
     udp_con_send(protocol_response, 3, &packet->source_addr);
+}
+
+void protocol_set_leds(udp_packet *packet)
+{
+    uint8_t *data = packet->data;
+    size_t len = packet->len;
+
+    if (len < 2 + 5 /* index + RGBW */)
+    {
+        ESP_LOGW(PROTOCOL_TAG, "Invalid SET_LEDS packet");
+        return;
+    }
+
+
+    for (int i = 2; i < len; i += 5)
+    {
+        uint8_t pixel_index = data[i];
+        uint8_t r = data[i + 1];
+        uint8_t g = data[i + 2];
+        uint8_t b = data[i + 3];
+        uint8_t w = data[i + 4];
+
+        leds_update(pixel_index, r, g, b, w);
+    }
+
+    leds_show();
+
+    protocol_response[0] = data[0];
+    protocol_response[1] = SET_LEDS;
+    udp_con_send(protocol_response, 2, &packet->source_addr);
 }

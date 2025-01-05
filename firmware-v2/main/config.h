@@ -8,6 +8,7 @@
 #define PORT 4210
 #define NUM_LEDS 15
 #define ID 1
+#define LED_PIN 18
 
 typedef struct
 {
@@ -17,10 +18,10 @@ typedef struct
     uint8_t num_leds;
     uint8_t pin;
     uint8_t brightness;
-} Config;
+} config_t;
 
 
-Config config_get();
+config_t config_get();
 bool config_store();
 
 #endif
