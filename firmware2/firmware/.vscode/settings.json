@@ -1,0 +1,7 @@
+{
+	"idf.port": "/dev/tty.wchusbserial595B0083511",
+	"idf.openOcdConfigs": ["board/esp32s3-builtin.cfg"],
+	"idf.flashType": "JTAG",
+	"idf.espIdfPath": "/Users/genbs/esp/esp-idf",
+	"idf.toolsPath": "/Users/genbs/.espressif"
+}

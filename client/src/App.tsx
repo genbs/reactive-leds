@@ -105,7 +105,7 @@ export default function Root() {
 					distance = distance + Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2) * 0.9
 
 					const [r, g, b, a] = hslToColor(
-						-time * 0.25 + jOffset * 50,
+						-time * 0.25 + jOffset * 50 + iOffset * 100,
 						//((i * j) / (width * height)) * Math.cos(time * 0.001) ** 2,
 						1,
 						0.5

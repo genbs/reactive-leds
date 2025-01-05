@@ -120,10 +120,10 @@ export function watch(canvas: HTMLCanvasElement, gridSize: [number, number]) {
 			const { pixels } = mapStripeOnData(canvasImage.data, size, gridSize, stripe)
 
 			for (let i = 0; i < stripe.device.num_leds; i++) {
-				pixels[i * 4 + 3] = 0
+				//pixels[i * 4 + 3] = 0
 			}
 
-			if (stripe.leds.every((v, i) => v === pixels[i])) return
+			//if (stripe.leds.every((v, i) => v === pixels[i])) return
 			stripe.leds.set(pixels)
 
 			const data = new Uint8Array(stripe.device.num_leds * 5)
@@ -138,7 +138,7 @@ export function watch(canvas: HTMLCanvasElement, gridSize: [number, number]) {
 			setLEDs(stripe.device.id, data)
 		}
 
-		// updateState({ stripes })
+		updateState({ stripes })
 
 		rid = requestAnimationFrame(clock)
 	}
