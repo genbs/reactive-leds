@@ -7,12 +7,12 @@
             "port": 4210,
             "brightness": 255,
             "num_leds": 15,
-            "online": true,
-            "lastPing": 1736097460312
+            "online": false,
+            "lastPing": 0
         },
         "map": {
-            "x": 5,
-            "y": 16,
+            "x": 0,
+            "y": 15,
             "scale": [
                 1,
                 1
