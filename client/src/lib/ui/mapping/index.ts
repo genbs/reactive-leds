@@ -1,4 +1,5 @@
 import { TStripe, TStripeMap } from "@shared"
+
 import { mappingUIRender } from "../rendering"
 import { mappingEvents } from "./events"
 import { TMap } from "./utils"

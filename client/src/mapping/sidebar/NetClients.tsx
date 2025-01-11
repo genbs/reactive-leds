@@ -1,12 +1,13 @@
-import gydraLeds from "@lib"
+import { useEffect, useState } from "react"
+
+import GydraLEDs from "@lib"
 import { TNetClient } from "@shared"
-import React, { useEffect } from "react"
 
 export default function NetClients() {
-	const [clients, setClients] = React.useState<TNetClient[]>([])
+	const [clients, setClients] = useState<TNetClient[]>([])
 
 	useEffect(() => {
-		return gydraLeds.onChangeState(state => {
+		return GydraLEDs.onChangeState(state => {
 			setClients(state.clients)
 		})
 	}, [])
@@ -18,7 +19,7 @@ export default function NetClients() {
 			<div>
 				<ul>
 					{clients.map(client => (
-						<li key={client.ip} onClick={() => gydraLeds.connect(client.ip)}>
+						<li key={client.ip} onClick={() => GydraLEDs.connect(client.ip)}>
 							{client.ip} {client.mac} {client.vendor} {client.hostname}
 						</li>
 					))}

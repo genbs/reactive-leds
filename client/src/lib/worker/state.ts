@@ -35,3 +35,7 @@ export function updateState(newState: Partial<GydraLEDState>) {
 export function getState() {
 	return state
 }
+
+export function isConnected() {
+	return state.connected
+}

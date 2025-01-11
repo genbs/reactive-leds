@@ -14,9 +14,8 @@ import {
 // @ts-ignore
 import MyWorker from "./worker/index.worker"
 
-import { getState, updateState } from "./state"
-import { mapStripeOnData } from "./ui/mapping/utils"
 import type { WorkerRequest, WorkerResponse } from "./worker/index.worker.js"
+import { updateState } from "./worker/state"
 
 ///////////////////////////
 
@@ -38,10 +37,33 @@ function onWorkerMessage(message: WorkerResponse) {
 		case "connectionChange":
 			updateState({ connected: message.data.status })
 			break
+		case "leds-setteds":
+			break
 		default:
 			console.error("Unknown message type", message)
 			break
 	}
+}
+
+function bind(callback: (message: WorkerResponse) => void) {
+	function onMessage(event: MessageEvent) {
+		callback(event.data)
+	}
+
+	globalWorker?.addEventListener("message", onMessage)
+
+	return () => {
+		globalWorker?.removeEventListener("message", onMessage)
+	}
+}
+
+function once(callback: (message: WorkerResponse) => void) {
+	function onMessage(event: MessageEvent) {
+		callback(event.data)
+		globalWorker?.removeEventListener("message", onMessage)
+	}
+
+	globalWorker?.addEventListener("message", onMessage)
 }
 
 ///////////////////////////
@@ -54,15 +76,29 @@ function checkConnected() {
 
 ///////////////////////////
 
-export function begin(serverUrl: string, debug = false) {
-	globalWorker = new MyWorker()
+const WEBSOCKET_CONNECTION_TIMEOUT = 10000
+export function begin(serverUrl: string, debug = false): Promise<void> {
+	let resolved = false
+	return new Promise((resolve, reject) => {
+		globalWorker = new MyWorker()
 
-	globalWorker.addEventListener("message", (event: MessageEvent) => {
-		onWorkerMessage(event.data)
+		bind(onWorkerMessage)
+
+		once(({ event, data }) => {
+			if (event === "connectionChange" && data.status) {
+				resolved = true
+				resolve()
+			}
+		})
+
+		const request: WorkerRequest = { type: "begin", data: { serverUrl, debug } }
+		globalWorker.postMessage(request)
+
+		setTimeout(() => {
+			if (resolved) return
+			reject(new Error("Connection timeout"))
+		}, WEBSOCKET_CONNECTION_TIMEOUT)
 	})
-
-	const request: WorkerRequest = { type: "begin", data: { serverUrl, debug } }
-	globalWorker.postMessage(request)
 }
 
 export function connect(ip: string) {
@@ -104,44 +140,31 @@ export function deleteStripe(ip: string) {
 export function watch(canvas: HTMLCanvasElement, gridSize: [number, number]) {
 	checkConnected()
 
-	const canvasImage = new ImageData(canvas.width, canvas.height)
-	const ctx = canvas.getContext("2d")
-	if (!ctx) return
-	const size = [canvas.width, canvas.height] as [number, number]
 	let rid = 0
-	// canvas will read frequently
-	function clock() {
-		// store canvas image to canvasImage
-		canvasImage.data.set(ctx.getImageData(0, 0, canvas.width, canvas.height).data)
 
-		const stripes = getState().stripes
-
-		for (const stripe of stripes) {
-			const { pixels } = mapStripeOnData(canvasImage.data, size, gridSize, stripe)
-
-			for (let i = 0; i < stripe.device.num_leds; i++) {
-				pixels[i * 4 + 3] = 0
+	function sendToWorker() {
+		once(({ event }) => {
+			if (event === "leds-setteds") {
+				rid = requestAnimationFrame(sendToWorker)
 			}
+		})
 
-			//if (stripe.leds.every((v, i) => v === pixels[i])) return
-			stripe.leds.set(pixels)
-
-			const data = new Uint8Array(stripe.device.num_leds * 5)
-			for (let i = 0; i < stripe.device.num_leds; i++) {
-				data[i * 5] = i
-				data[i * 5 + 1] = pixels[i * 4]
-				data[i * 5 + 2] = pixels[i * 4 + 1]
-				data[i * 5 + 3] = pixels[i * 4 + 2]
-				data[i * 5 + 4] = pixels[i * 4 + 3]
-			}
-
-			setLEDs(stripe.device.id, data)
-		}
-
-		rid = requestAnimationFrame(clock)
+		createImageBitmap(canvas).then(imageBitmap => {
+			globalWorker.postMessage(
+				{
+					type: "watch",
+					data: {
+						bitmap: imageBitmap,
+						grid: gridSize,
+					},
+					gridSize,
+				},
+				[imageBitmap]
+			)
+		})
 	}
 
-	requestAnimationFrame(clock)
+	requestAnimationFrame(sendToWorker)
 
 	return () => cancelAnimationFrame(rid)
 }

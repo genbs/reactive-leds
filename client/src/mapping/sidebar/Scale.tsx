@@ -1,6 +1,7 @@
-import { TMap, updateStripeMap } from "@lib"
+import GydraLEDs, { TMap } from "@lib"
 import { TStripe, TStripeMap } from "@shared"
-import EditableValue from "src/components/EditableValue"
+
+import EditableValue from "@mapping/components/EditableValue"
 
 interface ScaleProps {
 	stripe: TStripe
@@ -29,7 +30,7 @@ export default function Scale({ stripe, updateStripe, map, ax }: ScaleProps) {
 
 		updateStripe({
 			...stripe,
-			map: updateStripeMap(map, stripeMap, stripe.device.num_leds),
+			map: GydraLEDs.updateStripeMap(map, stripeMap, stripe.device.num_leds),
 		})
 	}
 

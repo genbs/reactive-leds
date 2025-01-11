@@ -1,11 +1,13 @@
-import gydraLEDs, { TMap } from "@lib"
-import { TStripe } from "@shared"
 import { useEffect, useState } from "react"
-import Canvas from "./canvas/Canvas"
-import Connection from "./connection/Connection"
-import AppContext, { TAppContext } from "./context"
-import Sidebar from "./sidebar/Sidebar"
-import { hslToColor } from "./utils"
+
+import GydraLEDs, { TMap } from "@lib"
+import { TStripe } from "@shared"
+
+import Canvas from "@mapping/canvas/Canvas"
+import Connection from "@mapping/connection/Connection"
+import AppContext, { TAppContext } from "@mapping/context"
+import Sidebar from "@mapping/sidebar/Sidebar"
+import { hslToColor } from "@mapping/utils"
 
 function App(props: TAppContext) {
 	//return <Debug ws={props.ws} />
@@ -38,16 +40,16 @@ export default function Root() {
 	const [connected, setConnected] = useState(false)
 
 	useEffect(() => {
-		gydraLEDs.begin("ws://localhost:8080")
+		GydraLEDs.begin("ws://localhost:8080")
 
-		return gydraLEDs.onChangeState(state => {
+		return GydraLEDs.onChangeState(state => {
 			setStripes(state.stripes)
 			setConnected(state.connected)
 		})
 	}, [])
 
 	useEffect(() => {
-		return gydraLEDs.watch(globalCanvas, map.gridSize)
+		return GydraLEDs.watch(globalCanvas, map.gridSize)
 	}, [stripes])
 
 	const context: TAppContext = {
@@ -74,7 +76,7 @@ export default function Root() {
 
 		const timeout = setTimeout(() => {
 			setLastStripes(stripeWithoutLeds)
-			stripeWithoutLeds.forEach(stripe => gydraLEDs.updateStripe(stripe.device.address, stripe))
+			stripeWithoutLeds.forEach(stripe => GydraLEDs.updateStripe(stripe.device.address, stripe))
 		}, 0)
 
 		return () => clearTimeout(timeout)

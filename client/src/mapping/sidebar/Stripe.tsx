@@ -1,13 +1,13 @@
-import { TStripe, TStripeMap } from "@shared"
-import Dropdown from "src/components/Dropdown"
-import EditableValue from "src/components/EditableValue"
-
-import gydraLed, { TMap } from "@lib"
 import { useState } from "react"
-import { updateStripeMap } from "src/lib/ui/mapping/utils"
-import { colorToHex, hexToColor } from "src/utils"
-import Debug from "./Debug"
-import Scale from "./Scale"
+
+import GydraLEDs, { TMap } from "@lib"
+import { TStripe, TStripeMap } from "@shared"
+
+import Dropdown from "@mapping/components/Dropdown"
+import EditableValue from "@mapping/components/EditableValue"
+import Debug from "@mapping/sidebar/Debug"
+import Scale from "@mapping/sidebar/Scale"
+import { colorToHex, hexToColor } from "@mapping/utils"
 
 interface StripeProps {
 	stripe: TStripe
@@ -57,7 +57,7 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 			stripe.leds[i * 4 + 3] = data[i * 5 + 4]
 		}
 
-		gydraLed.setLEDs(stripe.device.id, data)
+		GydraLEDs.setLEDs(stripe.device.id, data)
 
 		updateStripe(stripe)
 	}
@@ -79,7 +79,7 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 	function onChangeBrightness(b) {
 		const v = parseInt(b.target.value)
 
-		gydraLed.updateStripe(stripe.device.address, { ...stripe, device: { ...stripe.device, brightness: v } })
+		GydraLEDs.updateStripe(stripe.device.address, { ...stripe, device: { ...stripe.device, brightness: v } })
 	}
 
 	return (
@@ -149,7 +149,7 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 							<span
 								onClick={() => {
 									const stripeMap: TStripeMap = { ...stripe.map, orientation: (stripe.map.orientation + 1) % 4 }
-									updateStripe({ ...stripe, map: updateStripeMap(map, stripeMap, stripe.device.num_leds) })
+									updateStripe({ ...stripe, map: GydraLEDs.updateStripeMap(map, stripeMap, stripe.device.num_leds) })
 								}}
 								className="pointer unicode unicode--l pd--1"
 							>
@@ -181,7 +181,7 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 								</div>
 							</div>
 							<div>
-								<button onClick={() => gydraLed.deleteStripe(stripe.device.address)}>Delete</button>
+								<button onClick={() => GydraLEDs.deleteStripe(stripe.device.address)}>Delete</button>
 							</div>
 						</div>
 					)}

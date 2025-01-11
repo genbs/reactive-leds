@@ -40,7 +40,7 @@ export function stripeToRect(stripe: TStripe) {
  * @returns {pixels, width, height}
  */
 export function mapStripeOnData(
-	data: Uint8Array | Uint8ClampedArray,
+	data: Uint8Array | Uint8ClampedArray | ImageBitmap,
 	dataSize: [number, number],
 	mapGrid: [number, number],
 	stripe: TStripe

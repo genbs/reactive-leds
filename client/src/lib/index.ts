@@ -1,17 +1,22 @@
 import * as bluetooth from "./bluetooth"
 import * as proxy from "./proxy"
-import * as state from "./state"
+import * as state from "./worker/state"
 
-import { TMap, updateStripeMap } from "./ui/mapping/utils"
+import * as events from "./ui/mapping/events"
+import * as index from "./ui/mapping/index"
+import * as utils from "./ui/mapping/utils"
+import * as rendering from "./ui/rendering"
 
-const gydraLeds = {
-	...proxy,
+const GydraLEDs = {
 	...bluetooth,
+	...proxy,
 	...state,
+	...events,
+	...index,
+	...utils,
+	...rendering,
 }
 
-export { updateStripeMap }
+export { TMap } from "./ui/mapping/utils"
 
-export type { TMap }
-
-export default gydraLeds
+export default GydraLEDs

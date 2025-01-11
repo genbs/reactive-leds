@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react"
-import EditableValue from "src/components/EditableValue"
-import { drawGrid } from "src/lib/ui/rendering"
-import NetClients from "./NetClients"
-import Stripe from "./Stripe"
+
+import GydraLEDs from "@lib"
+
+import EditableValue from "@mapping/components/EditableValue"
+import NetClients from "@mapping/sidebar/NetClients"
+import Stripe from "@mapping/sidebar/Stripe"
 
 export default function Sidebar({ stripes, connected, updateStripe, map, updateMap, canvas }) {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -24,7 +26,7 @@ export default function Sidebar({ stripes, connected, updateStripe, map, updateM
 		function render() {
 			dstctx.clearRect(0, 0, width, height)
 			dstctx.drawImage(canvas, 0, 0)
-			drawGrid(dstctx, map.gridSize)
+			GydraLEDs.drawGrid(dstctx, map.gridSize)
 			rid = requestAnimationFrame(render)
 		}
 

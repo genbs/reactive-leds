@@ -1,10 +1,10 @@
-import { TStripe } from "@shared"
 import { useEffect, useRef } from "react"
 
-import { TMap } from "@lib"
-import { mappingUI } from "src/lib/ui/mapping"
-import useClientRect from "../hooks/useClientRect"
-import { style } from "../utils"
+import GydraLEDs, { TMap } from "@lib"
+import { TStripe } from "@shared"
+
+import useClientRect from "@mapping/hooks/useClientRect"
+import { style } from "@mapping/utils"
 
 interface CanvasProps {
 	map: TMap
@@ -28,7 +28,7 @@ export default function Canvas(props: CanvasProps) {
 	useEffect(() => {
 		if (!canvasRef.current) return
 
-		return mappingUI(canvasRef.current, props.map, props.stripes, props.updateStripe)
+		return GydraLEDs.mappingUI(canvasRef.current, props.map, props.stripes, props.updateStripe)
 	}, [canvasRef.current, props.stripes])
 
 	return (

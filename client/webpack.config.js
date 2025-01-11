@@ -2,24 +2,24 @@ const path = require("path")
 const webpack = require("webpack")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
 const TsconfigPathsPlugin = require("tsconfig-paths-webpack-plugin")
+const fs = require("fs")
 
 module.exports = {
 	entry: {
-		app: "./src/index.tsx",
+		mapping: "./src/mapping/index.tsx",
+		lib: "./src/lib/index.ts",
 	},
 
 	output: {
 		libraryTarget: "umd", // Supporta sia CommonJS che ES6
 		filename: "[name].js",
 		path: __dirname + "/build",
+		library: {
+			name: "leds",
+			type: "this",
+			export: "default",
+		},
 	},
-	// output: {
-	// 	library: {
-	// 		name: "GydraLED",
-	// 		type: "this",
-	// 		export: "default",
-	// 	},
-	// },
 	devtool: "source-map",
 	module: {
 		rules: [
@@ -47,22 +47,22 @@ module.exports = {
 	},
 	plugins: [
 		new HtmlWebpackPlugin({
-			template: "./src/index.html",
+			template: "./src/mapping/index.html",
 		}),
 		new webpack.DefinePlugin({
 			"process.env": JSON.stringify({ ...process.env }),
 		}),
-		// {
-		// 	apply: compiler => {
-		// 		compiler.hooks.afterEmit.tap("AfterEmitPlugin", compilation => {
-		// 			let filePath = path.resolve(__dirname, "build", "gydra-led.js")
-		// 			// copy to examples folder
-		// 			fs.copyFileSync(filePath, path.resolve("examples/gydra-led.js"))
-		// 		filePath = path.resolve(__dirname, "build", "gydra-led.js.map")
-		// 			fs.copyFileSync(filePath, path.resolve("examples/gydra-led.js.map"))
-		// 		})
-		// 	},
-		// },
+		{
+			apply: compiler => {
+				compiler.hooks.afterEmit.tap("AfterEmitPlugin", compilation => {
+					let filePath = path.resolve(__dirname, "build", "lib.js")
+					// copy to examples folder
+					fs.copyFileSync(filePath, path.resolve("examples/lib.js"))
+					filePath = path.resolve(__dirname, "build", "lib.js.map")
+					fs.copyFileSync(filePath, path.resolve("examples/lib.js.map"))
+				})
+			},
+		},
 	],
 	devServer: {
 		static: {

@@ -1,6 +1,7 @@
 import { createRef, useEffect, useState } from "react"
-import useClickOutside from "src/hooks/useClickOutside"
-import { style } from "src/utils"
+
+import useClickOutside from "@mapping/hooks/useClickOutside"
+import { style } from "@mapping/utils"
 
 style(`
     .editable-value {

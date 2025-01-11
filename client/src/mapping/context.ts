@@ -1,6 +1,7 @@
+import { createContext } from "react"
+
 import { TMap } from "@lib"
 import { TStripe } from "@shared"
-import { createContext } from "react"
 
 export type TAppContext = {
 	stripes: TStripe[]

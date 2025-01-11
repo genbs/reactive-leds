@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client"
-import App from "./App"
+
+import App from "@mapping/App"
 
 const main = document.getElementById("root")!
 
