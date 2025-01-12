@@ -11,7 +11,8 @@ export function mappingUI(
 	updateStripe: (stripe: TStripe) => void
 ) {
 	const ctx = canvas.getContext("2d")
-	if (!ctx) return
+	if (!ctx) return () => {}
+
 	const rect = canvas.getBoundingClientRect()
 	const events = mappingEvents(rect, map, stripes, (map: TStripeMap, stripe: TStripe) => {
 		updateStripe({ ...stripe, map })

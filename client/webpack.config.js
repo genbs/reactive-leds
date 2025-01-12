@@ -56,10 +56,12 @@ module.exports = {
 			apply: compiler => {
 				compiler.hooks.afterEmit.tap("AfterEmitPlugin", compilation => {
 					let filePath = path.resolve(__dirname, "build", "lib.js")
-					// copy to examples folder
 					fs.copyFileSync(filePath, path.resolve("examples/lib.js"))
+					fs.copyFileSync(filePath, path.resolve("../../../exts/leds.js"))
+
 					filePath = path.resolve(__dirname, "build", "lib.js.map")
 					fs.copyFileSync(filePath, path.resolve("examples/lib.js.map"))
+					fs.copyFileSync(filePath, path.resolve("../../../exts/leds.map.js"))
 				})
 			},
 		},

@@ -17,22 +17,22 @@
 			;(async () => {
 				await leds.begin("ws://localhost:8080")
 				const gydra = Gydra({
-					width: 200,
-					height: 200,
-					autoTick: false,
+					width: 600,
+					height: 600,
+					autoTick: true,
 				})
+				gydra.eval("noise(1).out()")
 
-				gydra.eval("osc(20, .5).modulatePixelate(src(o0).scale(.99)).thresh().out()")
-
+				leds.show()
 				leds.watch(document.querySelector("canvas"), [10, 10])
 
-				function send() {
-					gydra.tick()
+				// function send() {
+				// 	gydra.tick()
 
-					requestAnimationFrame(send)
-				}
+				// 	requestAnimationFrame(send)
+				// }
 
-				requestAnimationFrame(send)
+				// requestAnimationFrame(send)
 			})()
 		</script>
 	</body>

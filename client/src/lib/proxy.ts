@@ -6,7 +6,6 @@ import {
 	TWSRequestBlink,
 	TWSRequestJSONConnectDevice,
 	TWSRequestJSONGetClients,
-	TWSRequestJSONGetStripes,
 	TWSRequestJSONUpdateStripe,
 	TWSRequestSetLEDs,
 } from "@shared"
@@ -14,8 +13,9 @@ import {
 // @ts-ignore
 import MyWorker from "./worker/index.worker"
 
+import { mappingUI } from "./ui/mapping"
 import type { WorkerRequest, WorkerResponse } from "./worker/index.worker.js"
-import { updateState } from "./worker/state"
+import * as proxyState from "./worker/state"
 
 ///////////////////////////
 
@@ -23,19 +23,11 @@ import { updateState } from "./worker/state"
 
 function onWorkerMessage(message: WorkerResponse) {
 	switch (message.event) {
-		case "get_stripes":
-			updateState({
-				stripes: message.data.map(stripe => ({
-					...stripe,
-					leds: new Uint8Array(Object.values(stripe.leds)),
-				})),
-			})
-			break
-		case "get_clients":
-			updateState({ clients: message.data })
+		case "update_state":
+			proxyState.updateState(message.data)
 			break
 		case "connectionChange":
-			updateState({ connected: message.data.status })
+			proxyState.updateState({ connected: message.data.status })
 			break
 		case "leds-setteds":
 			break
@@ -84,9 +76,10 @@ export function begin(serverUrl: string, debug = false): Promise<void> {
 
 		bind(onWorkerMessage)
 
-		once(({ event, data }) => {
+		let unbind = bind(({ event, data }) => {
 			if (event === "connectionChange" && data.status) {
 				resolved = true
+				unbind()
 				resolve()
 			}
 		})
@@ -137,18 +130,14 @@ export function deleteStripe(ip: string) {
 
 ///////////////////////////
 
+let watchRID = 0
 export function watch(canvas: HTMLCanvasElement, gridSize: [number, number]) {
 	checkConnected()
 
-	let rid = 0
+	cancelAnimationFrame(watchRID)
 
-	function sendToWorker() {
-		once(({ event }) => {
-			if (event === "leds-setteds") {
-				rid = requestAnimationFrame(sendToWorker)
-			}
-		})
-
+	let lastSent = 0
+	function start_watching() {
 		createImageBitmap(canvas).then(imageBitmap => {
 			globalWorker.postMessage(
 				{
@@ -161,12 +150,14 @@ export function watch(canvas: HTMLCanvasElement, gridSize: [number, number]) {
 				},
 				[imageBitmap]
 			)
+
+			setTimeout(() => {
+				watchRID = requestAnimationFrame(start_watching)
+			}, 1000 / 60)
 		})
 	}
 
-	requestAnimationFrame(sendToWorker)
-
-	return () => cancelAnimationFrame(rid)
+	watchRID = requestAnimationFrame(start_watching)
 }
 
 /**
@@ -196,3 +187,49 @@ export function blink(stripe_id: TStripe["device"]["id"]) {
 }
 
 ///////////////////////////
+
+let showRAFID = -1
+export function show(gridSize: [number, number]) {
+	const currentCanvas = document.querySelector("canvas[data-type=leds]")
+	if (currentCanvas) {
+		return cancelAnimationFrame(showRAFID)
+	}
+
+	const canvasRef = document.querySelector("canvas:not([data-type=leds])") as HTMLCanvasElement | null
+	if (!canvasRef) throw new Error("Canvas not found")
+
+	const canvas = document.createElement("canvas")
+	canvas.width = 200
+	canvas.height = (canvasRef.height / canvasRef.width) * 200
+	canvas.style.position = "fixed"
+	canvas.style.top = "0"
+	canvas.style.right = "0"
+	canvas.style.zIndex = "9999"
+	canvas.setAttribute("data-type", "leds")
+	canvas.style.border = "1px solid red"
+	document.body.appendChild(canvas)
+
+	function draw() {
+		const stripes = proxyState.getState().stripes
+		mappingUI(
+			canvas,
+			{
+				gridSize,
+			},
+			stripes,
+			(stripe: TStripe) => {
+				updateStripe(stripe.device.address, stripe)
+			}
+		)
+	}
+
+	let lastUpdate = 0
+	proxyState.onChangeState(() => {
+		const now = performance.now()
+		if (now - lastUpdate < 1000 / 24) return
+		lastUpdate = now
+		draw()
+	})
+
+	draw()
+}

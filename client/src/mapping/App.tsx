@@ -49,7 +49,7 @@ export default function Root() {
 	}, [])
 
 	useEffect(() => {
-		return GydraLEDs.watch(globalCanvas, map.gridSize)
+		//return GydraLEDs.watch(globalCanvas, map.gridSize)
 	}, [stripes])
 
 	const context: TAppContext = {

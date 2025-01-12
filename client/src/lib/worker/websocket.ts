@@ -22,6 +22,7 @@ const defaultSettings: Partial<WSSettings> = {
 }
 
 export default class WS extends EventEmitter<WSEvents<TWSResponse>> {
+	public url!: string
 	private retries = 0
 	public settings: WSSettings
 	public connected: boolean
@@ -31,7 +32,7 @@ export default class WS extends EventEmitter<WSEvents<TWSResponse>> {
 		super()
 
 		this.settings = { ...defaultSettings, ...settings } as WSSettings
-
+		this.url = this.settings.url
 		if (this.settings.autoConnect) this.connect()
 		else this.socket = null
 

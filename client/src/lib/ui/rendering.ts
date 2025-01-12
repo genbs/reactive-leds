@@ -16,7 +16,7 @@ export function drawGrid(ctx: CanvasRenderingContext2D, gridSize: [number, numbe
 
 	ctx.strokeStyle = "#333"
 	ctx.lineWidth = 1
-	ctx.font = "8px Arial"
+	ctx.font = "6px Arial"
 	ctx.fillStyle = "#666"
 
 	for (let i = 0; i <= gridSize[0]; i++) {
@@ -42,7 +42,7 @@ export function drawGrid(ctx: CanvasRenderingContext2D, gridSize: [number, numbe
 				ctx.textBaseline = "top"
 				const xText = i * cellWidth
 				const yText = j * cellHeight
-				const pd = 5
+				const pd = 2
 
 				ctx.fillText(`${i.toString().padStart(2, "0")},${j.toString().padStart(2, "0")}`, xText + pd, yText + pd)
 			}
@@ -77,7 +77,7 @@ const angleArrowMap = {
 }
 
 function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: number, cellHeight: number) {
-	const color = stripe.map.visible ? stripe.color || [120, 120, 120, 255] : [120, 120, 120, 255]
+	const color = stripe.map.visible ? stripe.color || [0, 255, 0, 255] : [255, 0, 0, 255]
 	const stripeMap = stripe.map
 
 	const { direction } = angleArrowMap[stripeMap.orientation]
