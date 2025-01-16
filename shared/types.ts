@@ -17,25 +17,18 @@ export interface TESP extends TESPConfig {
 	lastPing: number
 }
 
-export enum EStripeOrientation {
-	Vertical = 0, // from down to up
-	Horizontal = 1, // from left to right
-	VerticalReverse = 2, // from up to down
-	HorizontalReverse = 3, // from right to left
-}
-
 export type TStripeMap = {
-	orientation?: EStripeOrientation
-	x: number
-	y: number
-	scale: [number, number]
+	x1: number
+	y1: number
+	x2: number
+	y2: number
 	visible: boolean
 }
 
 export type TStripe = TESP & {
 	name: string
 	color: TColor
-	leds: Uint8Array // [r, g, b, w, r, g, b, w, ...]
+	leds: Array<number> // [r, g, b, w, r, g, b, w, ...]
 
 	map: TStripeMap
 }

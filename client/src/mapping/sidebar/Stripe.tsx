@@ -1,7 +1,7 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import GydraLEDs from "@lib"
-import { TConfig, TStripe, TStripeMap } from "@shared"
+import { TConfig, TStripe } from "@shared"
 
 import Dropdown from "@mapping/components/Dropdown"
 import EditableValue from "@mapping/components/EditableValue"
@@ -13,33 +13,20 @@ interface StripeProps {
 	stripe: TStripe
 	updateStripe: (stripe: TStripe) => void
 	grid: TConfig["grid"]
+	canvas: HTMLCanvasElement | OffscreenCanvas
 }
 
-export default function Stripe({ stripe, updateStripe, grid }: StripeProps) {
+export default function Stripe({ stripe, updateStripe, grid, canvas }: StripeProps) {
 	const [prevPixel, setPrevPixel] = useState<Uint8Array>(new Uint8Array(0))
 	const [prevUpdate, setPrevUpdate] = useState(0)
 
 	const [imageLeds, setImageLeds] = useState<boolean>(false)
 
-	// useEffect(() => {
-	// 	if (!imageLeds) return
+	useEffect(() => {
+		if (!imageLeds) return
 
-	// 	const now = performance.now()
-	// 	if (!stripe || !image || now - prevUpdate < 1000 / 60) return
-
-	// 	const { pixels } = mapStripeOnData(image.data, image.size, map.gridSize, stripe)
-
-	// 	for (let i = 0; i < stripe.num_leds; i += 4) {
-	// 		pixels[i + 3] = 0
-	// 	}
-	// 	// check equal
-	// 	if (prevPixel.length === pixels.length && prevPixel.every((v, i) => v === pixels[i])) return
-
-	// 	setPrevPixel(pixels)
-	// 	setPrevUpdate(now)
-
-	// 	setLeds(pixels)
-	// }, [imageLeds, stripe, image, prevPixel, prevUpdate])
+		return GydraLEDs.watch(canvas, [stripe.id])
+	}, [imageLeds, canvas, stripe.id])
 
 	function setLeds(colors: Uint8Array) {
 		const data = new Uint8Array(stripe.num_leds * 5)
@@ -146,7 +133,7 @@ export default function Stripe({ stripe, updateStripe, grid }: StripeProps) {
 							>
 								{stripe.map.visible ? "⊡" : "⊠"}
 							</span>
-							<span
+							{/* <span
 								onClick={() => {
 									const stripeMap: TStripeMap = { ...stripe.map, orientation: (stripe.map.orientation + 1) % 4 }
 									updateStripe({ ...stripe, map: GydraLEDs.updateStripeMap(grid, stripeMap, stripe.num_leds) })
@@ -154,7 +141,7 @@ export default function Stripe({ stripe, updateStripe, grid }: StripeProps) {
 								className="pointer unicode unicode--l pd--1"
 							>
 								⟳
-							</span>
+							</span> */}
 
 							<div className="flex gap flex--v-center">
 								<Scale stripe={stripe} updateStripe={updateStripe} grid={grid} ax="x" />

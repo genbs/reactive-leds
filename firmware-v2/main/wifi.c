@@ -62,6 +62,13 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
+
+void wifi_disable_sleep() 
+{
+    ESP_LOGV(WIFI_TAG, "Disabling WiFi sleep");
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+}
+
 void wifi_init_sta() 
 {
     ESP_LOGV(WIFI_TAG, "Starting WiFi Station");

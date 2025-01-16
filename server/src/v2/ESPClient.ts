@@ -11,7 +11,6 @@ export class ESPClient implements TESP {
 	public hostname: string
 	public brightness: number
 	public lastPing: number = 0
-	private checkAlive = true
 
 	constructor(device: Partial<TESP>) {
 		this.address = device.address
@@ -38,11 +37,11 @@ export class ESPClient implements TESP {
 	 * Ping the device to check if it's online.
 	 */
 	async isAlive() {
-		if (!this.checkAlive) return
-
 		this.online = await this.ping()
 
 		if (this.online) this.lastPing = Date.now()
+
+		setTimeout(() => this.isAlive(), 10000)
 	}
 
 	/**

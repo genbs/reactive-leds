@@ -1,5 +1,5 @@
 import { TConfig, TStripe, TStripeMap } from "@shared"
-import { isInsideStripe, updateStripeMap } from "./utils"
+import { isInsideStripe } from "./utils"
 
 type DragState = {
 	isDragging: boolean
@@ -16,16 +16,17 @@ let dragState: DragState = {
 	dragMapInitial: null,
 	dragStripe: null,
 }
-export function mappingEvents(
-	rect: DOMRect | null,
-	config: TConfig,
-	update: (map: TStripeMap, stripe: TStripe) => void,
-	stripeAction?: (event: "click", stripe: TStripe) => void
-) {
-	const onClick = (e: MouseEvent) => {
-		// controlla se sto cliccando il rotate di una stripe
-		if (!rect || !stripeAction) return
 
+let selectedStripe: TStripe | null = null
+
+export function mappingEvents(
+	canvas: HTMLCanvasElement,
+	config: TConfig,
+	update: (map: TStripeMap, stripe: TStripe) => void
+) {
+	const rect = canvas.getBoundingClientRect()
+
+	const onClick = (e: MouseEvent) => {
 		const localX = e.clientX - rect.left
 		const localY = e.clientY - rect.top
 		const [cells, rows] = config.grid
@@ -37,13 +38,18 @@ export function mappingEvents(
 		for (const stripe of config.stripes) {
 			if (stripe.map?.visible === false) continue
 			if (isInsideStripe(ix, iy, stripe)) {
-				stripeAction("click", stripe)
+				selectedStripe = stripe
+
+				return
 			}
 		}
+
+		selectedStripe = null
 	}
 
 	const onMouseDown = (e: MouseEvent) => {
-		if (!rect) return
+		if (!selectedStripe) return
+
 		const [cells, rows] = config.grid
 		const cellWidth = rect.width / cells
 		const cellHeight = rect.height / rows
@@ -92,22 +98,15 @@ export function mappingEvents(
 
 		const stripeMap = {
 			...dragStripe.map,
-			x: dragMapInitial.x + gridDeltaX,
-			y: dragMapInitial.y + gridDeltaY,
+			x1: dragMapInitial.x1 + gridDeltaX,
+			y1: dragMapInitial.y1 + gridDeltaY,
+			x2: dragMapInitial.x2 + gridDeltaX,
+			y2: dragMapInitial.y2 + gridDeltaY,
 		}
-		// Nuova posizione basata sulla posizione iniziale
-		const { x: newX, y: newY } = updateStripeMap(config.grid, stripeMap, dragStripe.num_leds)
 
 		// Aggiorna solo se cambia cella
-		if (dragStripe.map.x !== newX || dragStripe.map.y !== newY) {
-			update(
-				{
-					...dragStripe.map,
-					x: newX,
-					y: newY,
-				},
-				dragStripe
-			)
+		if (JSON.stringify(stripeMap) !== JSON.stringify(dragStripe.map)) {
+			update(stripeMap, dragStripe)
 		}
 	}
 
@@ -120,5 +119,15 @@ export function mappingEvents(
 		}
 	}
 
-	return { onMouseDown, onMouseMove, onMouseUp, onClick }
+	canvas.addEventListener("mousedown", onMouseDown)
+	canvas.addEventListener("mousemove", onMouseMove)
+	canvas.addEventListener("mouseup", onMouseUp)
+	canvas.addEventListener("click", onClick)
+
+	return () => {
+		canvas.removeEventListener("mousedown", onMouseDown)
+		canvas.removeEventListener("mousemove", onMouseMove)
+		canvas.removeEventListener("mouseup", onMouseUp)
+		canvas.removeEventListener("click", onClick)
+	}
 }

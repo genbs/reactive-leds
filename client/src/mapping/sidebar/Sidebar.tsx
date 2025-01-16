@@ -10,9 +10,9 @@ import { TConfig } from "@shared"
 interface SidebarProps {
 	config: TConfig
 	connected: boolean
-	updateStripe
-	updateGrid
-	canvas
+	updateStripe: (stripe: TConfig["stripes"][0]) => void
+	updateGrid: (gridSize: [number, number]) => void
+	canvas: HTMLCanvasElement | OffscreenCanvas
 }
 
 export default function Sidebar(props: SidebarProps) {
@@ -64,7 +64,13 @@ export default function Sidebar(props: SidebarProps) {
 					/>
 				</div>
 				{props.config.stripes.map(stripe => (
-					<Stripe grid={props.config.grid} key={stripe.address} stripe={stripe} updateStripe={props.updateStripe} />
+					<Stripe
+						canvas={props.canvas}
+						grid={props.config.grid}
+						key={stripe.address}
+						stripe={stripe}
+						updateStripe={props.updateStripe}
+					/>
 				))}
 			</section>
 

@@ -1,4 +1,4 @@
-import { EStripeOrientation, TConfig, TStripe, TStripeMap } from "@shared"
+import { TStripe } from "@shared"
 
 export type TMap = {
 	gridSize: [number, number]
@@ -9,25 +9,17 @@ export type TMap = {
  * @param stripe TStripe
  */
 export function stripeToRect(stripe: TStripe) {
-	const [scaleX, scaleY] = stripe.map.scale
-	const x = stripe.map.x
-	const y = stripe.map.y
-	const lengthX = stripe.num_leds * scaleX
-	const lengthY = stripe.num_leds * scaleY
+	const { x1, y1, x2, y2 } = stripe.map
 
-	switch (stripe.map.orientation) {
-		case EStripeOrientation.Horizontal:
-			return { x1: x, y1: y, x2: x + lengthX, y2: y + scaleY }
+	// calculate bounding rect
+	let x, y, width, height
 
-		case EStripeOrientation.Vertical:
-			return { x1: x, y1: y, x2: x + scaleX, y2: y + lengthY }
+	x = Math.min(x1, x2)
+	y = Math.min(y1, y2)
+	width = Math.abs(x1 - x2)
+	height = Math.abs(y1 - y2)
 
-		case EStripeOrientation.HorizontalReverse:
-			return { x1: x - lengthX, y1: y, x2: x, y2: y + scaleY }
-
-		case EStripeOrientation.VerticalReverse:
-			return { x1: x, y1: y - lengthY, x2: x + scaleX, y2: y }
-	}
+	return { x, y, width, height }
 }
 
 /**
@@ -47,10 +39,10 @@ export function mapStripeOnData(
 ): { pixels: Uint8Array; width: number; height: number } {
 	const [imgWidth, imgHeight] = dataSize
 	const [cells, rows] = mapGrid
-	const { x1, y1, x2, y2 } = stripeToRect(stripe)
-	console.log(stripe, stripeToRect(stripe))
-	const cellCountX = (x2 - x1) / stripe.map.scale[0]
-	const cellCountY = (y2 - y1) / stripe.map.scale[1]
+	const { x1, y1, x2, y2 } = stripe.map
+
+	const cellCountX = x2 - x1
+	const cellCountY = y2 - y1
 
 	const cellWidth = imgWidth / cells
 	const cellHeight = imgHeight / rows
@@ -75,12 +67,12 @@ export function mapStripeOnData(
 			const srcIndex = (centerY * imgWidth + centerX) * 4
 			let dstIndex = pyOffset + px * 4
 
-			if (
-				stripe.map.orientation === EStripeOrientation.HorizontalReverse ||
-				stripe.map.orientation === EStripeOrientation.VerticalReverse
-			) {
-				dstIndex = outSize - dstIndex - 4
-			}
+			// if (
+			// 	stripe.map.orientation === EStripeOrientation.HorizontalReverse ||
+			// 	stripe.map.orientation === EStripeOrientation.VerticalReverse
+			// ) {
+			// 	dstIndex = outSize - dstIndex - 4
+			// }
 
 			output[dstIndex] = data[srcIndex]
 			output[dstIndex + 1] = data[srcIndex + 1]
@@ -100,37 +92,35 @@ export function mapStripeOnData(
 }
 
 export function isInsideStripe(cell: number, row: number, stripe: TStripe) {
-	const rect = stripeToRect(stripe)
-
-	if (cell >= rect.x1 && cell <= rect.x2 && row >= rect.y1 && row <= rect.y2) {
+	if (cell >= stripe.map.x1 && cell <= stripe.map.x2 && row >= stripe.map.y1 && row <= stripe.map.y2) {
 		return true
 	}
 
 	return false
 }
 
-export function updateStripeMap(grid: TConfig["grid"], stripeMap: TStripeMap, length: number) {
-	const [cols, rows] = grid
+// export function updateStripeMap(grid: TConfig["grid"], stripeMap: TStripeMap, length: number) {
+// 	const [cols, rows] = grid
 
-	const horizontal =
-		stripeMap.orientation === EStripeOrientation.Horizontal ||
-		stripeMap.orientation === EStripeOrientation.HorizontalReverse
-	const vertical =
-		stripeMap.orientation === EStripeOrientation.Vertical ||
-		stripeMap.orientation === EStripeOrientation.VerticalReverse
+// 	const horizontal =
+// 		stripeMap.orientation === EStripeOrientation.Horizontal ||
+// 		stripeMap.orientation === EStripeOrientation.HorizontalReverse
+// 	const vertical =
+// 		stripeMap.orientation === EStripeOrientation.Vertical ||
+// 		stripeMap.orientation === EStripeOrientation.VerticalReverse
 
-	const minX = stripeMap.orientation === EStripeOrientation.HorizontalReverse ? length : 0
-	const maxX = stripeMap.orientation === EStripeOrientation.Horizontal ? cols - length : vertical ? cols - 1 : cols
+// 	const minX = stripeMap.orientation === EStripeOrientation.HorizontalReverse ? length : 0
+// 	const maxX = stripeMap.orientation === EStripeOrientation.Horizontal ? cols - length : vertical ? cols - 1 : cols
 
-	const minY = stripeMap.orientation === EStripeOrientation.VerticalReverse ? length : 0
-	const maxY = stripeMap.orientation === EStripeOrientation.Vertical ? rows - length : horizontal ? rows - 1 : rows
+// 	const minY = stripeMap.orientation === EStripeOrientation.VerticalReverse ? length : 0
+// 	const maxY = stripeMap.orientation === EStripeOrientation.Vertical ? rows - length : horizontal ? rows - 1 : rows
 
-	const newX = Math.max(minX, Math.min(stripeMap.x, maxX))
-	const newY = Math.max(minY, Math.min(stripeMap.y, maxY))
+// 	const newX = Math.max(minX, Math.min(stripeMap.x, maxX))
+// 	const newY = Math.max(minY, Math.min(stripeMap.y, maxY))
 
-	return {
-		...stripeMap,
-		x: newX,
-		y: newY,
-	}
-}
+// 	return {
+// 		...stripeMap,
+// 		x: newX,
+// 		y: newY,
+// 	}
+// }

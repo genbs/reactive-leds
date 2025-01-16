@@ -8,7 +8,7 @@ export type WorkerRequest =
 	  }
 	| {
 			type: "watch"
-			data: { bitmap: ImageBitmap; grid: [number, number] }
+			data: { bitmap: ImageBitmap; grid: [number, number]; stripesId: TStripe["id"][] }
 	  }
 	| {
 			type: "update_stripe"

@@ -14,6 +14,7 @@ import {
 } from "@shared"
 
 import { mappingUI } from "../ui/mapping"
+import { WorkerRequest } from "../worker/types"
 import { checkConnected, getState, globalWorker, onChangeState } from "./com"
 
 ///////////////////////////
@@ -39,7 +40,6 @@ export function getConfig() {
 export function setConfig(config: Partial<TConfig>) {
 	const currentConfig = getState().config
 	if (JSON.stringify({ ...currentConfig, ...config }) === JSON.stringify(currentConfig)) return
-
 	checkConnected()
 
 	const request: TWSRequestJSONSetConfig = { type: "set_config", data: config }
@@ -101,13 +101,15 @@ export function blink(stripe_id: TStripe["id"]) {
 
 let watchRID = 0
 let watchTimeout: NodeJS.Timeout
-export function watch(canvas: HTMLCanvasElement) {
+export function watch(canvas: HTMLCanvasElement | OffscreenCanvas, stripes?: TStripe["id"][]) {
 	checkConnected()
 
 	cancelAnimationFrame(watchRID)
 	clearTimeout(watchTimeout)
 
 	const grid = getState().config.grid
+
+	stripes = !stripes || stripes.length === 0 ? getState().config.stripes.map(s => s.id) : stripes
 
 	function start_watching() {
 		createImageBitmap(canvas).then(imageBitmap => {
@@ -117,8 +119,9 @@ export function watch(canvas: HTMLCanvasElement) {
 					data: {
 						bitmap: imageBitmap,
 						grid: grid,
+						stripesId: stripes,
 					},
-				},
+				} as WorkerRequest,
 				[imageBitmap]
 			)
 
@@ -129,6 +132,11 @@ export function watch(canvas: HTMLCanvasElement) {
 	}
 
 	watchRID = requestAnimationFrame(start_watching)
+
+	return () => {
+		cancelAnimationFrame(watchRID)
+		clearTimeout(watchTimeout)
+	}
 }
 
 ///////////////////////////

@@ -41,10 +41,6 @@ export default function Root() {
 		})
 	}, [])
 
-	useEffect(() => {
-		return GydraLEDs.watch(globalCanvas)
-	}, [config])
-
 	const context: TAppContext = {
 		config,
 		updateStripe: (stripe: TStripe) => {
@@ -101,10 +97,10 @@ export default function Root() {
 					distance = distance + Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2) * 0.9
 
 					const [r, g, b, a] = hslToColor(
-						-time * 0.001 + iOffset * 420,
+						-time * 0.01 + iOffset * 420,
 						//((i * j) / (width * height)) * Math.cos(time * 0.001) ** 2,
 						1,
-						Math.round(time * 0.001 + iOffset * 3) % 2 === 0 ? 0.5 : 0
+						Math.round(time * 0.003 + iOffset * 3) % 2 === 0 ? 0.5 : 0
 					)
 
 					data[index] = r

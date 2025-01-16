@@ -1,12 +1,15 @@
 import { TColor, TStripe } from "@shared"
 
 export default function Debug(props: { stripe: TStripe; updateStripe: (stripe: TStripe) => void }) {
-	const selected = props.stripe.leds.subarray(0, 4) as TColor
+	const selected = props.stripe.leds.slice(0, 4) as TColor
 
 	function setStripeColor(color: TColor) {
-		const newLeds = new Uint8Array(props.stripe.leds.length)
+		const newLeds: number[] = new Array(props.stripe.leds.length)
 		for (let i = 0; i < props.stripe.leds.length; i += 4) {
-			newLeds.set(color, i)
+			newLeds[i] = color[0]
+			newLeds[i + 1] = color[1]
+			newLeds[i + 2] = color[2]
+			newLeds[i + 3] = color[3]
 		}
 
 		props.updateStripe({ ...props.stripe, leds: newLeds })
@@ -14,7 +17,7 @@ export default function Debug(props: { stripe: TStripe; updateStripe: (stripe: T
 
 	return (
 		<div>
-			<h2>Debug</h2>
+			<h2>Debug {props.stripe.id}</h2>
 			<DebugColor selected={selected} onChange={setStripeColor} />
 		</div>
 	)

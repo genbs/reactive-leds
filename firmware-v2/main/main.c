@@ -21,7 +21,10 @@ void app_main(void)
 {
     storage_begin();
 
+    
     wifi_init_sta();
+
+    wifi_disable_sleep();
 
     int num_networks;
     wifi_ap_record_t *networks = wifi_scan(&num_networks);

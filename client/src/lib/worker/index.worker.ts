@@ -77,24 +77,33 @@ function imageDataFromBitmap(bitmap: ImageBitmap): Uint8ClampedArray {
 	return ctx.getImageData(0, 0, bitmap.width, bitmap.height).data
 }
 
-function watchCanvas({ bitmap, grid }: { bitmap: ImageBitmap; grid: [number, number] }) {
+function watchCanvas({
+	bitmap,
+	grid,
+	stripesId,
+}: {
+	bitmap: ImageBitmap
+	grid: [number, number]
+	stripesId: TStripe["id"][]
+}) {
 	const stripes = workerState.getState().config.stripes
-
 	const imageData = imageDataFromBitmap(bitmap)
 	for (const stripe of stripes) {
-		const { pixels } = mapStripeOnData(imageData, [bitmap.width, bitmap.height], grid, stripe)
-		for (let i = 0; i < stripe.num_leds; i++) {
-			pixels[i * 4 + 3] = 0
+		if (stripesId.includes(stripe.id)) {
+			const { pixels } = mapStripeOnData(imageData, [bitmap.width, bitmap.height], grid, stripe)
+			for (let i = 0; i < stripe.num_leds; i++) {
+				pixels[i * 4 + 3] = 0
+			}
+			const data = new Uint8Array(stripe.num_leds * 5)
+			for (let i = 0; i < stripe.num_leds; i++) {
+				data[i * 5] = i
+				data[i * 5 + 1] = pixels[i * 4]
+				data[i * 5 + 2] = pixels[i * 4 + 1]
+				data[i * 5 + 3] = pixels[i * 4 + 2]
+				data[i * 5 + 4] = pixels[i * 4 + 3]
+			}
+			setLEDs(stripe.id, data)
 		}
-		const data = new Uint8Array(stripe.num_leds * 5)
-		for (let i = 0; i < stripe.num_leds; i++) {
-			data[i * 5] = i
-			data[i * 5 + 1] = pixels[i * 4]
-			data[i * 5 + 2] = pixels[i * 4 + 1]
-			data[i * 5 + 3] = pixels[i * 4 + 2]
-			data[i * 5 + 4] = pixels[i * 4 + 3]
-		}
-		setLEDs(stripe.id, data)
 	}
 
 	const response: WorkerResponse = { event: "leds-setteds" }
@@ -131,22 +140,7 @@ async function begin(serverUrl: string, debug = false): Promise<boolean> {
 				const config = data.data
 				workerState.updateState(prevState => ({
 					...prevState,
-					config: {
-						...config,
-						stripes: config.stripes.map(stripe => {
-							let leds = new Uint8Array(Object.values(stripe.leds))
-							if (leds.length !== stripe.num_leds * 4) {
-								console.warn("Invalid number of LEDs", leds.length, stripe.num_leds)
-
-								leds = new Uint8Array(stripe.num_leds * 4)
-							}
-
-							return {
-								...stripe,
-								leds,
-							}
-						}),
-					},
+					config,
 				}))
 				break
 			case "get_clients":
@@ -210,18 +204,19 @@ function connect(serverUrl: string, debug = false): Promise<boolean> {
 
 let lastClientUpdate = 0
 export function setLEDs(stripe_id: TStripe["id"], leds_with_pixel_index: Uint8Array) {
-	const request: TWSRequestSetLEDs = new Uint8Array(1 + 1 + leds_with_pixel_index.length)
-	request[0] = EWSRequestByteType.SetLEDs
-	request[1] = stripe_id
-	request.set(leds_with_pixel_index, 2)
-
-	globalWs?.send(request)
-
 	const now = performance.now()
-	if (now - lastClientUpdate > 1000 / 10) {
+	// todo to different stripe id
+	if (now - lastClientUpdate > 1000 / 60) {
+		const request: TWSRequestSetLEDs = new Uint8Array(1 + 1 + leds_with_pixel_index.length)
+		request[0] = EWSRequestByteType.SetLEDs
+		request[1] = stripe_id
+		request.set(leds_with_pixel_index, 2)
+
+		globalWs?.send(request)
+
 		const newState = workerState.getState()
 		const stripe = newState.config.stripes.find(stripe => stripe.id === stripe_id)
-		const leds = new Uint8Array(stripe.num_leds * 4)
+		const leds = new Array(stripe.num_leds * 4)
 
 		for (let i = 0; i < stripe.num_leds; i++) {
 			const led_index = leds_with_pixel_index[i * 5]

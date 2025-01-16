@@ -1,4 +1,4 @@
-import { EStripeOrientation, TConfig, TStripe } from "@shared"
+import { TConfig, TStripe } from "@shared"
 import { stripeToRect } from "./mapping/utils"
 
 /**
@@ -65,23 +65,16 @@ export function mappingUIRender(ctx: CanvasRenderingContext2D, config: TConfig) 
 
 	for (const stripe of config.stripes) {
 		if (stripe.map && stripe.map.visible === false) continue
+
 		drawStripe(ctx, stripe, cellWidth, cellHeight)
 	}
-}
-
-const angleArrowMap = {
-	[EStripeOrientation.Horizontal]: { angle: 0, direction: "→" },
-	[EStripeOrientation.Vertical]: { angle: 90, direction: "↓" },
-	[EStripeOrientation.HorizontalReverse]: { angle: 180, direction: "←" },
-	[EStripeOrientation.VerticalReverse]: { angle: 270, direction: "↑" },
 }
 
 function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: number, cellHeight: number) {
 	const color = stripe.map.visible ? stripe.color || [0, 255, 0, 255] : [255, 0, 0, 255]
 	const stripeMap = stripe.map
 
-	const { direction } = angleArrowMap[stripeMap.orientation]
-	const rect = stripeToRect(stripe)
+	const { direction } = getOrientation(stripeMap.x1, stripeMap.y1, stripeMap.x2, stripeMap.y2)
 
 	ctx.strokeStyle = `rgba(${color.join(",")})`
 	ctx.lineWidth = 2
@@ -91,13 +84,15 @@ function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: n
 	ctx.textAlign = "center"
 	ctx.textBaseline = "middle"
 
+	const rect = stripeToRect(stripe)
+
 	// ctx.fillText("→", x * cellWidth + cellWidth / 2, y * cellHeight + cellHeight / 2)
 	// ctx.strokeRect(x * cellWidth, y * cellHeight, size * cellWidth, cellHeight)
 
-	const x1 = rect.x1 * cellWidth
-	const y1 = rect.y1 * cellHeight
-	const x2 = rect.x2 * cellWidth
-	const y2 = rect.y2 * cellHeight
+	const x1 = stripe.map.x1 * cellWidth
+	const y1 = stripe.map.y1 * cellHeight
+	const x2 = stripe.map.x2 * cellWidth
+	const y2 = stripe.map.y2 * cellHeight
 
 	ctx.beginPath()
 	ctx.moveTo(x1, y1)
@@ -112,58 +107,90 @@ function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: n
 	ctx.font = "16px Arial"
 	ctx.textAlign = "left"
 	ctx.textBaseline = "top"
-	if (stripe.map.visible) {
-		//const mapping = mapStripeOnData(image.data, image.size, gridSize, stripe)
-		// const leds = mapping.pixels
-		// const width = mapping.width
-		// const height = mapping.height
-		const leds = stripe.leds
-		const width =
-			stripe.map.orientation === EStripeOrientation.Horizontal ||
-			stripe.map.orientation === EStripeOrientation.HorizontalReverse
-				? stripe.num_leds
-				: 1
-		const height =
-			stripe.map.orientation === EStripeOrientation.Vertical ||
-			stripe.map.orientation === EStripeOrientation.VerticalReverse
-				? stripe.num_leds
-				: 1
 
-		const reverse =
-			stripe.map.orientation === EStripeOrientation.HorizontalReverse ||
-			stripe.map.orientation === EStripeOrientation.VerticalReverse
+	const leds = stripe.leds
+	const reverse = false
+	const width = rect.width
+	const height = rect.height
 
-		for (let i = 0; i < leds.length; i += 4) {
-			const x = (i / 4) % width
-			const y = Math.floor(i / 4 / width)
+	for (let i = 0; i < leds.length; i += 4) {
+		const x = (i / 4) % width
+		const y = Math.floor(i / 4 / width)
 
-			const r = leds[i]
-			const g = leds[i + 1]
-			const b = leds[i + 2]
-			const w = leds[i + 3]
+		const r = leds[i]
+		const g = leds[i + 1]
+		const b = leds[i + 2]
+		const w = leds[i + 3]
 
-			const warmWhite = [255, 238, 203]
+		const warmWhite = [255, 238, 203]
 
-			const wp = (w / 255) * 0
+		const wp = (w / 255) * 0
 
-			const mix = [
-				Math.round(r * (1 - wp) + warmWhite[0] * wp), // Miscelazione del rosso
-				Math.round(g * (1 - wp) + warmWhite[1] * wp), // Miscelazione del verde
-				Math.round(b * (1 - wp) + warmWhite[2] * wp), // Miscelazione del blu
-			]
+		const mix = [
+			Math.round(r * (1 - wp) + warmWhite[0] * wp), // Miscelazione del rosso
+			Math.round(g * (1 - wp) + warmWhite[1] * wp), // Miscelazione del verde
+			Math.round(b * (1 - wp) + warmWhite[2] * wp), // Miscelazione del blu
+		]
 
-			const x0 = reverse ? (width - x - 1) * cellWidth + x1 : x * cellWidth + x1
-			const y0 = reverse ? (height - y - 1) * cellHeight + y1 : y * cellHeight + y1
+		const x0 = reverse ? (width - x - 1) * cellWidth + x1 : x * cellWidth + x1
+		const y0 = reverse ? (height - y - 1) * cellHeight + y1 : y * cellHeight + y1
 
-			ctx.fillStyle = `rgba(${mix[0]}, ${mix[1]}, ${mix[2]}, 255)`
-			//ctx.fillRect(x0, y0, cellWidth * stripeMap.scale[0], cellHeight * stripeMap.scale[1])
-			const pd = 5
-			ctx.fillRect(x0 + pd, y0 + pd, cellWidth * stripeMap.scale[0] - pd * 2, cellHeight * stripeMap.scale[1] - pd * 2)
+		ctx.fillStyle = `rgba(${mix[0]}, ${mix[1]}, ${mix[2]}, 255)`
+		//ctx.fillRect(x0, y0, cellWidth * stripeMap.scale[0], cellHeight * stripeMap.scale[1])
+		const pd = 1
+		ctx.fillRect(x0 + pd, y0 + pd, cellWidth - pd * 2, cellHeight - pd * 2)
 
-			// draw pixel index
-			ctx.fillStyle = "black"
-			const index = i / 4
-			ctx.fillText(`${index}`, x0 + 5 + pd, y0 + 5 + pd)
-		}
+		// draw pixel index
+		ctx.fillStyle = "black"
+		const index = i / 4
+		ctx.fillText(`${index}`, x0 + pd + 2, y0 + pd + 4)
+	}
+}
+
+function getOrientation(x1, y1, x2, y2) {
+	// Differenze
+	const dx = x2 - x1
+	const dy = y2 - y1
+
+	// Angolo in radianti rispetto all’asse X, in senso antiorario
+	// (Math.atan2 considera dx come asse X e dy come asse Y)
+	let angleRad = Math.atan2(dy, dx)
+	// Converti in gradi
+	let angleDeg = angleRad * (180 / Math.PI)
+
+	// Normalizza l’angolo in [0, 360)
+	if (angleDeg < 0) {
+		angleDeg += 360
+	}
+
+	// Calcola direzione approssimata a 4 direzioni
+	// useremo soglie di 45° attorno alle 4 direzioni principali:
+	//   → (0°)
+	//   ↑ (90°)
+	//   ← (180°)
+	//   ↓ (270°)
+	let approximateAngle
+	let directionSymbol
+
+	// Opzione 1: se vuoi cluster di 90° esatti
+	// (ogni 90 gradi circa 45 gradi di offset)
+	if (angleDeg >= 315 || angleDeg < 45) {
+		approximateAngle = 0
+		directionSymbol = "→"
+	} else if (angleDeg >= 45 && angleDeg < 135) {
+		approximateAngle = 90
+		directionSymbol = "↑"
+	} else if (angleDeg >= 135 && angleDeg < 225) {
+		approximateAngle = 180
+		directionSymbol = "←"
+	} else {
+		approximateAngle = 270
+		directionSymbol = "↓"
+	}
+
+	return {
+		angle: angleDeg, // Angolo reale in gradi
+		approximateAngle, // Angolo approssimato (0,90,180,270)
+		direction: directionSymbol, // Simbolo direzione
 	}
 }

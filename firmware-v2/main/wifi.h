@@ -19,6 +19,7 @@ typedef struct {
 #define MAX_AP_SCAN 10
 #define WIFI_TAG "WIFI"
 
+void wifi_disable_sleep();
 void wifi_init_sta();
 void wifi_connect(const char *WIFI_SSID, const char *WIFI_PASS);
 bool wifi_connected();

@@ -26,7 +26,6 @@ bool udp_con_begin(uint16_t port) {
     struct timeval timeout;
     timeout.tv_sec = 0;
     timeout.tv_usec = (1000 / 60) * 1000; // 60Hz refresh rate
-
     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         ESP_LOGE(UDP_TAG, "Failed to set socket timeout: errno %d", errno);
         return NULL;

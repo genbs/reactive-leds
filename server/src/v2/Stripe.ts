@@ -1,12 +1,12 @@
-import { EStripeOrientation, TColor, TStripe, TStripeMap } from "@shared"
+import { TColor, TStripe, TStripeMap } from "@shared"
 import { ESPClient } from "./ESPClient"
 
 const default_map: TStripeMap = {
-	x: 0,
-	y: 0,
-	scale: [1, 1],
 	visible: true,
-	orientation: EStripeOrientation.VerticalReverse,
+	x1: 0,
+	x2: 1,
+	y1: 16,
+	y2: 16,
 }
 
 export class Stripe extends ESPClient implements TStripe {
@@ -14,7 +14,9 @@ export class Stripe extends ESPClient implements TStripe {
 	colorHex: string
 	map: TStripeMap
 	color: TColor
-	leds: Uint8Array // [r, g, b, w, r, g, b, w, ...]
+	leds: number[] // [r, g, b, w, r, g, b, w, ...]
+
+	lastSent: number = 0
 
 	constructor(options: Partial<TStripe>) {
 		super({
@@ -28,8 +30,9 @@ export class Stripe extends ESPClient implements TStripe {
 
 		this.name = options.name
 		this.color = options.color
-		this.map = { ...default_map, ...(options.map || {}) }
-		this.leds = new Uint8Array(options.num_leds * 4)
+
+		this.map = { ...{ ...default_map, y1: options.num_leds || 0, y2: options.num_leds || 16 }, ...(options.map || {}) }
+		this.leds = options.leds || new Array((options.num_leds || 16) * 4).fill(0)
 	}
 
 	async update(data: Partial<TStripe>) {
@@ -77,23 +80,23 @@ export class Stripe extends ESPClient implements TStripe {
 			ledsBuffer[i + 4] = data[i + 4]
 		}
 
-		return super.setLEDs(ledsBuffer)
+		const now = performance.now()
+		if (now - this.lastSent > 1000 / 60) {
+			this.lastSent = now
+
+			super.setLEDs(ledsBuffer)
+		}
+
+		return Promise.resolve()
 	}
 
 	toObject(): TStripe {
 		return {
-			id: this.id,
-			hostname: this.hostname,
-			port: this.port,
-			num_leds: this.num_leds,
-			brightness: this.brightness,
+			...super.toObject(),
 			name: this.name,
 			color: this.color,
 			map: this.map,
-			leds: this.leds,
-			address: this.address,
-			online: this.online,
-			lastPing: this.lastPing,
+			leds: Object.values(this.leds),
 		}
 	}
 }

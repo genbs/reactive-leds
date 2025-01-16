@@ -17,6 +17,12 @@ async function main() {
 	// Load from config
 	const stripesConfig = config.get().stripes
 
+	// for (const stripe of stripesConfig) {
+	// 	const newStripe = new Stripe(stripe)
+	// 	newStripe.online = true
+	// 	stripes.push(newStripe)
+	// }
+
 	for (const stripe of stripesConfig) {
 		const newStripe = new Stripe(stripe)
 
@@ -24,6 +30,10 @@ async function main() {
 			stripes.push(newStripe)
 		}
 	}
+	config.update({
+		...config.get(),
+		stripes: stripes.map(s => s.toObject()),
+	})
 	console.log(`Loaded ${stripes.length} from config`)
 
 	// utility functions
@@ -49,6 +59,11 @@ async function main() {
 		if (await newStripe.connect()) {
 			console.log(`Connected to ${device.address}`)
 			addStripe(newStripe)
+
+			config.update({
+				stripes: stripes.map(s => s.toObject()),
+			})
+
 			return true
 		} else {
 			console.log(`Can't connect to ${device.address}`)
@@ -142,14 +157,18 @@ async function main() {
 					break
 				case "set_config": {
 					const newConfig = request.data
-					config.update(newConfig)
 
 					if (newConfig.stripes) {
 						newConfig.stripes.forEach(newStripe => {
 							const stripe = findStripe(newStripe.id)
-							if (stripe) stripe.update(stripe)
+							if (stripe) stripe.update(newStripe)
 						})
 					}
+
+					config.update({
+						grid: newConfig.grid,
+						stripes: stripes.map(s => s.toObject()),
+					})
 
 					wss.send({
 						event: "get_config",
@@ -160,17 +179,22 @@ async function main() {
 				}
 				case "update_stripe": {
 					const stripe = findStripe(request.ip)
-					if (stripe) stripe.update(request.data)
+					if (stripe) {
+						stripe.update(request.data)
+						config.update({
+							stripes: stripes.map(s => s.toObject()),
+						})
+					}
 					break
 				}
 				case "connect": {
 					const netClient = netService.getClients().find(client => client.address === request.ip)
+					console.log("connect", request.ip, netClient)
 					if (netClient) addStripeIfNotExist(netClient)
 
 					break
 				}
 				case "delete_stripe": {
-					console.log("delete_stripe", request.ip)
 					const stripe = findStripe(request.ip)
 					if (stripe) deleteStripe(stripe)
 
