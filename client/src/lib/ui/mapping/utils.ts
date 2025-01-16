@@ -1,4 +1,4 @@
-import { EStripeOrientation, TStripe, TStripeMap } from "@shared"
+import { EStripeOrientation, TConfig, TStripe, TStripeMap } from "@shared"
 
 export type TMap = {
 	gridSize: [number, number]
@@ -12,8 +12,8 @@ export function stripeToRect(stripe: TStripe) {
 	const [scaleX, scaleY] = stripe.map.scale
 	const x = stripe.map.x
 	const y = stripe.map.y
-	const lengthX = stripe.device.num_leds * scaleX
-	const lengthY = stripe.device.num_leds * scaleY
+	const lengthX = stripe.num_leds * scaleX
+	const lengthY = stripe.num_leds * scaleY
 
 	switch (stripe.map.orientation) {
 		case EStripeOrientation.Horizontal:
@@ -48,7 +48,7 @@ export function mapStripeOnData(
 	const [imgWidth, imgHeight] = dataSize
 	const [cells, rows] = mapGrid
 	const { x1, y1, x2, y2 } = stripeToRect(stripe)
-
+	console.log(stripe, stripeToRect(stripe))
 	const cellCountX = (x2 - x1) / stripe.map.scale[0]
 	const cellCountY = (y2 - y1) / stripe.map.scale[1]
 
@@ -109,8 +109,8 @@ export function isInsideStripe(cell: number, row: number, stripe: TStripe) {
 	return false
 }
 
-export function updateStripeMap(map: TMap, stripeMap: TStripeMap, length: number) {
-	const [cols, rows] = map.gridSize
+export function updateStripeMap(grid: TConfig["grid"], stripeMap: TStripeMap, length: number) {
+	const [cols, rows] = grid
 
 	const horizontal =
 		stripeMap.orientation === EStripeOrientation.Horizontal ||

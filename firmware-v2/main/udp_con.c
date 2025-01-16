@@ -72,7 +72,7 @@ void udp_con_close() {
 }
 
 void udp_con_send(uint8_t *data, size_t len, struct sockaddr_storage *dest_addr) {
-    ESP_LOGV(UDP_TAG, "Sending data");
+    ESP_LOGI(UDP_TAG, "Sending data");
 
     int err = sendto(sock, data, len, 0, (struct sockaddr *)dest_addr, sizeof(*dest_addr));
     if (err < 0) {

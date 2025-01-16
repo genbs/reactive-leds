@@ -1,3 +1,4 @@
+import ConfigService from "@services/Config"
 import NetService from "@services/Net"
 import StripeService from "@services/StripeService"
 import WebSocketService from "@services/WebSocketService"
@@ -6,10 +7,12 @@ import { EWSRequestByteType, logger } from "@shared"
 /////////////////
 
 async function main() {
+	const config = new ConfigService()
 	const netService = new NetService()
-	const stripeService = new StripeService()
+	const stripeService = new StripeService(config)
 	const webSocketService = new WebSocketService(8080)
 
+	// send devices finded on network and send to client
 	netService.on("clients", clients => {
 		webSocketService.send({
 			event: "get_clients",
@@ -17,30 +20,35 @@ async function main() {
 		})
 	})
 
+	// when stripe is updated, send to client
 	stripeService.on("onUpdate", () => {
+		// config was updated before starting onUpdate event
+
 		webSocketService.send({
-			event: "get_stripes",
-			data: stripeService.stripes.map(stripe => stripe.toJSON()),
+			event: "get_config",
+			data: config.get(),
 		})
-		stripeService.save()
 	})
 
+	// when client connect, send stripes and netclient to client
 	webSocketService.on("onClientConnect", ws => {
 		logger.debug(`Client Connected`)
+
 		webSocketService.send({
-			event: "get_stripes",
-			data: stripeService.stripes.map(stripe => stripe.toJSON()),
+			event: "get_config",
+			data: config.get(),
+		})
+		webSocketService.send({
+			event: "get_clients",
+			data: netService.getClients(),
 		})
 	})
 
 	webSocketService.on("onClientDisconnect", ws => {
 		logger.debug(`Client Disconnected`)
-		webSocketService.send({
-			event: "get_stripes",
-			data: stripeService.stripes.map(stripe => stripe.toJSON()),
-		})
 	})
 
+	// manage messages from client
 	webSocketService.on("onMessage", (request, ws) => {
 		if (isArray(request)) {
 			const messageType = request[0]
@@ -63,10 +71,10 @@ async function main() {
 						event: "get_clients",
 						data: netService.getClients(),
 					})
-				case "get_stripes":
+				case "get_config":
 					webSocketService.send({
-						event: "get_stripes",
-						data: stripeService.stripes.map(stripe => stripe.toJSON()),
+						event: "get_config",
+						data: config.get(),
 					})
 					break
 				case "update_stripe":

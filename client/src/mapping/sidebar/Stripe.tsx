@@ -1,7 +1,7 @@
 import { useState } from "react"
 
-import GydraLEDs, { TMap } from "@lib"
-import { TStripe, TStripeMap } from "@shared"
+import GydraLEDs from "@lib"
+import { TConfig, TStripe, TStripeMap } from "@shared"
 
 import Dropdown from "@mapping/components/Dropdown"
 import EditableValue from "@mapping/components/EditableValue"
@@ -12,10 +12,10 @@ import { colorToHex, hexToColor } from "@mapping/utils"
 interface StripeProps {
 	stripe: TStripe
 	updateStripe: (stripe: TStripe) => void
-	map: TMap
+	grid: TConfig["grid"]
 }
 
-export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
+export default function Stripe({ stripe, updateStripe, grid }: StripeProps) {
 	const [prevPixel, setPrevPixel] = useState<Uint8Array>(new Uint8Array(0))
 	const [prevUpdate, setPrevUpdate] = useState(0)
 
@@ -29,7 +29,7 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 
 	// 	const { pixels } = mapStripeOnData(image.data, image.size, map.gridSize, stripe)
 
-	// 	for (let i = 0; i < stripe.device.num_leds; i += 4) {
+	// 	for (let i = 0; i < stripe.num_leds; i += 4) {
 	// 		pixels[i + 3] = 0
 	// 	}
 	// 	// check equal
@@ -42,9 +42,9 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 	// }, [imageLeds, stripe, image, prevPixel, prevUpdate])
 
 	function setLeds(colors: Uint8Array) {
-		const data = new Uint8Array(stripe.device.num_leds * 5)
+		const data = new Uint8Array(stripe.num_leds * 5)
 
-		for (let i = 0; i < stripe.device.num_leds; i++) {
+		for (let i = 0; i < stripe.num_leds; i++) {
 			data[i * 5] = i
 			data[i * 5 + 1] = colors[i * 4]
 			data[i * 5 + 2] = colors[i * 4 + 1]
@@ -57,7 +57,7 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 			stripe.leds[i * 4 + 3] = data[i * 5 + 4]
 		}
 
-		GydraLEDs.setLEDs(stripe.device.id, data)
+		GydraLEDs.setLEDs(stripe.id, data)
 
 		updateStripe(stripe)
 	}
@@ -65,8 +65,8 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 	function sendColor(stripe: TStripe) {
 		if (imageLeds) return
 
-		const colors = new Uint8Array(stripe.device.num_leds * 4)
-		for (let i = 0; i < stripe.device.num_leds; i++) {
+		const colors = new Uint8Array(stripe.num_leds * 4)
+		for (let i = 0; i < stripe.num_leds; i++) {
 			colors[i * 4] = stripe.leds[0]
 			colors[i * 4 + 1] = stripe.leds[1]
 			colors[i * 4 + 2] = stripe.leds[2]
@@ -79,11 +79,11 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 	function onChangeBrightness(b) {
 		const v = parseInt(b.target.value)
 
-		GydraLEDs.updateStripe(stripe.device.address, { ...stripe, device: { ...stripe.device, brightness: v } })
+		GydraLEDs.updateStripe(stripe.address, { ...stripe, brightness: v })
 	}
 
 	return (
-		<div key={stripe.device.address}>
+		<div key={stripe.address}>
 			<Dropdown>
 				<div className="flex gap">
 					<EditableValue
@@ -100,35 +100,35 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 							></div>
 						)}
 					/>
-					<span className="unicode">{stripe.device.online ? "●" : "○"}</span>
+					<span className="unicode">{stripe.online ? "●" : "○"}</span>
 					<div className="flex flex--column">
 						<EditableValue
-							value={stripe.device.id}
-							onChange={id => updateStripe({ ...stripe, device: { ...stripe.device, id } })}
+							value={stripe.id}
+							onChange={id => updateStripe({ ...stripe, id })}
 							min={0}
 							max={255}
 							type="number"
 						/>
-						<span>{stripe.device.address}</span>
+						<span>{stripe.address}</span>
 						<small>
 							:
 							<EditableValue
-								value={stripe.device.port}
-								onChange={port => updateStripe({ ...stripe, device: { ...stripe.device, port } })}
+								value={stripe.port}
+								onChange={port => updateStripe({ ...stripe, port })}
 								min={4000}
 								max={4300}
 								type="number"
 							/>
 							(
 							<EditableValue
-								value={stripe.device.hostname}
-								onChange={hostname => updateStripe({ ...stripe, device: { ...stripe.device, hostname } })}
+								value={stripe.hostname}
+								onChange={hostname => updateStripe({ ...stripe, hostname })}
 								type="text"
 							/>
 							:
 							<EditableValue
-								value={stripe.device.num_leds}
-								onChange={num_leds => updateStripe({ ...stripe, device: { ...stripe.device, num_leds } })}
+								value={stripe.num_leds}
+								onChange={num_leds => updateStripe({ ...stripe, num_leds })}
 								min={0}
 								max={255}
 								type="number"
@@ -138,7 +138,7 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 					</div>
 				</div>
 				<div>
-					{(stripe.device.online || true) && (
+					{(stripe.online || true) && (
 						<div className="flex gap">
 							<span
 								onClick={() => updateStripe({ ...stripe, map: { ...stripe.map, visible: !stripe.map.visible } })}
@@ -149,7 +149,7 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 							<span
 								onClick={() => {
 									const stripeMap: TStripeMap = { ...stripe.map, orientation: (stripe.map.orientation + 1) % 4 }
-									updateStripe({ ...stripe, map: GydraLEDs.updateStripeMap(map, stripeMap, stripe.device.num_leds) })
+									updateStripe({ ...stripe, map: GydraLEDs.updateStripeMap(grid, stripeMap, stripe.num_leds) })
 								}}
 								className="pointer unicode unicode--l pd--1"
 							>
@@ -157,8 +157,8 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 							</span>
 
 							<div className="flex gap flex--v-center">
-								<Scale stripe={stripe} updateStripe={updateStripe} map={map} ax="x" />
-								<Scale stripe={stripe} updateStripe={updateStripe} map={map} ax="y" />
+								<Scale stripe={stripe} updateStripe={updateStripe} grid={grid} ax="x" />
+								<Scale stripe={stripe} updateStripe={updateStripe} grid={grid} ax="y" />
 							</div>
 
 							<div>
@@ -169,10 +169,10 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 								<Debug stripe={stripe} updateStripe={sendColor} />
 
 								<div>
-									<span>Brightness {stripe.device.brightness}</span>
+									<span>Brightness {stripe.brightness}</span>
 									<input
 										type="range"
-										value={stripe.device.brightness}
+										value={stripe.brightness}
 										onChange={onChangeBrightness}
 										min={0}
 										max={255}
@@ -181,7 +181,7 @@ export default function Stripe({ stripe, updateStripe, map }: StripeProps) {
 								</div>
 							</div>
 							<div>
-								<button onClick={() => GydraLEDs.deleteStripe(stripe.device.address)}>Delete</button>
+								<button onClick={() => GydraLEDs.deleteStripe(stripe.address)}>Delete</button>
 							</div>
 						</div>
 					)}

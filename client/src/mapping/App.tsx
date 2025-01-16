@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 
-import GydraLEDs, { TMap } from "@lib"
-import { TStripe } from "@shared"
+import GydraLEDs from "@lib"
+import { TConfig, TStripe } from "@shared"
 
 import Canvas from "@mapping/canvas/Canvas"
 import Connection from "@mapping/connection/Connection"
@@ -24,50 +24,43 @@ function App(props: TAppContext) {
 	)
 }
 
-const initialState = localStorage.getItem("state")
-	? JSON.parse(localStorage.getItem("state"))
-	: {
-			map: { gridSize: [10, 10] },
-	  }
-
 const globalCanvas = document.createElement("canvas")
 globalCanvas.width = 400
 globalCanvas.height = 400
 export default function Root() {
-	const [stripes, setStripes] = useState<TStripe[]>([])
 	const [lastStripes, setLastStripes] = useState<TStripe[]>([])
-	const [map, setMap] = useState<TMap>(initialState.map)
+	const [config, setConfig] = useState<TConfig>({ grid: [0, 0], stripes: [] })
 	const [connected, setConnected] = useState(false)
 
 	useEffect(() => {
-		GydraLEDs.begin("ws://localhost:8080")
+		GydraLEDs.begin("ws://localhost:4200")
 
 		return GydraLEDs.onChangeState(state => {
-			setStripes(state.stripes)
+			setConfig(state.config)
 			setConnected(state.connected)
 		})
 	}, [])
 
 	useEffect(() => {
-		//return GydraLEDs.watch(globalCanvas, map.gridSize)
-	}, [stripes])
+		return GydraLEDs.watch(globalCanvas)
+	}, [config])
 
 	const context: TAppContext = {
-		stripes,
+		config,
 		updateStripe: (stripe: TStripe) => {
-			setStripes(prev => prev.map(s => (s.device.address === stripe.device.address ? stripe : s)))
+			const stripes = config.stripes.map(s => (s.address === stripe.address ? stripe : s))
+
+			GydraLEDs.setConfig({ ...config, stripes })
 		},
-		map,
-		updateMap: map => {
-			setMap(map)
-			localStorage.setItem("state", JSON.stringify({ map }))
+		updateGrid: gridSize => {
+			GydraLEDs.setConfig({ grid: gridSize })
 		},
 		connected,
 		canvas: globalCanvas,
 	}
 
 	useEffect(() => {
-		const stripeWithoutLeds = stripes.map(stripe => {
+		const stripeWithoutLeds = config.stripes.map(stripe => {
 			const { leds, ...rest } = stripe
 			return rest
 		}) as TStripe[]
@@ -76,11 +69,11 @@ export default function Root() {
 
 		const timeout = setTimeout(() => {
 			setLastStripes(stripeWithoutLeds)
-			stripeWithoutLeds.forEach(stripe => GydraLEDs.updateStripe(stripe.device.address, stripe))
+			stripeWithoutLeds.forEach(stripe => GydraLEDs.updateStripe(stripe.address, stripe))
 		}, 0)
 
 		return () => clearTimeout(timeout)
-	}, [stripes, lastStripes])
+	}, [config.stripes, lastStripes])
 
 	////////////////////////
 
@@ -108,10 +101,10 @@ export default function Root() {
 					distance = distance + Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2) * 0.9
 
 					const [r, g, b, a] = hslToColor(
-						-time * 0.1 + iOffset * 420,
+						-time * 0.001 + iOffset * 420,
 						//((i * j) / (width * height)) * Math.cos(time * 0.001) ** 2,
 						1,
-						Math.round(time * 0.01 + iOffset * 3) % 2 === 0 ? 0.5 : 0
+						Math.round(time * 0.001 + iOffset * 3) % 2 === 0 ? 0.5 : 0
 					)
 
 					data[index] = r

@@ -1,14 +1,12 @@
 import { createContext } from "react"
 
-import { TMap } from "@lib"
-import { TStripe } from "@shared"
+import { TConfig, TStripe } from "@shared"
 
 export type TAppContext = {
-	stripes: TStripe[]
-	updateStripe: (stripe: TStripe) => void
+	config: TConfig
 	connected: boolean
-	map: TMap
-	updateMap: (map: TMap) => void
+	updateStripe: (stripe: TStripe) => void
+	updateGrid: (grid: TConfig["grid"]) => void
 	canvas: HTMLCanvasElement | OffscreenCanvas
 }
 

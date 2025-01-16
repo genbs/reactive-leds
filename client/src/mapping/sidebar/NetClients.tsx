@@ -19,8 +19,8 @@ export default function NetClients() {
 			<div>
 				<ul>
 					{clients.map(client => (
-						<li key={client.ip} onClick={() => GydraLEDs.connect(client.ip)}>
-							{client.ip} {client.mac} {client.vendor} {client.hostname}
+						<li key={client.address} onClick={() => GydraLEDs.connect(client.address)}>
+							{client.address} {client.mac} {client.vendor} {client.hostname}
 						</li>
 					))}
 				</ul>

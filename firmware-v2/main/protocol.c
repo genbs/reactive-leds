@@ -60,17 +60,19 @@ void protocol_loop()
 
 void protocol_ping(udp_packet *packet)
 {
+    ESP_LOGI(PROTOCOL_TAG, "PING");
+
     protocol_response[0] = packet->data[0];
     protocol_response[1] = PING;
 
     udp_con_send(protocol_response, 2, &packet->source_addr);
-
-    ESP_LOGI(PROTOCOL_TAG, "PING");
 }
 
 
 void protocol_get_config(udp_packet *packet)
 {
+    ESP_LOGI(PROTOCOL_TAG, "GET_CONFIG");
+
     uint8_t *data = packet->data;
 
     config_t config = config_get();
@@ -86,8 +88,6 @@ void protocol_get_config(udp_packet *packet)
     memcpy(&protocol_response[7], config.hostname, hostname_len);
 
     udp_con_send(protocol_response, 7 + hostname_len, &packet->source_addr);
-
-    ESP_LOGI(PROTOCOL_TAG, "GET_CONFIG");
 }
 
 void protocol_set_config(udp_packet *packet)
@@ -100,6 +100,8 @@ void protocol_set_config(udp_packet *packet)
         ESP_LOGW(PROTOCOL_TAG, "Invalid SET_CONFIG packet");
         return;
     }
+
+    ESP_LOGI(PROTOCOL_TAG, "SET_CONFIG");
 
     config_t config = config_get();
     config.port = (data[2] << 8) | data[3]; // TODO: if port changes, restart the server

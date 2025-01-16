@@ -40,14 +40,14 @@ export default class ESPService extends EventEmitter<ESPServiceEvents> {
 	}
 
 	public add(esp: Partial<TESP> & { address: TESP["address"] }) {
-		if (this.clients.has(esp.address)) return this.clients.get(esp.address)
+		if (!this.clients.has(esp.address)) {
+			const client = new ESPClient(esp)
+			client.on("onConnect", () => this.emit("espConnect", client))
+			client.on("onDisconnect", () => this.emit("espDisconnect", client))
+			this.clients.set(esp.address, client)
+		}
 
-		const client = new ESPClient(esp)
-		client.on("onConnect", () => this.emit("espConnect", client))
-		client.on("onDisconnect", () => this.emit("espDisconnect", client))
-		this.clients.set(esp.address, client)
-
-		return client
+		return this.clients.get(esp.address)
 	}
 
 	async connect(address: string, port?: number) {

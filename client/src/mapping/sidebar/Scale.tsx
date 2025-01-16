@@ -1,17 +1,17 @@
-import GydraLEDs, { TMap } from "@lib"
-import { TStripe, TStripeMap } from "@shared"
+import GydraLEDs from "@lib"
+import { TConfig, TStripe, TStripeMap } from "@shared"
 
 import EditableValue from "@mapping/components/EditableValue"
 
 interface ScaleProps {
 	stripe: TStripe
 	updateStripe: (stripe: TStripe) => void
-	map: TMap
+	grid: TConfig["grid"]
 	ax: "x" | "y"
 }
 
-export default function Scale({ stripe, updateStripe, map, ax }: ScaleProps) {
-	const max = ax === "x" ? map.gridSize[0] : map.gridSize[1]
+export default function Scale({ stripe, updateStripe, grid, ax }: ScaleProps) {
+	const max = ax === "x" ? grid[0] : grid[1]
 	const currentScale = ax === "x" ? stripe.map.scale[0] : stripe.map.scale[1]
 
 	function setScale(newScale: number) {
@@ -30,7 +30,7 @@ export default function Scale({ stripe, updateStripe, map, ax }: ScaleProps) {
 
 		updateStripe({
 			...stripe,
-			map: GydraLEDs.updateStripeMap(map, stripeMap, stripe.device.num_leds),
+			map: GydraLEDs.updateStripeMap(grid, stripeMap, stripe.num_leds),
 		})
 	}
 

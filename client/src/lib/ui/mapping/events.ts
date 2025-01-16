@@ -1,5 +1,5 @@
-import { TStripe, TStripeMap } from "@shared"
-import { isInsideStripe, TMap, updateStripeMap } from "./utils"
+import { TConfig, TStripe, TStripeMap } from "@shared"
+import { isInsideStripe, updateStripeMap } from "./utils"
 
 type DragState = {
 	isDragging: boolean
@@ -9,7 +9,7 @@ type DragState = {
 	dragStripe: TStripe | null
 }
 
-let dragState = {
+let dragState: DragState = {
 	isDragging: false,
 	startX: 0,
 	startY: 0,
@@ -18,8 +18,7 @@ let dragState = {
 }
 export function mappingEvents(
 	rect: DOMRect | null,
-	map: TMap,
-	stripes: TStripe[],
+	config: TConfig,
 	update: (map: TStripeMap, stripe: TStripe) => void,
 	stripeAction?: (event: "click", stripe: TStripe) => void
 ) {
@@ -29,13 +28,13 @@ export function mappingEvents(
 
 		const localX = e.clientX - rect.left
 		const localY = e.clientY - rect.top
-		const [cells, rows] = map.gridSize
+		const [cells, rows] = config.grid
 		const cellWidth = rect.width / cells
 		const cellHeight = rect.height / rows
 		const ix = Math.floor(localX / cellWidth)
 		const iy = Math.floor(localY / cellHeight)
 
-		for (const stripe of stripes) {
+		for (const stripe of config.stripes) {
 			if (stripe.map?.visible === false) continue
 			if (isInsideStripe(ix, iy, stripe)) {
 				stripeAction("click", stripe)
@@ -45,7 +44,7 @@ export function mappingEvents(
 
 	const onMouseDown = (e: MouseEvent) => {
 		if (!rect) return
-		const [cells, rows] = map.gridSize
+		const [cells, rows] = config.grid
 		const cellWidth = rect.width / cells
 		const cellHeight = rect.height / rows
 
@@ -61,7 +60,7 @@ export function mappingEvents(
 			dragStripe: null,
 		}
 
-		for (const stripe of stripes) {
+		for (const stripe of config.stripes) {
 			if (stripe.map?.visible === false) continue
 
 			if (isInsideStripe(Math.floor(localX / cellWidth), Math.floor(localY / cellHeight), stripe)) {
@@ -79,7 +78,7 @@ export function mappingEvents(
 		const { isDragging, dragStripe, dragMapInitial, startX, startY } = dragState
 		if (!isDragging || !dragStripe || !dragMapInitial || !rect) return
 
-		const [cells, rows] = map.gridSize
+		const [cells, rows] = config.grid
 		const cellWidth = rect.width / cells
 		const cellHeight = rect.height / rows
 
@@ -97,7 +96,7 @@ export function mappingEvents(
 			y: dragMapInitial.y + gridDeltaY,
 		}
 		// Nuova posizione basata sulla posizione iniziale
-		const { x: newX, y: newY } = updateStripeMap(map, stripeMap, dragStripe.device.num_leds)
+		const { x: newX, y: newY } = updateStripeMap(config.grid, stripeMap, dragStripe.num_leds)
 
 		// Aggiorna solo se cambia cella
 		if (dragStripe.map.x !== newX || dragStripe.map.y !== newY) {

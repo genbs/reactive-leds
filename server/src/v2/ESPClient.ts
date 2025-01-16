@@ -1,15 +1,8 @@
 import proto from "@protocol"
-import { EventEmitter, TESP } from "@shared"
+import { TESP } from "@shared"
 import { ProtocolBoardConfig } from "src/protocol/types"
 
-type ESPClientEvents = {
-	onConnect: (self: ESPClient) => void
-	onDisconnect: (self: ESPClient) => void
-}
-
-export class ESPClient extends EventEmitter<ESPClientEvents> implements TESP {
-	static CHECK_ALIVE_INTERVAL = 10000
-
+export class ESPClient implements TESP {
 	public address: string
 	public online = false
 	public port: number
@@ -17,22 +10,10 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements TESP {
 	public num_leds: number
 	public hostname: string
 	public brightness: number
-
 	public lastPing: number = 0
-
-	/**
-	 * The interval to check if the device is online.
-	 *
-	 * @private
-	 * @type {NodeJS.Timeout}
-	 */
-	private checkAliveInterval: NodeJS.Timeout
-
 	private checkAlive = true
 
-	constructor(device: Partial<TESP>, checkAlive = true) {
-		super()
-
+	constructor(device: Partial<TESP>) {
 		this.address = device.address
 		this.port = device.port
 		this.id = device.id
@@ -41,15 +22,16 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements TESP {
 		this.brightness = device.brightness
 
 		this.online = false
-		this.checkAlive = checkAlive
+	}
 
-		if (!checkAlive) return
+	async connect(): Promise<boolean> {
+		await this.isAlive()
 
-		this.isAlive = this.isAlive.bind(this)
+		if (this.online) {
+			await this.loadConfig()
+		}
 
-		this.loadConfig().then(() => {
-			this.isAlive()
-		})
+		return this.online
 	}
 
 	/**
@@ -58,16 +40,9 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements TESP {
 	async isAlive() {
 		if (!this.checkAlive) return
 
-		const online = await this.ping()
+		this.online = await this.ping()
 
-		if (online) this.lastPing = Date.now()
-
-		if (this.online !== online) {
-			this.online = online
-			this.emit(this.online ? "onConnect" : "onDisconnect", this)
-		}
-
-		setTimeout(this.isAlive, ESPClient.CHECK_ALIVE_INTERVAL)
+		if (this.online) this.lastPing = Date.now()
 	}
 
 	/**
@@ -139,9 +114,7 @@ export class ESPClient extends EventEmitter<ESPClientEvents> implements TESP {
 	 * Destroy the client.
 	 */
 	destroy() {
-		clearInterval(this.checkAliveInterval)
 		this.online = false
-		this.removeAllListeners()
 	}
 
 	toString() {

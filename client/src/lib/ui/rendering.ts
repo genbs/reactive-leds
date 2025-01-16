@@ -1,5 +1,5 @@
-import { EStripeOrientation, TStripe } from "@shared"
-import { stripeToRect, TMap } from "./mapping/utils"
+import { EStripeOrientation, TConfig, TStripe } from "@shared"
+import { stripeToRect } from "./mapping/utils"
 
 /**
  * Draw pixelation grid in canvas
@@ -52,18 +52,18 @@ export function drawGrid(ctx: CanvasRenderingContext2D, gridSize: [number, numbe
 	return [cellWidth, cellHeight]
 }
 
-export function mappingUIRender(ctx: CanvasRenderingContext2D, map: TMap, stripes: TStripe[]) {
+export function mappingUIRender(ctx: CanvasRenderingContext2D, config: TConfig) {
 	const width = ctx.canvas.width
 	const height = ctx.canvas.height
 
-	const [cols, rows] = map.gridSize
+	const [cols, rows] = config.grid
 	const cellWidth = width / cols
 	const cellHeight = height / rows
 
 	ctx.clearRect(0, 0, width, height)
-	drawGrid(ctx, map.gridSize)
+	drawGrid(ctx, config.grid)
 
-	for (const stripe of stripes) {
+	for (const stripe of config.stripes) {
 		if (stripe.map && stripe.map.visible === false) continue
 		drawStripe(ctx, stripe, cellWidth, cellHeight)
 	}
@@ -121,12 +121,12 @@ function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: n
 		const width =
 			stripe.map.orientation === EStripeOrientation.Horizontal ||
 			stripe.map.orientation === EStripeOrientation.HorizontalReverse
-				? stripe.device.num_leds
+				? stripe.num_leds
 				: 1
 		const height =
 			stripe.map.orientation === EStripeOrientation.Vertical ||
 			stripe.map.orientation === EStripeOrientation.VerticalReverse
-				? stripe.device.num_leds
+				? stripe.num_leds
 				: 1
 
 		const reverse =

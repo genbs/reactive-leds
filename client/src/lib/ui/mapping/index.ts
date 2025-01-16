@@ -1,20 +1,14 @@
-import { TStripe, TStripeMap } from "@shared"
+import { TConfig, TStripe, TStripeMap } from "@shared"
 
 import { mappingUIRender } from "../rendering"
 import { mappingEvents } from "./events"
-import { TMap } from "./utils"
 
-export function mappingUI(
-	canvas: HTMLCanvasElement,
-	map: TMap,
-	stripes: TStripe[],
-	updateStripe: (stripe: TStripe) => void
-) {
+export function mappingUI(canvas: HTMLCanvasElement, config: TConfig, updateStripe: (stripe: TStripe) => void) {
 	const ctx = canvas.getContext("2d")
 	if (!ctx) return () => {}
 
 	const rect = canvas.getBoundingClientRect()
-	const events = mappingEvents(rect, map, stripes, (map: TStripeMap, stripe: TStripe) => {
+	const events = mappingEvents(rect, config, (map: TStripeMap, stripe: TStripe) => {
 		updateStripe({ ...stripe, map })
 	})
 
@@ -25,7 +19,7 @@ export function mappingUI(
 	canvas.addEventListener("mouseup", events.onMouseUp)
 	canvas.addEventListener("click", events.onClick)
 
-	rid = requestAnimationFrame(() => mappingUIRender(ctx, map, stripes))
+	rid = requestAnimationFrame(() => mappingUIRender(ctx, config))
 
 	return () => {
 		cancelAnimationFrame(rid)

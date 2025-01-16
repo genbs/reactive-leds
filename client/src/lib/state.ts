@@ -1,13 +1,16 @@
-import { TNetClient, TStripe } from "@shared"
+import { TConfig, TNetClient } from "@shared"
 
 export type GydraLEDState = {
-	stripes: TStripe[]
+	config: TConfig
 	clients: TNetClient[]
 	connected: boolean
 }
 
 const state: GydraLEDState = {
-	stripes: [],
+	config: {
+		stripes: [],
+		grid: [0, 0],
+	},
 	clients: [],
 	connected: false,
 }
@@ -15,7 +18,7 @@ const state: GydraLEDState = {
 const onChangeStateListeners = []
 
 export function onChangeState(callback: (state: GydraLEDState) => void) {
-	callback(state)
+	callback(getState())
 	onChangeStateListeners.push(callback)
 
 	return () => {
@@ -24,7 +27,11 @@ export function onChangeState(callback: (state: GydraLEDState) => void) {
 	}
 }
 
-export function updateState(newState: Partial<GydraLEDState>) {
+export function updateState(newState: Partial<GydraLEDState> | ((state: GydraLEDState) => Partial<GydraLEDState>)) {
+	if (typeof newState === "function") {
+		newState = newState(state)
+	}
+
 	Object.assign(state, newState)
 
 	onChangeStateListeners.forEach(callback => {
@@ -33,7 +40,7 @@ export function updateState(newState: Partial<GydraLEDState>) {
 }
 
 export function getState() {
-	return state
+	return JSON.parse(JSON.stringify(state)) as GydraLEDState
 }
 
 export function isConnected() {

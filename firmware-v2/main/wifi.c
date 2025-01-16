@@ -19,6 +19,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 
             case WIFI_EVENT_STA_DISCONNECTED: {
                 wifi_event_sta_disconnected_t *disconn = (wifi_event_sta_disconnected_t *) event_data;
+
                 ESP_LOGW(WIFI_TAG, "WIFI_EVENT_STA_DISCONNECTED => reason=%d", disconn->reason);
 
                 if (retry_num < MAX_RETRY) {
@@ -95,7 +96,7 @@ void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
     strcpy((char *)wifi_config.sta.ssid, (char *)WIFI_SSID);
     strcpy((char *)wifi_config.sta.password, (char *)WIFI_PASS);
     wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
-    //wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+    wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     wifi_config.sta.pmf_cfg.capable = true;
     wifi_config.sta.pmf_cfg.required = false;
     

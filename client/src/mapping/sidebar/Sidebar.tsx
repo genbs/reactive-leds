@@ -5,18 +5,27 @@ import GydraLEDs from "@lib"
 import EditableValue from "@mapping/components/EditableValue"
 import NetClients from "@mapping/sidebar/NetClients"
 import Stripe from "@mapping/sidebar/Stripe"
+import { TConfig } from "@shared"
 
-export default function Sidebar({ stripes, connected, updateStripe, map, updateMap, canvas }) {
+interface SidebarProps {
+	config: TConfig
+	connected: boolean
+	updateStripe
+	updateGrid
+	canvas
+}
+
+export default function Sidebar(props: SidebarProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 
 	useEffect(() => {
-		if (!canvas || !canvasRef.current) return
+		if (!props.canvas || !canvasRef.current) return
 
-		const srcctx = canvas.getContext("2d")
+		const srcctx = props.canvas.getContext("2d")
 		const dstctx = canvasRef.current.getContext("2d")
 		if (!dstctx || !srcctx) return
 
-		const { width, height } = canvas
+		const { width, height } = props.canvas
 		canvasRef.current.width = width
 		canvasRef.current.height = height
 		canvasRef.current.style.width = "100%"
@@ -25,37 +34,37 @@ export default function Sidebar({ stripes, connected, updateStripe, map, updateM
 		let rid = 0
 		function render() {
 			dstctx.clearRect(0, 0, width, height)
-			dstctx.drawImage(canvas, 0, 0)
-			GydraLEDs.drawGrid(dstctx, map.gridSize)
+			dstctx.drawImage(props.canvas, 0, 0)
+			GydraLEDs.drawGrid(dstctx, props.config.grid)
 			rid = requestAnimationFrame(render)
 		}
 
 		render()
 
 		return () => cancelAnimationFrame(rid)
-	}, [canvasRef.current, canvas])
+	}, [canvasRef.current, props.canvas])
 
 	return (
-		<aside style={{ display: "flex", flexDirection: "column" }}>
+		<aside style={{ display: "flex", flexDirection: "column", maxHeight: "100%", overflow: "auto" }}>
 			<section>
 				<div>
-					{connected ? "Connected" : "Disconnected"} {stripes.length}
+					{props.connected ? "Connected" : "Disconnected"} {props.config.stripes.length}
 				</div>
 				<div>
 					grid
 					<EditableValue
-						value={map.gridSize[0]}
-						onChange={gridSize => updateMap({ ...map, gridSize: [gridSize, map.gridSize[1]] })}
+						value={props.config.grid[0]}
+						onChange={gridSize => props.updateGrid([gridSize, props.config.grid[1]])}
 						type="number"
 					/>
 					<EditableValue
-						value={map.gridSize[1]}
-						onChange={gridSize => updateMap({ ...map, gridSize: [map.gridSize[0], gridSize] })}
+						value={props.config.grid[1]}
+						onChange={gridSize => props.updateGrid([props.config.grid[0], gridSize])}
 						type="number"
 					/>
 				</div>
-				{stripes.map(stripe => (
-					<Stripe map={map} key={stripe.device.address} stripe={stripe} updateStripe={updateStripe} />
+				{props.config.stripes.map(stripe => (
+					<Stripe grid={props.config.grid} key={stripe.address} stripe={stripe} updateStripe={props.updateStripe} />
 				))}
 			</section>
 

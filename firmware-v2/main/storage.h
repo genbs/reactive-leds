@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include "mbedtls/md5.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "nvs.h"

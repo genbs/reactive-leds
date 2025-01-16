@@ -1,6 +1,6 @@
 import * as bluetooth from "./bluetooth"
 import * as proxy from "./proxy"
-import * as state from "./worker/state"
+import * as state from "./state"
 
 import * as events from "./ui/mapping/events"
 import * as index from "./ui/mapping/index"
