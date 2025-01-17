@@ -5,7 +5,7 @@ enum LOG_LEVEL {
 	ERROR,
 }
 
-const logLevel = LOG_LEVEL.DEBUG
+const logLevel = LOG_LEVEL.WARN
 
 const logger = {
 	debug: (...args: any[]) => {

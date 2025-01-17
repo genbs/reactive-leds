@@ -7,7 +7,7 @@ import Canvas from "@mapping/canvas/Canvas"
 import Connection from "@mapping/connection/Connection"
 import AppContext, { TAppContext } from "@mapping/context"
 import Sidebar from "@mapping/sidebar/Sidebar"
-import { hslToColor } from "@mapping/utils"
+import { hslToColor } from "./utils"
 
 function App(props: TAppContext) {
 	//return <Debug ws={props.ws} />
@@ -25,8 +25,8 @@ function App(props: TAppContext) {
 }
 
 const globalCanvas = document.createElement("canvas")
-globalCanvas.width = 400
-globalCanvas.height = 400
+globalCanvas.width = 200
+globalCanvas.height = 200
 export default function Root() {
 	const [lastStripes, setLastStripes] = useState<TStripe[]>([])
 	const [config, setConfig] = useState<TConfig>({ grid: [0, 0], stripes: [] })
@@ -77,10 +77,11 @@ export default function Root() {
 		let rid = 0
 		const width = context.canvas.width
 		const height = context.canvas.height
+		const data = new Uint8ClampedArray(width * height * 4)
+		const imageData = new ImageData(data, width, height)
+		const ctx = context.canvas.getContext("2d") as OffscreenCanvasRenderingContext2D
 
 		function createImage(time) {
-			const data = new Uint8ClampedArray(width * height * 4)
-
 			for (let i = 0; i < height; i++) {
 				for (let j = 0; j < width; j++) {
 					const index = (i * width + j) * 4
@@ -97,10 +98,10 @@ export default function Root() {
 					distance = distance + Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2) * 0.9
 
 					const [r, g, b, a] = hslToColor(
-						-time * 0.01 + iOffset * 420,
+						time * 0.1 + iOffset * 120,
 						//((i * j) / (width * height)) * Math.cos(time * 0.001) ** 2,
 						1,
-						Math.round(time * 0.003 + iOffset * 3) % 2 === 0 ? 0.5 : 0
+						Math.round(time * 0.002 + iOffset * 4) % 2 === 0 ? 0.05 : 0
 					)
 
 					data[index] = r
@@ -110,8 +111,8 @@ export default function Root() {
 				}
 			}
 
-			const ctx = context.canvas.getContext("2d") as OffscreenCanvasRenderingContext2D
-			ctx.putImageData(new ImageData(data, width, height), 0, 0)
+			imageData.data.set(data)
+			ctx.putImageData(imageData, 0, 0)
 
 			rid = requestAnimationFrame(createImage)
 		}

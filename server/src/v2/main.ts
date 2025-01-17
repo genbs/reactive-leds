@@ -108,8 +108,6 @@ async function main() {
 	})
 
 	netService.on("clients", async clients => {
-		console.log("clients", clients)
-
 		for (const client of clients) {
 			addStripeIfNotExist(client)
 		}

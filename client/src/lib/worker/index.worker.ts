@@ -91,16 +91,16 @@ function watchCanvas({
 	for (const stripe of stripes) {
 		if (stripesId.includes(stripe.id)) {
 			const { pixels } = mapStripeOnData(imageData, [bitmap.width, bitmap.height], grid, stripe)
-			for (let i = 0; i < stripe.num_leds; i++) {
-				pixels[i * 4 + 3] = 0
-			}
+			// for (let i = 0; i < stripe.num_leds; i++) {
+			// 	pixels[i * 4 + 3] = 0
+			// }
 			const data = new Uint8Array(stripe.num_leds * 5)
 			for (let i = 0; i < stripe.num_leds; i++) {
 				data[i * 5] = i
 				data[i * 5 + 1] = pixels[i * 4]
 				data[i * 5 + 2] = pixels[i * 4 + 1]
 				data[i * 5 + 3] = pixels[i * 4 + 2]
-				data[i * 5 + 4] = pixels[i * 4 + 3]
+				data[i * 5 + 4] = 0 //pixels[i * 4 + 3]
 			}
 			setLEDs(stripe.id, data)
 		}

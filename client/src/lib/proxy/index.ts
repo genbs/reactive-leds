@@ -110,7 +110,7 @@ export function watch(canvas: HTMLCanvasElement | OffscreenCanvas, stripes?: TSt
 	const grid = getState().config.grid
 
 	stripes = !stripes || stripes.length === 0 ? getState().config.stripes.map(s => s.id) : stripes
-
+	let lastSent = 0
 	function start_watching() {
 		createImageBitmap(canvas).then(imageBitmap => {
 			globalWorker.postMessage(
@@ -125,9 +125,13 @@ export function watch(canvas: HTMLCanvasElement | OffscreenCanvas, stripes?: TSt
 				[imageBitmap]
 			)
 
+			const now = performance.now()
+			const diff = now - lastSent
+			lastSent = now
+
 			watchTimeout = setTimeout(() => {
 				watchRID = requestAnimationFrame(start_watching)
-			}, 1000 / 60)
+			}, Math.max(0, 1000 / 60 - diff))
 		})
 	}
 
