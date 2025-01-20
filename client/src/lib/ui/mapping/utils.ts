@@ -1,4 +1,4 @@
-import { TStripe } from "@shared"
+import { TStripe, TStripeMap } from "@shared"
 
 export type TMap = {
 	gridSize: [number, number]
@@ -11,7 +11,6 @@ export type TMap = {
 export function stripeToRect(stripe: TStripe) {
 	const { x1, y1, x2, y2 } = stripe.map
 
-	// calculate bounding rect
 	let x, y, width, height
 
 	x = Math.min(x1, x2)
@@ -88,38 +87,52 @@ export function isInsideStripe(cell: number, row: number, stripe: TStripe) {
 	const x = cell
 	const y = row
 
-	const a = (x1 - x0) * (y - y0) - (x - x0) * (y1 - y0)
-	const b = (x2 - x1) * (y - y1) - (x - x1) * (y2 - y1)
-	const c = (x3 - x2) * (y - y2) - (x - x2) * (y3 - y2)
-	const d = (x0 - x3) * (y - y3) - (x - x3) * (y0 - y3)
+	const a = Math.round((x1 - x0) * (y - y0) - (x - x0) * (y1 - y0))
+	const b = Math.round((x2 - x1) * (y - y1) - (x - x1) * (y2 - y1))
+	const c = Math.round((x3 - x2) * (y - y2) - (x - x2) * (y3 - y2))
+	const d = Math.round((x0 - x3) * (y - y3) - (x - x3) * (y0 - y3))
 
 	if (a >= 0 && b >= 0 && c >= 0 && d >= 0) return true
 
 	return false
 }
 
-// export function updateStripeMap(grid: TConfig["grid"], stripeMap: TStripeMap, length: number) {
-// 	const [cols, rows] = grid
+export function rotate(map: TStripeMap, rad: number) {
+	const { x0, y0, x1, y1, x2, y2, x3, y3 } = map
 
-// 	const horizontal =
-// 		stripeMap.orientation === EStripeOrientation.Horizontal ||
-// 		stripeMap.orientation === EStripeOrientation.HorizontalReverse
-// 	const vertical =
-// 		stripeMap.orientation === EStripeOrientation.Vertical ||
-// 		stripeMap.orientation === EStripeOrientation.VerticalReverse
+	const cos = Math.cos(rad)
+	const sin = Math.sin(rad)
 
-// 	const minX = stripeMap.orientation === EStripeOrientation.HorizontalReverse ? length : 0
-// 	const maxX = stripeMap.orientation === EStripeOrientation.Horizontal ? cols - length : vertical ? cols - 1 : cols
+	const cx = (x0 + x1 + x2 + x3) / 4
+	const cy = (y0 + y1 + y2 + y3) / 4
 
-// 	const minY = stripeMap.orientation === EStripeOrientation.VerticalReverse ? length : 0
-// 	const maxY = stripeMap.orientation === EStripeOrientation.Vertical ? rows - length : horizontal ? rows - 1 : rows
+	const rotatePoint = (px: number, py: number) => {
+		const tx = px - cx
+		const ty = py - cy
 
-// 	const newX = Math.max(minX, Math.min(stripeMap.x, maxX))
-// 	const newY = Math.max(minY, Math.min(stripeMap.y, maxY))
+		const rx = tx * cos - ty * sin
+		const ry = tx * sin + ty * cos
 
-// 	return {
-// 		...stripeMap,
-// 		x: newX,
-// 		y: newY,
-// 	}
-// }
+		return {
+			x: rx + cx,
+			y: ry + cy,
+		}
+	}
+
+	const newP0 = rotatePoint(x0, y0)
+	const newP1 = rotatePoint(x1, y1)
+	const newP2 = rotatePoint(x2, y2)
+	const newP3 = rotatePoint(x3, y3)
+
+	return {
+		...map,
+		x0: newP0.x,
+		y0: newP0.y,
+		x1: newP1.x,
+		y1: newP1.y,
+		x2: newP2.x,
+		y2: newP2.y,
+		x3: newP3.x,
+		y3: newP3.y,
+	}
+}

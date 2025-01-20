@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 
 import GydraLEDs from "@lib"
-import { TConfig, TStripe, TStripeMap } from "@shared"
+import { TConfig, TStripe } from "@shared"
 
 import Dropdown from "@mapping/components/Dropdown"
 import EditableValue from "@mapping/components/EditableValue"
@@ -70,54 +70,10 @@ export default function Stripe({ stripe, updateStripe, grid, canvas }: StripePro
 	}
 
 	function changeOrientation() {
-		const stripeMap: TStripeMap = { ...stripe.map }
-		const { x0, y0, x1, y1, x2, y2, x3, y3 } = stripeMap
-
-		// Angolo in radianti (45° esempio)
-		const angle = (15 * Math.PI) / 180
-		const cos = Math.cos(angle)
-		const sin = Math.sin(angle)
-
-		// 1. Calcoliamo il "centro" (o baricentro) dei quattro punti
-		//    Qui facciamo la media di x e y di tutti i punti
-		const cx = (x0 + x1 + x2 + x3) / 4
-		const cy = (y0 + y1 + y2 + y3) / 4
-
-		// 2. Funzione per ruotare un punto (px, py) attorno a (cx, cy)
-		const rotatePoint = (px: number, py: number) => {
-			// Traslazione in modo che (cx, cy) diventi l’origine
-			const tx = px - cx
-			const ty = py - cy
-
-			// Rotazione antioraria
-			const rx = tx * cos - ty * sin
-			const ry = tx * sin + ty * cos
-
-			// Ritorno alla posizione originale
-			return {
-				x: rx + cx,
-				y: ry + cy,
-			}
-		}
-
-		// 3. Applichiamo la rotazione a tutti i punti
-		const newP0 = rotatePoint(x0, y0)
-		const newP1 = rotatePoint(x1, y1)
-		const newP2 = rotatePoint(x2, y2)
-		const newP3 = rotatePoint(x3, y3)
-
-		// 4. Aggiorniamo i valori nello stripeMap
-		stripeMap.x0 = newP0.x
-		stripeMap.y0 = newP0.y
-		stripeMap.x1 = newP1.x
-		stripeMap.y1 = newP1.y
-		stripeMap.x2 = newP2.x
-		stripeMap.y2 = newP2.y
-		stripeMap.x3 = newP3.x
-		stripeMap.y3 = newP3.y
-
-		// 5. Infine eseguiamo l’update
-		updateStripe({ ...stripe, map: stripeMap })
+		updateStripe({
+			...stripe,
+			map: GydraLEDs.rotate(stripe.map, Math.PI / 10),
+		})
 	}
 
 	return (

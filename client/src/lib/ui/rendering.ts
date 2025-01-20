@@ -1,6 +1,5 @@
 import { TConfig, TStripe, TStripeMap } from "@shared"
 import { mappingEvents } from "./mapping/events"
-import { stripeToRect } from "./mapping/utils"
 
 /**
  * Draw pixelation grid in canvas
@@ -93,9 +92,6 @@ function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: n
 	ctx.textAlign = "center"
 	ctx.textBaseline = "middle"
 
-	// rect con dimensioni in CELLE (ad es. x2 - x1, y2 - y1, se la logica rimane la stessa)
-	const rect = stripeToRect(stripe)
-
 	// Estraggo i 4 punti (in CELLE) e li converto in PIXEL
 	const x0 = stripeMap.x0 * cellWidth
 	const y0 = stripeMap.y0 * cellHeight
@@ -171,7 +167,6 @@ function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: n
 		const [px, py] = points[i]
 
 		ctx.fillStyle = `rgba(${mix[0]}, ${mix[1]}, ${mix[2]}, 1)`
-		console.log(i, `rgba(${mix[0]}, ${mix[1]}, ${mix[2]}, 1)`)
 		ctx.beginPath()
 		ctx.arc(px, py, 5, 0, Math.PI * 2)
 		ctx.fill()
