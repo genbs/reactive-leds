@@ -90,7 +90,7 @@ function watchCanvas({
 	const imageData = imageDataFromBitmap(bitmap)
 	for (const stripe of stripes) {
 		if (stripesId.includes(stripe.id)) {
-			const { pixels } = mapStripeOnData(imageData, [bitmap.width, bitmap.height], grid, stripe)
+			const pixels = mapStripeOnData(imageData, [bitmap.width, bitmap.height], grid, stripe)
 			// for (let i = 0; i < stripe.num_leds; i++) {
 			// 	pixels[i * 4 + 3] = 0
 			// }

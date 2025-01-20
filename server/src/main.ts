@@ -1,107 +1,223 @@
-import ConfigService from "@services/Config"
-import NetService from "@services/Net"
-import StripeService from "@services/StripeService"
-import WebSocketService from "@services/WebSocketService"
-import { EWSRequestByteType, logger } from "@shared"
-
-/////////////////
+import proto from "@protocol"
+import { EWSRequestByteType, TNetClient } from "@shared"
+import BonjourService, { TBonjourClient } from "./Bonjur"
+import ConfigService from "./Config"
+import NetService from "./Net"
+import { Stripe } from "./Stripe"
+import WebSocketService from "./WebSocket"
 
 async function main() {
+	const stripes: Stripe[] = []
 	const config = new ConfigService()
-	const netService = new NetService()
-	const stripeService = new StripeService(config)
-	const webSocketService = new WebSocketService(8080)
 
-	// send devices finded on network and send to client
-	netService.on("clients", clients => {
-		webSocketService.send({
+	const bonjour = new BonjourService()
+	const netService = new NetService()
+	const wss = new WebSocketService(4200)
+
+	// Load from config
+	const stripesConfig = config.get().stripes
+
+	if (true) {
+		for (const stripe of stripesConfig) {
+			const newStripe = new Stripe(stripe)
+			newStripe.online = true
+			stripes.push(newStripe)
+		}
+	} else {
+		for (const stripe of stripesConfig) {
+			const newStripe = new Stripe(stripe)
+
+			if (await newStripe.connect()) {
+				stripes.push(newStripe)
+			}
+		}
+		config.update({
+			...config.get(),
+			stripes: stripes.map(s => s.toObject()),
+		})
+	}
+	console.log(`Loaded ${stripes.length} from config`)
+
+	// utility functions
+	function findStripe(ipOrId: string | number) {
+		return stripes.find(stripe => stripe.address === ipOrId || stripe.id === ipOrId)
+	}
+
+	async function addStripeIfNotExist(device: TNetClient | TBonjourClient) {
+		const stripe = findStripe(device.address)
+		if (stripe || ("vendor" in device && !device.vendor.toLocaleLowerCase().includes("espressif"))) return false
+
+		const port = await findDeviceUDPPort(device.address)
+		if (!port) {
+			console.log(`No open port found for ${device.address}`)
+			return false
+		}
+		console.log(`Find new device on network: ${device.address}, try to connect`)
+		const newStripe = new Stripe({
+			address: device.address,
+			port,
+			hostname: device.hostname,
+		})
+		if (await newStripe.connect()) {
+			console.log(`Connected to ${device.address}`)
+			addStripe(newStripe)
+
+			config.update({
+				stripes: stripes.map(s => s.toObject()),
+			})
+
+			return true
+		} else {
+			console.log(`Can't connect to ${device.address}`)
+		}
+	}
+
+	function addStripe(stripe: Stripe) {
+		stripes.push(stripe)
+
+		config.update({
+			stripes: stripes.map(s => s.toObject()),
+		})
+
+		wss.send({
+			event: "get_config",
+			data: config.get(),
+		})
+	}
+
+	function deleteStripe(stripe: Stripe) {
+		stripes.splice(stripes.indexOf(stripe), 1)
+
+		config.update({
+			stripes: stripes.map(s => s.toObject()),
+		})
+
+		wss.send({
+			event: "get_config",
+			data: config.get(),
+		})
+	}
+
+	function isArray(value: any): value is Uint8Array {
+		return value instanceof Uint8Array
+	}
+
+	// Find device on network and try to connect
+	bonjour.on("deviceUp", async device => {
+		console.log("deviceUp", device)
+
+		addStripeIfNotExist(device)
+	})
+
+	netService.on("clients", async clients => {
+		for (const client of clients) {
+			addStripeIfNotExist(client)
+		}
+		// send devices finded on network for manual connect
+		wss.send({
 			event: "get_clients",
 			data: clients,
 		})
 	})
 
-	// when stripe is updated, send to client
-	stripeService.on("onUpdate", () => {
-		// config was updated before starting onUpdate event
-
-		webSocketService.send({
-			event: "get_config",
-			data: config.get(),
-		})
-	})
-
 	// when client connect, send stripes and netclient to client
-	webSocketService.on("onClientConnect", ws => {
-		logger.debug(`Client Connected`)
-
-		webSocketService.send({
-			event: "get_config",
-			data: config.get(),
-		})
-		webSocketService.send({
-			event: "get_clients",
-			data: netService.getClients(),
-		})
+	wss.on("onClientConnect", ws => {
+		console.log("Client Connected")
 	})
 
-	webSocketService.on("onClientDisconnect", ws => {
-		logger.debug(`Client Disconnected`)
-	})
-
-	// manage messages from client
-	webSocketService.on("onMessage", (request, ws) => {
+	// handle client messages
+	wss.on("onMessage", async (request, ws) => {
 		if (isArray(request)) {
 			const messageType = request[0]
 			switch (messageType) {
 				case EWSRequestByteType.SetLEDs: {
-					const stripe = stripeService.byID(request[1])
-					stripe && stripe.updateLEDs(request.slice(2))
+					const stripe = findStripe(request[1])
+					stripe && stripe.setLEDs(request.slice(2))
 					break
 				}
 				case EWSRequestByteType.Blink: {
-					const stripe = stripeService.byID(request[1])
-					if (stripe) stripe.device.blink()
+					const stripe = findStripe(request[1])
+					if (stripe) stripe.blink()
 					break
 				}
 			}
 		} else {
 			switch (request.type) {
 				case "get_clients":
-					webSocketService.send({
+					wss.send({
 						event: "get_clients",
 						data: netService.getClients(),
 					})
+					break
 				case "get_config":
-					webSocketService.send({
+					wss.send({
 						event: "get_config",
 						data: config.get(),
 					})
 					break
-				case "update_stripe":
-					const stripe = stripeService.byIP(request.ip)
+				case "set_config": {
+					const newConfig = request.data
+
+					if (newConfig.stripes) {
+						newConfig.stripes.forEach(newStripe => {
+							const stripe = findStripe(newStripe.id)
+							if (stripe) stripe.update(newStripe)
+						})
+					}
+
+					config.update({
+						grid: newConfig.grid,
+						stripes: stripes.map(s => s.toObject()),
+					})
+
+					wss.send({
+						event: "get_config",
+						data: config.get(),
+					})
+
+					break
+				}
+				case "update_stripe": {
+					const stripe = findStripe(request.ip)
 					if (stripe) {
 						stripe.update(request.data)
+						config.update({
+							stripes: stripes.map(s => s.toObject()),
+						})
 					}
 					break
-				case "connect":
-					logger.info("connect", request.ip)
-					stripeService.espService.connect(request.ip)
+				}
+				case "connect": {
+					const netClient = netService.getClients().find(client => client.address === request.ip)
+					console.log("connect", request.ip, netClient)
+					if (netClient) addStripeIfNotExist(netClient)
+
 					break
-				case "delete_stripe":
-					logger.info("delete_stripe", request.ip)
-					stripeService.delete(request.ip)
+				}
+				case "delete_stripe": {
+					const stripe = findStripe(request.ip)
+					if (stripe) deleteStripe(stripe)
+
 					break
+				}
 			}
 		}
 	})
 
-	stripeService.start()
-	webSocketService.start()
 	netService.start()
+	wss.start()
 }
 
 main()
 
-function isArray(value: any): value is Uint8Array {
-	return value instanceof Uint8Array
+const PORT_START = 4200
+const PORT_END = 4220
+async function findDeviceUDPPort(
+	address: string,
+	startPort: number = PORT_START,
+	endPort: number = PORT_END
+): Promise<number> {
+	for (let port = startPort; port <= endPort; port++) if (await proto.ping(address, port)) return port
+
+	return 0
 }

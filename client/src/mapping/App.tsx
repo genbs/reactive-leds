@@ -101,7 +101,7 @@ export default function Root() {
 						time * 0.1 + iOffset * 120,
 						//((i * j) / (width * height)) * Math.cos(time * 0.001) ** 2,
 						1,
-						Math.round(time * 0.002 + iOffset * 4) % 2 === 0 ? 0.05 : 0
+						Math.round(time * 0.002 + iOffset * 4 + j * 0.01) % 2 === 0 ? 0.5 : 0
 					)
 
 					data[index] = r

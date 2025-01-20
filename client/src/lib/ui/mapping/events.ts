@@ -98,10 +98,14 @@ export function mappingEvents(
 
 		const stripeMap = {
 			...dragStripe.map,
+			x0: dragMapInitial.x0 + gridDeltaX,
+			y0: dragMapInitial.y0 + gridDeltaY,
 			x1: dragMapInitial.x1 + gridDeltaX,
 			y1: dragMapInitial.y1 + gridDeltaY,
 			x2: dragMapInitial.x2 + gridDeltaX,
 			y2: dragMapInitial.y2 + gridDeltaY,
+			x3: dragMapInitial.x3 + gridDeltaX,
+			y3: dragMapInitial.y3 + gridDeltaY,
 		}
 
 		// Aggiorna solo se cambia cella

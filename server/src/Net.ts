@@ -10,18 +10,20 @@ export type NetServiceEvents = {
 }
 
 export default class NetService extends EventEmitter<NetServiceEvents> {
-	private clients = new Map<string, TNetClient>()
+	private clients: TNetClient[] = []
 
 	constructor() {
 		super()
 	}
 
 	start() {
+		this.find()
+
 		setInterval(() => this.find(), 5000)
 	}
 
 	getClients(): TNetClient[] {
-		return [...this.clients.values()]
+		return this.clients
 	}
 
 	private getARPTable(): Promise<{ ip: string; mac: string; type: string }[]> {
@@ -76,7 +78,7 @@ export default class NetService extends EventEmitter<NetServiceEvents> {
 		return vendor
 	}
 
-	private async getHostnames(ip: string): Promise<string | null> {
+	private async getHostname(ip: string): Promise<string | null> {
 		return new Promise((resolve, reject) => {
 			dns.reverse(ip, (err, hostnames) => {
 				resolve(err ? null : hostnames[0])
@@ -86,44 +88,42 @@ export default class NetService extends EventEmitter<NetServiceEvents> {
 
 	private async find() {
 		const devices = await this.getARPTable()
-		const clients: TNetClient[] = []
+		let clients: TNetClient[] = []
 
 		for (const device of devices) {
+			if (clients.find(client => client.mac === device.mac) || clients.find(client => client.address === device.ip))
+				continue
+
 			const vendor = await this.getMACVendor(device.mac)
-			const hostname = await this.getHostnames(device.ip)
+			const hostname = await this.getHostname(device.ip)
 
-			clients.push({ vendor, ip: device.ip, mac: device.mac, hostname })
+			clients.push({ vendor, address: device.ip, mac: device.mac, hostname })
 		}
 
-		let changes = false
-		const oldClients = [...this.clients.values()]
+		clients = clients.sort(ipSort)
+		const oldClients = this.clients.sort(ipSort)
 
-		if (oldClients.length !== clients.length) {
-			changes = true
-		} else {
-			for (const client of clients) {
-				const oldClient = oldClients.find(c => c.mac === client.mac)
-				if (!oldClient) {
-					changes = true
-					break
-				}
-
-				if (oldClient.vendor !== client.vendor || oldClient.hostname !== client.hostname) {
-					changes = true
-					break
-				}
-			}
-		}
-
-		if (changes) {
-			this.clients = new Map(clients.map(client => [client.mac, client]))
-			this.emit("clients", [...this.clients.values()])
+		if (JSON.stringify(oldClients) !== JSON.stringify(clients)) {
+			this.clients = clients
+			this.emit("clients", this.clients)
 		}
 	}
 
 	on<K extends keyof NetServiceEvents>(event: K, listener: NetServiceEvents[K]): () => void {
-		if (event === "clients") listener([...this.clients.values()])
+		if (event === "clients") listener(this.clients)
 
 		return super.on(event, listener)
 	}
+}
+
+function ipSort(a: TNetClient, b: TNetClient) {
+	const aParts = a.address.split(".")
+	const bParts = b.address.split(".")
+
+	for (let i = 0; i < 4; i++) {
+		if (parseInt(aParts[i]) < parseInt(bParts[i])) return -1
+		if (parseInt(aParts[i]) > parseInt(bParts[i])) return 1
+	}
+
+	return 0
 }

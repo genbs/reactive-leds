@@ -3,10 +3,14 @@ import { ESPClient } from "./ESPClient"
 
 const default_map: TStripeMap = {
 	visible: true,
-	x1: 0,
+	x0: 1,
+	y0: 1,
+	x1: 2,
+	y1: 1,
 	x2: 1,
-	y1: 16,
 	y2: 16,
+	x3: 2,
+	y3: 16,
 }
 
 export class Stripe extends ESPClient implements TStripe {

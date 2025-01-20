@@ -3,7 +3,6 @@
     "version": "1.2.0",
     "description": "",
     "scripts": {
-        "start2": "ts-node -r tsconfig-paths/register src/v2/main.ts",
         "start": "ts-node -r tsconfig-paths/register src/main.ts",
         "format": "npx prettier ./src --write \"!**/*.json\" > /dev/null"
     },

@@ -1,4 +1,5 @@
-import { TConfig, TStripe } from "@shared"
+import { TConfig, TStripe, TStripeMap } from "@shared"
+import { mappingEvents } from "./mapping/events"
 import { stripeToRect } from "./mapping/utils"
 
 /**
@@ -52,7 +53,13 @@ export function drawGrid(ctx: CanvasRenderingContext2D, gridSize: [number, numbe
 	return [cellWidth, cellHeight]
 }
 
-export function mappingUIRender(ctx: CanvasRenderingContext2D, config: TConfig) {
+export function mappingUIRender(
+	ctx: CanvasRenderingContext2D,
+	config: TConfig,
+	update: (map: TStripeMap, stripe: TStripe) => void
+) {
+	const unbind = mappingEvents(ctx.canvas, config, update)
+
 	const width = ctx.canvas.width
 	const height = ctx.canvas.height
 
@@ -68,129 +75,136 @@ export function mappingUIRender(ctx: CanvasRenderingContext2D, config: TConfig) 
 
 		drawStripe(ctx, stripe, cellWidth, cellHeight)
 	}
+
+	return unbind
 }
 
 function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: number, cellHeight: number) {
 	const color = stripe.map.visible ? stripe.color || [0, 255, 0, 255] : [255, 0, 0, 255]
 	const stripeMap = stripe.map
 
-	const { direction } = getOrientation(stripeMap.x1, stripeMap.y1, stripeMap.x2, stripeMap.y2)
+	const angle = getAngle(stripeMap) // se serve un angolo (altrimenti toglilo)
 
 	ctx.strokeStyle = `rgba(${color.join(",")})`
 	ctx.lineWidth = 2
 
 	ctx.font = "20px Arial"
-	ctx.fillStyle = `rgba(${color.join(",")})`
+	ctx.fillStyle = `rgba(${color.join(",")}`
 	ctx.textAlign = "center"
 	ctx.textBaseline = "middle"
 
+	// rect con dimensioni in CELLE (ad es. x2 - x1, y2 - y1, se la logica rimane la stessa)
 	const rect = stripeToRect(stripe)
 
-	// ctx.fillText("→", x * cellWidth + cellWidth / 2, y * cellHeight + cellHeight / 2)
-	// ctx.strokeRect(x * cellWidth, y * cellHeight, size * cellWidth, cellHeight)
+	// Estraggo i 4 punti (in CELLE) e li converto in PIXEL
+	const x0 = stripeMap.x0 * cellWidth
+	const y0 = stripeMap.y0 * cellHeight
+	const x1 = stripeMap.x1 * cellWidth
+	const y1 = stripeMap.y1 * cellHeight
+	const x2 = stripeMap.x2 * cellWidth
+	const y2 = stripeMap.y2 * cellHeight
+	const x3 = stripeMap.x3 * cellWidth
+	const y3 = stripeMap.y3 * cellHeight
 
-	const x1 = stripe.map.x1 * cellWidth
-	const y1 = stripe.map.y1 * cellHeight
-	const x2 = stripe.map.x2 * cellWidth
-	const y2 = stripe.map.y2 * cellHeight
-
+	// Disegno contorno quadrilatero
 	ctx.beginPath()
-	ctx.moveTo(x1, y1)
-	ctx.lineTo(x2, y1)
+	ctx.moveTo(x0, y0)
+	ctx.lineTo(x1, y1)
 	ctx.lineTo(x2, y2)
-	ctx.lineTo(x1, y2)
+	ctx.lineTo(x3, y3)
 	ctx.closePath()
 	ctx.stroke()
 
-	ctx.fillText(direction, (x1 + x2) / 2, (y1 + y2) / 2)
+	// Disegno i 4 punti
+	function drawPoint(px: number, py: number, c: string) {
+		ctx.beginPath()
+		ctx.arc(px, py, 5, 0, Math.PI * 2)
+		ctx.fillStyle = c
+		ctx.fill()
+	}
+	drawPoint(x0, y0, "red")
+	drawPoint(x1, y1, "blue")
+	drawPoint(x2, y2, "green")
+	drawPoint(x3, y3, "purple")
 
-	ctx.font = "16px Arial"
+	// Se vuoi disegnare un simbolo in mezzo (→)
+	ctx.save()
+	ctx.translate((x0 + x2) / 2, (y0 + y2) / 2)
+	ctx.rotate(angle)
+	ctx.fillText("→", 0, 0)
+	ctx.restore()
+
+	// Ora disegno i LED usando l'interpolazione bilineare 2D
+	const leds = stripe.leds
+
+	ctx.font = "14px Arial"
 	ctx.textAlign = "left"
 	ctx.textBaseline = "top"
 
-	const leds = stripe.leds
-	const reverse = false
-	const width = rect.width
-	const height = rect.height
+	const steps = stripe.num_leds
+	const points: [number, number][] = new Array(stripe.num_leds)
 
-	for (let i = 0; i < leds.length; i += 4) {
-		const x = (i / 4) % width
-		const y = Math.floor(i / 4 / width)
+	for (let index = 0; index < stripe.num_leds; index++) {
+		const offset1 = index / steps
+		const offset2 = (index + 1) / steps
+		const [px, py] = step(offset1, x0, y0, x3, y3)
+		const [px1, py1] = step(offset2, x1, y1, x2, y2)
 
-		const r = leds[i]
-		const g = leds[i + 1]
-		const b = leds[i + 2]
-		const w = leds[i + 3]
+		points[index] = [px + (px1 - px) / 2, py + (py1 - py) / 2]
+	}
 
+	for (let i = 0; i < stripe.num_leds; i++) {
+		const ledindex = i * 4
+		const r = leds[ledindex]
+		const g = leds[ledindex + 1]
+		const b = leds[ledindex + 2]
+		const w = leds[ledindex + 3]
+
+		// Miscelo con warm white (facoltativo)
 		const warmWhite = [255, 238, 203]
-
 		const wp = (w / 255) * 0
-
 		const mix = [
-			Math.round(r * (1 - wp) + warmWhite[0] * wp), // Miscelazione del rosso
-			Math.round(g * (1 - wp) + warmWhite[1] * wp), // Miscelazione del verde
-			Math.round(b * (1 - wp) + warmWhite[2] * wp), // Miscelazione del blu
+			Math.round(r * (1 - wp) + warmWhite[0] * wp),
+			Math.round(g * (1 - wp) + warmWhite[1] * wp),
+			Math.round(b * (1 - wp) + warmWhite[2] * wp),
 		]
+		const [px, py] = points[i]
 
-		const x0 = reverse ? (width - x - 1) * cellWidth + x1 : x * cellWidth + x1
-		const y0 = reverse ? (height - y - 1) * cellHeight + y1 : y * cellHeight + y1
-
-		ctx.fillStyle = `rgba(${mix[0]}, ${mix[1]}, ${mix[2]}, 255)`
-		//ctx.fillRect(x0, y0, cellWidth * stripeMap.scale[0], cellHeight * stripeMap.scale[1])
-		const pd = 1
-		ctx.fillRect(x0 + pd, y0 + pd, cellWidth - pd * 2, cellHeight - pd * 2)
-
-		// draw pixel index
-		ctx.fillStyle = "black"
-		const index = i / 4
-		ctx.fillText(`${index}`, x0 + pd + 2, y0 + pd + 4)
+		ctx.fillStyle = `rgba(${mix[0]}, ${mix[1]}, ${mix[2]}, 1)`
+		console.log(i, `rgba(${mix[0]}, ${mix[1]}, ${mix[2]}, 1)`)
+		ctx.beginPath()
+		ctx.arc(px, py, 5, 0, Math.PI * 2)
+		ctx.fill()
 	}
 }
+function step(offset, x0, y0, x1, y1) {
+	const x = x0 + offset * (x1 - x0)
+	const y = y0 + offset * (y1 - y0)
+	return [x, y]
+}
 
-function getOrientation(x1, y1, x2, y2) {
-	// Differenze
-	const dx = x2 - x1
-	const dy = y2 - y1
+export function getAngle(stripeMap: TStripeMap) {
+	const { x0, y0, x1, y1, x2, y2, x3, y3 } = stripeMap
 
-	// Angolo in radianti rispetto all’asse X, in senso antiorario
-	// (Math.atan2 considera dx come asse X e dy come asse Y)
-	let angleRad = Math.atan2(dy, dx)
-	// Converti in gradi
-	let angleDeg = angleRad * (180 / Math.PI)
+	const anglesRad = [
+		Math.atan2(y1 - y0, x1 - x0),
+		Math.atan2(y2 - y1, x2 - x1),
+		Math.atan2(y3 - y2, x3 - x2),
+		Math.atan2(y0 - y3, x0 - x3),
+	]
 
-	// Normalizza l’angolo in [0, 360)
+	let sumX = 0
+	let sumY = 0
+	for (const rad of anglesRad) {
+		sumX += Math.cos(rad)
+		sumY += Math.sin(rad)
+	}
+
+	let angleDeg = Math.atan2(sumY, sumX) + Math.PI
+
 	if (angleDeg < 0) {
-		angleDeg += 360
+		angleDeg += Math.PI * 2
 	}
 
-	// Calcola direzione approssimata a 4 direzioni
-	// useremo soglie di 45° attorno alle 4 direzioni principali:
-	//   → (0°)
-	//   ↑ (90°)
-	//   ← (180°)
-	//   ↓ (270°)
-	let approximateAngle
-	let directionSymbol
-
-	// Opzione 1: se vuoi cluster di 90° esatti
-	// (ogni 90 gradi circa 45 gradi di offset)
-	if (angleDeg >= 315 || angleDeg < 45) {
-		approximateAngle = 0
-		directionSymbol = "→"
-	} else if (angleDeg >= 45 && angleDeg < 135) {
-		approximateAngle = 90
-		directionSymbol = "↑"
-	} else if (angleDeg >= 135 && angleDeg < 225) {
-		approximateAngle = 180
-		directionSymbol = "←"
-	} else {
-		approximateAngle = 270
-		directionSymbol = "↓"
-	}
-
-	return {
-		angle: angleDeg, // Angolo reale in gradi
-		approximateAngle, // Angolo approssimato (0,90,180,270)
-		direction: directionSymbol, // Simbolo direzione
-	}
+	return angleDeg
 }
