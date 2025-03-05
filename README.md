@@ -10,6 +10,9 @@ echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210
 Print result in hex
 
 ```bash
+# ping
+echo -n -e '\x01\x01' | nc -u -w1 192.168.x.x 4210 | hexdump -C
+
 # blink
 echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210 | hexdump -C
 

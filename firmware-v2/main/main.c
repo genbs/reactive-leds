@@ -3,7 +3,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
+
 #include "storage.h"
 #include "wifi.h"
 #include "config.h"
@@ -12,93 +14,171 @@
 
 #define TAG "MAIN"
 
+#define WIFI_CONNECT_TIMEOUT 20000
+#define BLE_TIMEOUT_MS 300000 // 5 minutes
+
+// current wifi credentials
+typedef struct {
+    char ssid[32];
+    char pass[32];
+} wifi_credentials_t;
+
 void delay(uint32_t ms)
 {
     vTaskDelay(pdMS_TO_TICKS(ms));
 }
 
-void app_main(void)
-{
-    storage_begin();
-
-    
-    wifi_init_sta();
-
-    wifi_disable_sleep();
-
+/**
+ * Scan all wifi networks, check if any of them is known and try to connect to it.
+ */
+bool connect_to_known_networks(wifi_credentials_t *credentials) {
     int num_networks;
+
+    // scan wifi networks
     wifi_ap_record_t *networks = wifi_scan(&num_networks);
     ESP_LOGV(TAG, "Found %d networks", num_networks);
 
-    bool connected = false;
-    char pass[32];
-    char ssid[32];
-    size_t pass_len = sizeof(pass);
+    if (num_networks <= 0) {
+        ESP_LOGI(TAG, "No networks found.");
+        return false;
+    }
 
     for (int i = 0; i < num_networks; i++) {
-        char scanned_ssid[33];
-        memset(scanned_ssid, 0, sizeof(scanned_ssid));      
-        memcpy(scanned_ssid, networks[i].ssid, 32);         
+        char scanned_ssid[33] = {0};
+        snprintf(scanned_ssid, sizeof(scanned_ssid), "%.*s", 32, networks[i].ssid);
 
-        ESP_LOGI(TAG, "SSID: %s, RSSI: %d, Channel: %d, Authmode: %d",
-                 scanned_ssid,
-                 networks[i].rssi,
-                 networks[i].primary,
-                 networks[i].authmode);
+        ESP_LOGI(TAG, "Found SSID: %s, RSSI: %d, Channel: %d, Authmode: %d",
+            scanned_ssid, networks[i].rssi, networks[i].primary, networks[i].authmode);
 
+        // check if the network is known
         if (storage_has_key("wifi", scanned_ssid)) {
             ESP_LOGI(TAG, "Trying to connect to %s", scanned_ssid);
-            
-            storage_get("wifi", scanned_ssid, pass, &pass_len);
-            pass[pass_len] = '\0';
-            // print the password
-            ESP_LOGI(TAG, "Password: '%s'", pass);
-            wifi_connect(scanned_ssid, pass);
+                        
+            // store the password and ssid in the credentials struct
+            size_t pass_len = sizeof(credentials->pass) - 1;
+            storage_get("wifi", scanned_ssid, credentials->pass, &pass_len);
+            credentials->pass[pass_len] = '\0';
+            strncpy(credentials->ssid, scanned_ssid, sizeof(credentials->ssid) - 1);
+
+            // try to connect to the network
+            wifi_connect(credentials->ssid, credentials->pass);
 
             uint32_t start = esp_log_timestamp();
-            while (esp_log_timestamp() - start < 20000) {
+            while (esp_log_timestamp() - start < WIFI_CONNECT_TIMEOUT) {
                 if (wifi_connected()) {
-                    connected = true;
-                    strncpy(ssid, scanned_ssid, sizeof(ssid) - 1);
-                    ssid[sizeof(ssid) - 1] = '\0';
-
-                    ESP_LOGI(TAG, "Connected to %s", ssid);
-                    break;
+                    ESP_LOGI(TAG, "Connected to %s", credentials->ssid);
+                    return true;
                 }
-                delay(300);
 
-                ESP_LOGI(TAG, ".");
+                delay(100);
+            }
+
+            ESP_LOGW(TAG, "Failed to connect to %s", credentials->ssid);
+
+            // remove the network from the known networks, maybe the password is wrong
+            //storage_delete("wifi", scanned_ssid);
+        } else {
+            ESP_LOGI(TAG, "Network %s is unknown", scanned_ssid);
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Start BLE and wait to retrieve the wifi credentials from the client.
+ * When client sends the credentials, store them and reboot the device.
+ */
+void ble_configuration_loop() {
+    ble_begin();
+    
+    uint32_t start_time = esp_log_timestamp();
+    while (esp_log_timestamp() - start_time < BLE_TIMEOUT_MS) { 
+        delay(100);
+    }
+
+    ESP_LOGW(TAG, "BLE timeout, rebooting");
+    esp_restart();
+}
+
+
+/**
+ * Main application loop.
+ * While connected to wifi, read packets from the server.
+ */
+void app_loop(void *param) {
+    wifi_credentials_t *credentials = (wifi_credentials_t *)param;
+
+    while (1) {
+        if (wifi_connected()) {
+
+            // read packets from the server
+            protocol_loop();
+            delay(1);
+
+        } else {
+            ESP_LOGI(TAG, "Reconnecting to WiFi");
+            wifi_connect(credentials->ssid, credentials->pass);
+
+            uint32_t start_time = esp_log_timestamp();
+            while (!wifi_connected()) {
+                delay(10);
+
+                if (esp_log_timestamp() - start_time > WIFI_CONNECT_TIMEOUT) {
+                    ESP_LOGW(TAG, "WiFi connection timeout, rebooting");
+                    
+                    // TODO: off the leds
+                    esp_restart();
+                }
             }
         }
     }
+}
 
-    if (!connected) {
+/**
+ * Application entry point.
+ * 
+ * Connect to known WiFi networks or start BLE configuration if none are found.
+ * If wifi is connected, start the protocol to communicate with the server.
+ */
+void app_main(void)
+{
+    // init storage service
+    storage_begin();
+
+    // load config from storage
+    config_begin();
+    config_print();
+
+    // start wifi in station mode and disable sleep
+    wifi_init_sta();
+    wifi_disable_sleep();
+
+    wifi_credentials_t credentials = {0};
+    if (!connect_to_known_networks(&credentials)) {
         ESP_LOGI(TAG, "No known networks found, starting BLE");
-        wifi_stop();
-        ble_begin();
-    
-        while (1) {
-            delay(100);
-        }
-    }
 
+        // stop wifi, when BLE receives the credentials, it will restart the device
+        wifi_stop();
+
+        // start ble configuration loop
+        ble_configuration_loop();
+    } else {
+        // stop BLE
+        ble_down();
+    }
+    
+    // Start application
     ESP_LOGI(TAG, "Connected to WiFi");
     ESP_LOGI(TAG, "IP address: %s", wifi_ip());
     ESP_LOGI(TAG, "MAC address: %s", wifi_mac());
 
+    // Start protocol to handshake with the server and communicate with it
     protocol_begin();
 
-    while (1) {
-        if (wifi_connected()) {
-            protocol_loop();
-        } else {
-            ESP_LOGI(TAG, "Reconnecting to WiFi");
+    // Create a task for app_loop to run on a different core    
+    xTaskCreatePinnedToCore(app_loop, "app_loop", 4096, &credentials, 5, NULL, 1);
 
-            wifi_connect(ssid, pass);
-
-            while (!wifi_connected()) {
-                delay(100);
-            }
-        }
-    }
+    // Delete the main task
+    vTaskDelete(NULL);
 }

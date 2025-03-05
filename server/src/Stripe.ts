@@ -66,8 +66,7 @@ export class Stripe extends ESPClient implements TStripe {
 	}
 
 	setLEDs(data: Uint8Array /* [r,g,b,r,g,b] */) {
-		const count = data.length / 4
-		const ledsBuffer = new Uint8Array(count * 5)
+		const ledsBuffer = new Uint8Array(data.length)
 
 		for (let i = 0; i < data.length; i += 5) {
 			const led_index = data[i] * 4

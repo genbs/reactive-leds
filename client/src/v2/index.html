@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Document</title>
+	</head>
+	<body>
+		<script async defer>
+			setTimeout(async () => {
+				const leds = window.leds
+
+				await leds.begin("ws://localhost:8000", true)
+				console.log("[MAIN] Connected to server")
+
+				const devices = [
+					{
+						ip: "192.168.0.5",
+						port: 4210,
+					},
+				]
+
+				for (const device of devices) {
+					const result = await leds.ping(device.ip, device.port)
+					console.log(`[MAIN] Pinged device ${device.ip}:${device.port} with result: ${result}`)
+
+					if (result) {
+						const config = await leds.getConfig(device.ip, device.port)
+						console.log(`[MAIN] Got config from device ${device.ip}:${device.port}:`, config)
+					}
+				}
+			})
+		</script>
+	</body>
+</html>

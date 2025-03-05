@@ -138,16 +138,6 @@ function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: n
 	ctx.textBaseline = "top"
 
 	const steps = stripe.num_leds
-	const points: [number, number][] = new Array(stripe.num_leds)
-
-	for (let index = 0; index < stripe.num_leds; index++) {
-		const offset1 = index / steps
-		const offset2 = (index + 1) / steps
-		const [px, py] = step(offset1, x0, y0, x3, y3)
-		const [px1, py1] = step(offset2, x1, y1, x2, y2)
-
-		points[index] = [px + (px1 - px) / 2, py + (py1 - py) / 2]
-	}
 
 	for (let i = 0; i < stripe.num_leds; i++) {
 		const ledindex = i * 4
@@ -164,12 +154,17 @@ function drawStripe(ctx: CanvasRenderingContext2D, stripe: TStripe, cellWidth: n
 			Math.round(g * (1 - wp) + warmWhite[1] * wp),
 			Math.round(b * (1 - wp) + warmWhite[2] * wp),
 		]
-		const [px, py] = points[i]
 
-		ctx.fillStyle = `rgba(${mix[0]}, ${mix[1]}, ${mix[2]}, 1)`
-		ctx.beginPath()
-		ctx.arc(px, py, 5, 0, Math.PI * 2)
-		ctx.fill()
+		const offset1 = i / steps
+		const offset2 = (i + 1) / steps
+		const [px0, py0] = step(offset1, x0, y0, x3, y3)
+		const [px1, py1] = step(offset2, x1, y1, x2, y2)
+		const px = px0 + (px1 - px0) / 2
+		const py = py0 + (py1 - py0) / 2
+
+		//draw rect px0, py0, px1, py1
+		ctx.fillStyle = `rgba(${mix.join(",")})`
+		ctx.fillRect(px0, py0, px1 - px0, py1 - py0)
 	}
 }
 function step(offset, x0, y0, x1, y1) {

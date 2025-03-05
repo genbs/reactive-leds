@@ -87,9 +87,9 @@ function watchCanvas({
 	stripesId: TStripe["id"][]
 }) {
 	const stripes = workerState.getState().config.stripes
-	const imageData = imageDataFromBitmap(bitmap)
 	for (const stripe of stripes) {
 		if (stripesId.includes(stripe.id)) {
+			const imageData = imageDataFromBitmap(bitmap)
 			const pixels = mapStripeOnData(imageData, [bitmap.width, bitmap.height], grid, stripe)
 			// for (let i = 0; i < stripe.num_leds; i++) {
 			// 	pixels[i * 4 + 3] = 0
@@ -102,6 +102,7 @@ function watchCanvas({
 				data[i * 5 + 3] = pixels[i * 4 + 2]
 				data[i * 5 + 4] = 0 //pixels[i * 4 + 3]
 			}
+			console.log("send pixels to", stripe.id)
 			setLEDs(stripe.id, data)
 		}
 	}

@@ -11,15 +11,13 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 {
     if (event_base == WIFI_EVENT) {
         switch (event_id) {
-
             case WIFI_EVENT_STA_START:
                 ESP_LOGI(WIFI_TAG, "WIFI_EVENT_STA_START => connecting...");
                 esp_wifi_connect();
                 break;
 
-            case WIFI_EVENT_STA_DISCONNECTED: {
+            case WIFI_EVENT_STA_DISCONNECTED: 
                 wifi_event_sta_disconnected_t *disconn = (wifi_event_sta_disconnected_t *) event_data;
-
                 ESP_LOGW(WIFI_TAG, "WIFI_EVENT_STA_DISCONNECTED => reason=%d", disconn->reason);
 
                 if (retry_num < MAX_RETRY) {
@@ -30,26 +28,25 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 } else {
                     ESP_LOGE(WIFI_TAG, "Failed to connect after %d attempts", MAX_RETRY);
                     connected = false;
+
+                    // clear IP address
                     snprintf(ip_address_str, sizeof(ip_address_str), "0.0.0.0");
                 }
                 break;
-            }
 
             default:
                 ESP_LOGI(WIFI_TAG, "Unhandled WIFI_EVENT (%d)", (int)event_id);
                 break;
-            }
-        } else if (event_base == IP_EVENT) {
-            switch (event_id) {
-
+        }
+    } else if (event_base == IP_EVENT) {
+        switch (event_id) {
             case IP_EVENT_STA_GOT_IP: {
                 ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
 
-                // Salvo l'IP in ip_address_str
+                // Store IP address
                 snprintf(ip_address_str, sizeof(ip_address_str), IPSTR, IP2STR(&event->ip_info.ip));
                 ESP_LOGI(WIFI_TAG, "IP_EVENT_STA_GOT_IP => %s", ip_address_str);
 
-                // Ora siamo connessi
                 connected = true;
                 retry_num = 0;
                 break;
@@ -62,7 +59,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-
+// wifi in perfomance mode
 void wifi_disable_sleep() 
 {
     ESP_LOGV(WIFI_TAG, "Disabling WiFi sleep");
@@ -75,7 +72,17 @@ void wifi_init_sta()
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
+    esp_netif_t *netif = esp_netif_create_default_wifi_sta();
+
+    if (netif != NULL) {
+        const char *hostname = config.hostname;
+        esp_err_t err = esp_netif_set_hostname(netif, hostname);
+        if (err == ESP_OK) {
+            ESP_LOGI(WIFI_TAG, "Hostname set to %s", hostname);
+        } else {
+            ESP_LOGE(WIFI_TAG, "Failed to set hostname: %s", esp_err_to_name(err));
+        }
+    }
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg)); 
@@ -84,20 +91,12 @@ void wifi_init_sta()
 
 void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
 {   
-    ESP_LOGI(WIFI_TAG, "Connecting to WiFi network: %s", WIFI_SSID);
+    ESP_LOGI(WIFI_TAG, "Connecting to WiFi network: %s-%s", WIFI_SSID, WIFI_PASS);
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
-    esp_event_handler_instance_register(WIFI_EVENT,
-                                        ESP_EVENT_ANY_ID,
-                                        &event_handler,
-                                        NULL,
-                                        &instance_any_id);
-    esp_event_handler_instance_register(IP_EVENT,
-                                        IP_EVENT_STA_GOT_IP,
-                                        &event_handler,
-                                        NULL,
-                                        &instance_got_ip);
+    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &instance_any_id);
+    esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &instance_got_ip);
 
     wifi_config_t wifi_config = {0}; 
     strcpy((char *)wifi_config.sta.ssid, (char *)WIFI_SSID);
@@ -112,6 +111,8 @@ void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
 
     uint8_t mac[6];
     esp_wifi_get_mac(ESP_IF_WIFI_STA, mac);
+
+    // store MAC address
     snprintf(mac_address_str, sizeof(mac_address_str), "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     ESP_ERROR_CHECK(esp_wifi_connect());
@@ -144,6 +145,8 @@ void wifi_stop() {
     ESP_ERROR_CHECK(esp_wifi_deinit());
 }
 
+// Scan all available networks
+// returns an array of wifi_ap_record_t and set num_networks to the number of networks found
 wifi_ap_record_t* wifi_scan(int *num_networks) {
     ESP_LOGI(WIFI_TAG, "Starting WiFi scan");
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -166,9 +169,7 @@ wifi_ap_record_t* wifi_scan(int *num_networks) {
     // ESP_ERROR_CHECK(esp_wifi_deinit());
 
     *num_networks = ap_num;
-
     ESP_LOGI(WIFI_TAG, "WiFi scan complete, found %d networks", ap_num);
     
     return ap_records;
-
 }

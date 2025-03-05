@@ -1,11 +1,11 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import GydraLEDs from "@lib"
 
 import EditableValue from "@mapping/components/EditableValue"
 import NetClients from "@mapping/sidebar/NetClients"
 import Stripe from "@mapping/sidebar/Stripe"
-import { TConfig } from "@shared"
+import { TConfig, TStripe } from "@shared"
 
 interface SidebarProps {
 	config: TConfig
@@ -17,6 +17,7 @@ interface SidebarProps {
 
 export default function Sidebar(props: SidebarProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
+	const [watched, setWatched] = useState<TStripe[]>([])
 
 	useEffect(() => {
 		if (!props.canvas || !canvasRef.current) return
@@ -44,6 +45,24 @@ export default function Sidebar(props: SidebarProps) {
 		return () => cancelAnimationFrame(rid)
 	}, [canvasRef.current, props.canvas])
 
+	useEffect(() => {
+		if (!GydraLEDs.isConnected()) return
+
+		console.log("watched", watched)
+		return GydraLEDs.watch(
+			props.canvas,
+			watched.map(w => w.id)
+		)
+	}, [props.canvas, watched])
+
+	function onWatch(stripe: TStripe) {
+		if (watched.find(w => w.id === stripe.id)) {
+			setWatched(watched.filter(w => w.id !== stripe.id))
+		} else {
+			setWatched([...watched, stripe])
+		}
+	}
+
 	return (
 		<aside style={{ display: "flex", flexDirection: "column", maxHeight: "100%", overflow: "auto" }}>
 			<section>
@@ -65,11 +84,11 @@ export default function Sidebar(props: SidebarProps) {
 				</div>
 				{props.config.stripes.map(stripe => (
 					<Stripe
-						canvas={props.canvas}
 						grid={props.config.grid}
 						key={stripe.address}
 						stripe={stripe}
 						updateStripe={props.updateStripe}
+						onWatch={onWatch}
 					/>
 				))}
 			</section>

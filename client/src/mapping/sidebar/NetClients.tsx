@@ -5,6 +5,7 @@ import { TNetClient } from "@shared"
 
 export default function NetClients() {
 	const [clients, setClients] = useState<TNetClient[]>([])
+	const [address, setAddress] = useState("")
 
 	useEffect(() => {
 		return GydraLEDs.onChangeState(state => {
@@ -24,6 +25,10 @@ export default function NetClients() {
 						</li>
 					))}
 				</ul>
+			</div>
+			<div>
+				<input type="text" value={address} onChange={e => setAddress(e.target.value)} />
+				<button onClick={() => GydraLEDs.connect(address)}>Send</button>
 			</div>
 		</div>
 	)

@@ -1,23 +1,25 @@
 import dgram from "dgram"
-
-import { logger } from "@shared"
+import { logger } from "../shared/logger"
 import {
+	bufferToConfig,
 	Color,
-	EMPTY_MESSAGE_ID,
-	MessageTypeString,
-	ProtocolBoardConfig,
-	ProtocolMessageType,
-	ProtocolRequestID,
-	ProtocolResponse,
-} from "./types"
+	Config,
+	configToBuffer,
+	EMPTY_PACKET_ID,
+	Packet,
+	PacketID,
+	PacketStatus,
+	PacketType,
+	PacketTypeMap,
+} from "../shared/protocol"
 
 class Protocol {
-	static PING_TIMEOUT = 4000
-	static GET_CONFIG_TIMEOUT = 200
+	static PING_TIMEOUT = 1000
+	static GET_CONFIG_TIMEOUT = 1000
 	static SET_CONFIG_TIMEOUT = 1000
 
 	private socket: dgram.Socket
-	private requestID: ProtocolRequestID = 1
+	private requestID: PacketID = 1
 
 	/**
 	 * Create UDP socket to communicate with devices.
@@ -35,31 +37,23 @@ class Protocol {
 	 * @returns (Promise) true if response received, false otherwise
 	 */
 	async ping(ip: string, port: number): Promise<boolean> {
-		return (await this.sendSync(ip, port, ProtocolMessageType.PING, null, Protocol.PING_TIMEOUT)) !== null
+		return (await this.sendSync(ip, port, PacketType.PING, null, Protocol.PING_TIMEOUT)) !== null
 	}
 
 	/**
 	 * Get device configuration.
 	 * First byte is message id, second byte is message type.
-	 * Response is [requestID, ProtocolMessageType.GET_CONFIG, port, id, num_leds, hostname], each byte is a number, except hostname.
+	 * Response is [requestID, PacketType.GET_CONFIG, port, id, num_leds, hostname], each byte is a number, except hostname.
 	 *
 	 * @param ip device ip
 	 * @param port device port
 	 * @returns (Promise) null if no response, otherwise {port, id, num_leds, hostname}
 	 */
-	async getConfig(ip: string, port: number): Promise<ProtocolBoardConfig | null> {
-		const response = await this.sendSync(ip, port, ProtocolMessageType.GET_CONFIG, null, Protocol.GET_CONFIG_TIMEOUT)
+	async getConfig(ip: string, port: number): Promise<Config | null> {
+		const response = await this.sendSync(ip, port, PacketType.GET_CONFIG, null, Protocol.GET_CONFIG_TIMEOUT)
 		if (!response) return null
 
-		const data = response.slice(2)
-
-		return {
-			port: (data[0] << 8) | data[1],
-			id: data[2],
-			num_leds: data[3],
-			brightness: data[4],
-			hostname: String.fromCharCode(...data.slice(5)).replace(/\0/g, ""),
-		}
+		return bufferToConfig(response.slice(2))
 	}
 
 	/**
@@ -70,22 +64,12 @@ class Protocol {
 	 * @param config
 	 * @returns [MessageID, MessageType, Status (boolean)]
 	 */
-	async setConfig(ip: string, port: number, config: ProtocolBoardConfig): Promise<boolean> {
-		const response = await this.sendSync(
-			ip,
-			port,
-			ProtocolMessageType.SET_CONFIG,
-			[
-				(config.port >> 8) & 0xff,
-				config.port & 0xff,
-				config.id,
-				config.num_leds,
-				config.brightness,
-				...bufferFromString(config.hostname),
-			],
-			Protocol.SET_CONFIG_TIMEOUT
-		)
-		return response && response.length >= 2 && response[2] === 1
+	async setConfig(ip: string, port: number, config: Config): Promise<boolean> {
+		const packet = configToBuffer(config)
+
+		const response = await this.sendSync(ip, port, PacketType.SET_CONFIG, packet, Protocol.SET_CONFIG_TIMEOUT)
+
+		return response !== null && response.length >= 2 && response[2] === PacketStatus.OK
 	}
 
 	/**
@@ -97,7 +81,7 @@ class Protocol {
 	 * @returns
 	 */
 	async setLEDs(ip: string, port: number, data: Uint8Array) {
-		return this.send(ip, port, ProtocolMessageType.SET_LEDS, data)
+		return this.send(ip, port, PacketType.SET_LEDS, data)
 	}
 
 	/**
@@ -134,7 +118,7 @@ class Protocol {
 			delay & 0xff,
 		])
 
-		return this.send(ip, port, ProtocolMessageType.BLINK, data)
+		return this.send(ip, port, PacketType.BLINK, data)
 	}
 
 	/**
@@ -142,13 +126,15 @@ class Protocol {
 	 *
 	 * @param ip device ip
 	 * @param port device port
-	 * @param type ProtocolMessageType
 	 * @param data any
 	 */
-	private send(ip: string, port: number, type: ProtocolMessageType, data: number[] | Uint8Array) {
-		const message = new Uint8Array([EMPTY_MESSAGE_ID, type, ...data])
+	private send(ip: string, port: number, type: PacketType, data: Uint8Array) {
+		const message = new Uint8Array(1 + 1 + data.length)
+		message[0] = EMPTY_PACKET_ID
+		message[1] = type
+		message.set(data, 2)
 
-		logger.debug(`\x1b[90m[Request (not sync)] Sending ${MessageTypeString[type]} to ${ip}:${port}\x1b[0m`, data)
+		logger.debug(`\x1b[90m[Request (not sync)] Sending ${PacketTypeMap[type]} to ${ip}:${port}\x1b[0m`, data)
 
 		this.socket.send(message, 0, message.length, port, ip, err => err && console.error(err))
 	}
@@ -159,7 +145,7 @@ class Protocol {
 	 *
 	 * @param ip device ip
 	 * @param port device port
-	 * @param type ProtocolMessageType
+	 * @param type PacketType
 	 * @param data any
 	 * @param timeout milliseconds to wait for response
 	 * @returns
@@ -167,54 +153,63 @@ class Protocol {
 	private sendSync(
 		ip: string,
 		port: number,
-		type: ProtocolMessageType,
-		data: number[] | Uint8Array | null = null,
+		type: PacketType,
+		data: Uint8Array | null = null,
 		timeout: number
-	): Promise<ProtocolResponse | null> {
+	): Promise<Packet | null> {
 		// from 1 to 255 with modulo (0 is reserved for empty message)
 		this.requestID = (this.requestID % 255) + 1
+
 		// grey text color
-		logger.debug(`\x1b[90m[Request:${this.requestID}] Sending ${MessageTypeString[type]} to ${ip}:${port}\x1b[0m`, data)
+		logger.debug(`\x1b[90m[Request:${this.requestID}] Sending ${PacketTypeMap[type]} to ${ip}:${port}\x1b[0m`, data)
+
 		const requestID = this.requestID
-		const message = new Uint8Array([requestID, type, ...(data || [])])
+		const message = new Uint8Array(1 + 1 + (data ? data.length : 0))
+		message[0] = requestID
+		message[1] = type
+		if (data) message.set(data, 2)
+
 		let closeTimeout: NodeJS.Timeout
 
 		return new Promise(resolve => {
-			let active = true
+			let closed = false
 
 			const startTime = performance.now()
-			const close = data => {
-				if (!active) return
-				console.log("data", data)
+			const close = (data: Packet | null) => {
+				if (closed) return
+
 				if (data) {
 					logger.debug(
-						// green text color
-						`\x1b[32m[Request:${requestID}] Received ${MessageTypeString[type]} from ${ip}:${port} in ${
+						`\x1b[32m[Request:${requestID}] Received ${PacketTypeMap[type]} from ${ip}:${port} in ${
 							performance.now() - startTime
 						}ms\x1b[0m`,
 						data
 					)
 				} else {
-					// yellow text color
 					logger.debug(
-						`\x1b[33m[Request:${requestID}] Timeout for ${MessageTypeString[type]} from ${ip}:${port} in ${
+						`\x1b[33m[Request:${requestID}] Timeout for ${PacketTypeMap[type]} from ${ip}:${port} in ${
 							performance.now() - startTime
 						}ms\x1b[0m`
 					)
 				}
-				active = false
+
+				// cleanup
+				closed = true
 				clearTimeout(closeTimeout)
 				this.socket.off("message", onMessage)
 
 				resolve(data)
 			}
 
-			const onMessage = (msg: Buffer) =>
-				msg[0] === requestID && msg[1] === type && close(msg as unknown as ProtocolResponse)
+			const onMessage = (msg: Packet) => {
+				if (msg[0] === requestID && msg[1] === type) {
+					// graceful close
+					close(msg)
+				}
+			}
 
 			closeTimeout = setTimeout(() => close(null), timeout)
 			this.socket.on("message", onMessage)
-
 			this.socket.send(message, 0, message.length, port, ip, err => err && close(null))
 		})
 	}
@@ -222,12 +217,5 @@ class Protocol {
 
 const proto = new Protocol()
 
+export { Protocol }
 export default proto
-
-function bufferFromString(str: string): Uint8Array {
-	const buffer = new Uint8Array(str.length)
-	for (let i = 0; i < str.length; i++) {
-		buffer[i] = str.charCodeAt(i)
-	}
-	return buffer
-}

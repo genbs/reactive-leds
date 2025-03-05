@@ -14,10 +14,10 @@
 
 #include "config.h"
 
-#define LEDS_TAG "LEDS"
+#define LEDS_TAG "LEDS_SERVICE"
 
-#define RMT_TX_CHANNEL    0       // RMT channel for TX
-#define RMT_CLK_DIV       2       // Clock divider for RMT
+#define RMT_TX_CHANNEL    0        // RMT channel for TX
+#define RMT_CLK_DIV       2        // Clock divider for RMT
 #define RMT_RESOLUTION_HZ 10000000 // 10MHz resolution, 1 tick = 0.1us (led strip needs a high resolution)
 
 #define RMT_IDLE_LEVEL_LOW  0

@@ -16,10 +16,10 @@ export default class NetService extends EventEmitter<NetServiceEvents> {
 		super()
 	}
 
-	start() {
-		this.find()
+	async start() {
+		await this.find()
 
-		setInterval(() => this.find(), 5000)
+		setTimeout(() => this.start(), 5000)
 	}
 
 	getClients(): TNetClient[] {
@@ -32,13 +32,14 @@ export default class NetService extends EventEmitter<NetServiceEvents> {
 				if (error || stderr) {
 					resolve([])
 				}
-
 				const devices = stdout
 					.split("\n")
 					.map(line => {
 						const parts = line.split(/\s+/)
 						if (parts.length >= 4) {
-							if (parts[3] === "(incomplete)" || parts[3] === "ff:ff:ff:ff:ff:ff") return null
+							if (parts[3] === "(incomplete)" || parts[3] === "ff:ff:ff:ff:ff:ff") {
+								return null
+							}
 
 							return {
 								ip: parts[1].replace(/[()]/g, ""), // Rimuove le parentesi dall'indirizzo IP
@@ -78,7 +79,7 @@ export default class NetService extends EventEmitter<NetServiceEvents> {
 		return vendor
 	}
 
-	private async getHostname(ip: string): Promise<string | null> {
+	async getHostname(ip: string): Promise<string | null> {
 		return new Promise((resolve, reject) => {
 			dns.reverse(ip, (err, hostnames) => {
 				resolve(err ? null : hostnames[0])

@@ -5,10 +5,11 @@ const TsconfigPathsPlugin = require("tsconfig-paths-webpack-plugin")
 const fs = require("fs")
 
 module.exports = {
-	entry: {
-		mapping: "./src/mapping/index.tsx",
-		lib: "./src/lib/index.ts",
-	},
+	// entry: {
+	// 	mapping: "./src/mapping/index.tsx",
+	// 	lib: "./src/lib/index.ts",
+	// },
+	entry: "./src/v2/main.ts",
 
 	output: {
 		libraryTarget: "umd", // Supporta sia CommonJS che ES6
@@ -47,7 +48,7 @@ module.exports = {
 	},
 	plugins: [
 		new HtmlWebpackPlugin({
-			template: "./src/mapping/index.html",
+			template: "./src/v2/index.html",
 		}),
 		new webpack.DefinePlugin({
 			"process.env": JSON.stringify({ ...process.env }),

@@ -4,7 +4,11 @@
 uint8_t *protocol_response = NULL;
 
 bool protocol_begin() {
-    protocol_response = (uint8_t *)malloc(1 + 1 + config_get().num_leds * 5);
+    protocol_response = (uint8_t *)malloc(1 + 1 + config.num_leds * 5);
+    if (protocol_response == NULL) {
+        ESP_LOGE(PROTOCOL_TAG, "Failed to allocate memory for protocol response");
+        return false;
+    }
 
     if (udp_con_begin(4210)) {
         leds_begin();
@@ -17,13 +21,6 @@ bool protocol_begin() {
 
 void protocol_process_packet(udp_packet *packet)
 {
-    size_t length = packet->len;
-    if (length < 2)
-    {
-        ESP_LOGW(PROTOCOL_TAG, "Received invalid packet");
-        return;
-    }
-
     switch (packet->data[1])
     {
     case PING:
@@ -50,22 +47,27 @@ void protocol_process_packet(udp_packet *packet)
 void protocol_loop()
 {
     udp_packet *packet = udp_con_read();
-    if (packet != NULL) {
-        ESP_LOGV(PROTOCOL_TAG, "Received %d bytes from %s:", packet->len, packet->address);
+    if (is_valid_packet(packet, 2)) {
+        ESP_LOGV(PROTOCOL_TAG, "Received %d bytes from %s:", packet->len, inet_ntoa(((struct sockaddr_in *)&packet->source_addr)->sin_addr));
         
         protocol_process_packet(packet);
-    }
+    } 
 }
 
 
+/**
+ * When receving [MESSAGE_ID, PING], respond with [MESSAGE_ID, PING, 1]
+ */
 void protocol_ping(udp_packet *packet)
 {
     ESP_LOGI(PROTOCOL_TAG, "PING");
 
+    // PONG
     protocol_response[0] = packet->data[0];
     protocol_response[1] = PING;
+    protocol_response[2] = 1; 
 
-    udp_con_send(protocol_response, 2, &packet->source_addr);
+    udp_con_send(protocol_response, 3, &packet->source_addr);
 }
 
 
@@ -75,14 +77,13 @@ void protocol_get_config(udp_packet *packet)
 
     uint8_t *data = packet->data;
 
-    config_t config = config_get();
     protocol_response[0] = data[0];
     protocol_response[1] = GET_CONFIG;
-    protocol_response[2] = (config.port >> 8) & 0xFF;
-    protocol_response[3] = config.port & 0xFF;
-    protocol_response[4] = config.id;
-    protocol_response[5] = config.num_leds;
-    protocol_response[6] = config.brightness;
+    protocol_response[2] = config.pin; 
+    protocol_response[3] = config.num_leds;
+    protocol_response[4] = config.brightness;
+    protocol_response[5] = (config.port >> 8) & 0xFF;
+    protocol_response[6] = config.port & 0xFF;
 
     size_t hostname_len = strlen(config.hostname);
     memcpy(&protocol_response[7], config.hostname, hostname_len);
@@ -103,15 +104,15 @@ void protocol_set_config(udp_packet *packet)
 
     ESP_LOGI(PROTOCOL_TAG, "SET_CONFIG");
 
-    config_t config = config_get();
-    config.port = (data[2] << 8) | data[3]; // TODO: if port changes, restart the server
-    config.id = data[4];
-    config.num_leds = data[5];
-    config.brightness = data[6];
+    config.pin = data[2];
+    config.num_leds = data[3];
+    config.brightness = data[4];
+    config.port = (data[5] << 8) | data[6]; // TODO: if port changes, restart the server
 
-    uint8_t hostname_length = len - 7;
+    size_t hostname_length = len - 7;
     if (hostname_length >= sizeof(config.hostname))
     {
+        ESP_LOGW(PROTOCOL_TAG, "Hostname too long, truncating");
         hostname_length = sizeof(config.hostname) - 1;
     }
     memcpy(config.hostname, &data[7], hostname_length);
@@ -151,6 +152,12 @@ void protocol_set_leds(udp_packet *packet)
     for (int i = 2; i < len; i += 5)
     {
         uint8_t pixel_index = data[i];
+
+        if (pixel_index >= config.num_leds) {
+            ESP_LOGW(PROTOCOL_TAG, "LED index %d out of range", pixel_index);
+            continue;  
+        }
+
         uint8_t r = data[i + 1];
         uint8_t g = data[i + 2];
         uint8_t b = data[i + 3];

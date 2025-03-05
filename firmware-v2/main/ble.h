@@ -7,6 +7,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/timers.h"
 
 #include "esp_system.h"
 #include "esp_log.h"
@@ -27,6 +28,14 @@
 
 #define GATTS_APP_ID 0
 
+static const uint8_t SERVICE_UUID_128[ESP_UUID_LEN_128] = {
+    0xe8, 0x8f, 0xf4, 0xac,
+    0x7f, 0x94, 0xdc, 0x81,
+    0xd7, 0x41, 0x36, 0x84,
+    0x56, 0x1f, 0xca, 0xa9
+};
+
 void ble_begin();
+void ble_down();
 
 #endif

@@ -1,7 +1,15 @@
 {
-	"idf.port": "/dev/tty.wchusbserial595B0083511",
+	"idf.port": "/dev/tty.usbmodem1101",
 	"idf.openOcdConfigs": ["board/esp32s3-builtin.cfg"],
-	"idf.flashType": "JTAG",
+	"idf.flashType": "UART",
 	"idf.espIdfPath": "/Users/genbs/esp/esp-idf",
-	"idf.toolsPath": "/Users/genbs/.espressif"
+	"idf.toolsPath": "/Users/genbs/.espressif",
+	"files.associations": {
+		"*.h": "cpp",
+		"*.tcc": "cpp",
+		"format": "cpp",
+		"limits": "cpp",
+		"chrono": "cpp",
+		"typeinfo": "cpp"
+	}
 }

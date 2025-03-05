@@ -90,7 +90,7 @@ export default function Root() {
 
 					const angle = Math.atan2(iOffset, jOffset)
 					const angle2 = Math.atan(jOffset / iOffset)
-					let center = [Math.sin(time * 0.001), Math.cos(time * 0.001)]
+					let center = [Math.sin(time * 0.01), Math.cos(time * 0.01)]
 					//let center = [0.5, 0.5]
 					let distance = Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2)
 
@@ -98,16 +98,16 @@ export default function Root() {
 					distance = distance + Math.sqrt((iOffset - center[0]) ** 2 + (jOffset - center[1]) ** 2) * 0.9
 
 					const [r, g, b, a] = hslToColor(
-						time * 0.1 + iOffset * 120,
-						//((i * j) / (width * height)) * Math.cos(time * 0.001) ** 2,
+						time * 0.2 + iOffset * 90,
 						1,
 						Math.round(time * 0.002 + iOffset * 4) % 2 === 0 ? 0.5 : (j * i * 0.00005) ** 5
+						//((i * j) / (width * height)) * Math.cos(time * 0.001) ** 2
 					)
 
 					data[index] = r
 					data[index + 1] = g
 					data[index + 2] = b
-					data[index + 3] = a
+					data[index + 3] = a //* Math.cos(time * 0.001) ** 2
 				}
 			}
 

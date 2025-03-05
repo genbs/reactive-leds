@@ -32,6 +32,24 @@ export function mappingEvents(
 
 	const onKeyDown = (e: KeyboardEvent) => {
 		lastKey = e.key
+
+		switch (lastKey) {
+			case "d":
+				selectedMode = "default"
+				break
+			case "x":
+				selectedMode = "scaleX"
+				break
+			case "y":
+				selectedMode = "scaleY"
+				break
+			case "r":
+				selectedMode = "rotate"
+				break
+			default:
+				selectedMode = "move"
+				break
+		}
 	}
 
 	const onKeyUp = (e: KeyboardEvent) => {
@@ -51,23 +69,6 @@ export function mappingEvents(
 			if (stripe.map?.visible === false) continue
 
 			if (isInsideStripe(ix, iy, stripe)) {
-				switch (lastKey) {
-					case "d":
-						selectedMode = "default"
-						break
-					case "x":
-						selectedMode = "scaleX"
-						break
-					case "y":
-						selectedMode = "scaleY"
-						break
-					case "r":
-						selectedMode = "rotate"
-						break
-					default:
-						selectedMode = "move"
-						break
-				}
 				selectedStripe = stripe
 
 				return

@@ -44,8 +44,13 @@ async function main() {
 	}
 
 	async function addStripeIfNotExist(device: TNetClient | TBonjourClient) {
+		console.log("addStripeIfNotExist")
 		const stripe = findStripe(device.address)
-		if (stripe || ("vendor" in device && !device.vendor.toLocaleLowerCase().includes("espressif"))) return false
+		console.log("stripe", stripe)
+		if (stripe || ("vendor" in device && !device.vendor.toLocaleLowerCase().includes("espressif"))) {
+			console.log("stripe already exist or not espressif", device)
+			return false
+		}
 
 		const port = await findDeviceUDPPort(device.address)
 		if (!port) {
@@ -190,7 +195,29 @@ async function main() {
 				case "connect": {
 					const netClient = netService.getClients().find(client => client.address === request.ip)
 					console.log("connect", request.ip, netClient)
-					if (netClient) addStripeIfNotExist(netClient)
+					addStripeIfNotExist({
+						name: request.ip,
+						hostname: request.ip,
+						address: request.ip,
+					})
+					// if (netClient) {
+					// 	console.log("connect 1")
+					// 	addStripeIfNotExist(netClient)
+					// } else {
+					// 	console.log("connect 2")
+					// 	const hostname = await netService.getHostname(request.ip)
+					// 	console.log("connect 3", hostname)
+					// 	if (hostname) {
+					// 		console.log("connect 3")
+					// 		addStripeIfNotExist({
+					// 			name: hostname,
+					// 			hostname,
+					// 			address: request.ip,
+					// 		})
+					// 	} else {
+					// 		console.log(`Not connect ${request.ip}`)
+					// 	}
+					// }
 
 					break
 				}
@@ -210,14 +237,16 @@ async function main() {
 
 main()
 
-const PORT_START = 4200
-const PORT_END = 4220
+const PORT_START = 4210
+const PORT_END = 4210
 async function findDeviceUDPPort(
 	address: string,
 	startPort: number = PORT_START,
 	endPort: number = PORT_END
 ): Promise<number> {
-	for (let port = startPort; port <= endPort; port++) if (await proto.ping(address, port)) return port
-
+	console.log("findDeviceUDPPort")
+	for (let port = startPort; port <= endPort; port++) {
+		if (await proto.ping(address, port)) return port
+	}
 	return 0
 }

@@ -13,20 +13,14 @@ interface StripeProps {
 	stripe: TStripe
 	updateStripe: (stripe: TStripe) => void
 	grid: TConfig["grid"]
-	canvas: HTMLCanvasElement | OffscreenCanvas
+	onWatch: (stripe: TStripe) => void
 }
 
-export default function Stripe({ stripe, updateStripe, grid, canvas }: StripeProps) {
+export default function Stripe({ stripe, updateStripe, grid, onWatch }: StripeProps) {
 	const [prevPixel, setPrevPixel] = useState<Uint8Array>(new Uint8Array(0))
 	const [prevUpdate, setPrevUpdate] = useState(0)
 
 	const [imageLeds, setImageLeds] = useState<boolean>(false)
-
-	useEffect(() => {
-		if (!imageLeds) return
-
-		return GydraLEDs.watch(canvas, [stripe.id])
-	}, [imageLeds, canvas, stripe.id])
 
 	function setLeds(colors: Uint8Array) {
 		const data = new Uint8Array(stripe.num_leds * 5)
@@ -73,6 +67,27 @@ export default function Stripe({ stripe, updateStripe, grid, canvas }: StripePro
 		updateStripe({
 			...stripe,
 			map: GydraLEDs.rotate(stripe.map, Math.PI / 10),
+		})
+	}
+
+	useEffect(() => {
+		onWatch(stripe)
+	}, [imageLeds])
+
+	function reset() {
+		updateStripe({
+			...stripe,
+			map: {
+				...stripe.map,
+				x0: 1,
+				y0: 1,
+				x1: 2,
+				y1: 1,
+				x2: 2,
+				y2: stripe.num_leds,
+				x3: 1,
+				y3: stripe.num_leds,
+			},
 		})
 	}
 
@@ -142,6 +157,9 @@ export default function Stripe({ stripe, updateStripe, grid, canvas }: StripePro
 							</span>
 							<span onClick={changeOrientation} className="pointer unicode unicode--l pd--1">
 								⟳
+							</span>
+							<span onClick={reset} className="pointer unicode unicode--l pd--1">
+								r
 							</span>
 
 							<div className="flex gap flex--v-center">

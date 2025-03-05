@@ -13,25 +13,24 @@ void leds_begin()
     ESP_LOGI(LEDS_TAG, "LEDs driver initializing");
 
     // Buffer initialization
-    leds = (uint8_t*)malloc(sizeof(uint8_t) * NUM_LEDS * 4);
+    leds = (uint8_t*)malloc(sizeof(uint8_t) * config.num_leds * 4);
     if (leds == NULL) {
         ESP_LOGE(LEDS_TAG, "Failed to allocate memory for LEDs");
         return;
     }
-    memset(leds, 0, sizeof(uint8_t) * NUM_LEDS * 4);
+    memset(leds, 0, sizeof(uint8_t) * config.num_leds * 4);
     
-    // Configurazione del driver RMT
+    // Configure RMT
     ESP_LOGV(LEDS_TAG, "Create RMT TX channel");
     rmt_tx_channel_config_t tx_chan_config = {
         .clk_src = RMT_CLK_SRC_DEFAULT, // select source clock
-        .gpio_num = LED_PIN,
+        .gpio_num = config.pin, // select output GPIO
         .mem_block_symbols = 64, // increase the block size can make the LED less flickering
         .resolution_hz = RMT_RESOLUTION_HZ,
-        .trans_queue_depth = 4, // set the number of transactions that can be pending in the background
+        .trans_queue_depth = 8, // set the number of transactions that can be pending in the background
     };
     ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &led_chan));
 
-    
     ESP_LOGV(LEDS_TAG, "Install led strip encoder");
     led_strip_encoder_config_t encoder_config = {
         .resolution = RMT_RESOLUTION_HZ,
@@ -47,7 +46,7 @@ void leds_begin()
 
 void leds_update(uint8_t pixel_index, uint8_t r, uint8_t g, uint8_t b, uint8_t w)
 {
-    if (pixel_index >= NUM_LEDS) {
+    if (pixel_index >= config.num_leds) {
         ESP_LOGE(LEDS_TAG, "Pixel index out of range");
         return;
     }
@@ -60,14 +59,12 @@ void leds_update(uint8_t pixel_index, uint8_t r, uint8_t g, uint8_t b, uint8_t w
 
 void leds_clear()
 {
-    for (int i = 0; i < NUM_LEDS; i++) {
-        leds_update(i, 0, 0, 0, 0);
-    }
+    memset(leds, 0, config.num_leds * 4);
 }
 
 void leds_show()
 {
-    ESP_ERROR_CHECK(rmt_transmit(led_chan, led_encoder, leds, NUM_LEDS * 4, &tx_config));
+    ESP_ERROR_CHECK(rmt_transmit(led_chan, led_encoder, leds, config.num_leds * 4, &tx_config));
     ESP_ERROR_CHECK(rmt_tx_wait_all_done(led_chan, portMAX_DELAY));
 }
 

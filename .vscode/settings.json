@@ -22,6 +22,6 @@
 	"cmake.sourceDirectory": "/Users/genbs/My Drive/Repositories/gydra/packages/gydra-led/firmware-v2",
 	"idf.espIdfPath": "/Users/genbs/esp/esp-idf",
 	"idf.toolsPath": "/Users/genbs/.espressif",
-	"idf.port": "/dev/tty.usbmodem1101",
+	"idf.port": "/dev/tty.wchusbserial595B0083511",
 	"idf.openOcdConfigs": ["board/esp32s3-builtin.cfg"]
 }

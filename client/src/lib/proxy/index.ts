@@ -110,6 +110,7 @@ export function watch(canvas: HTMLCanvasElement | OffscreenCanvas, stripes?: TSt
 	const grid = getState().config.grid
 
 	stripes = !stripes || stripes.length === 0 ? getState().config.stripes.map(s => s.id) : stripes
+	console.log("stripes", stripes)
 	let lastSent = 0
 	function start_watching() {
 		createImageBitmap(canvas).then(imageBitmap => {
