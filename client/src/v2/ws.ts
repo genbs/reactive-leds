@@ -1,3 +1,5 @@
+import { logger } from "@shared"
+
 const WS_RECONNECTION_TIMEOUT = 5000
 const WS_RECONNECTION_MAX_RETRIES = 5
 
@@ -36,15 +38,16 @@ export default class WS {
 	 * Connects to the WebSocket server.
 	 */
 	public connect() {
-		this.log("Connecting to", this.settings.url)
+		console.log(this.settings)
+		logger.info("Connecting to", this.settings.url)
 
 		if (this.socket) {
-			this.log("Warning: already connected, closing existing connection")
+			logger.warn("Warning: already connected, closing existing connection")
 			this.socket.close()
 		}
 
 		const onOpen = (e: Event) => {
-			this.log("Connection established", e)
+			logger.info("Connection established", e)
 
 			this.connected = true
 			this.retries = 0
@@ -56,7 +59,7 @@ export default class WS {
 			if (e.data.length <= 0) return
 
 			const data = new Uint8Array(e.data)
-			this.log("Received", data)
+			logger.debug("Received", data)
 
 			this.settings.onMessage?.(data)
 		}
@@ -74,18 +77,18 @@ export default class WS {
 	}
 
 	public close() {
-		this.log("Gracefully closing")
+		logger.info("Gracefully closing")
 		this.connected = false
 		this.socket?.close()
 	}
 
 	public send(payload) {
 		if (!this.socket) {
-			this.log("Error: not connected, can't send message")
+			logger.warn("Error: not connected, can't send message")
 			return
 		}
 
-		this.log("Sending", payload)
+		logger.debug("Sending", payload)
 
 		this.socket.send(payload)
 	}
@@ -99,7 +102,7 @@ export default class WS {
 	 * @returns
 	 */
 	private onSocketClose(e: CloseEvent) {
-		this.log("Connection closed", e)
+		logger.info("Connection closed", e)
 
 		this.settings.onConnectionChange?.(false)
 
@@ -110,21 +113,13 @@ export default class WS {
 
 		if (shouldReconnect) {
 			if (this.retries >= WS_RECONNECTION_MAX_RETRIES) {
-				this.log("Max retries reached, not reconnecting")
+				logger.info("Max retries reached, not reconnecting")
 				return
 			}
 
-			this.log(`Reconnecting in ${WS_RECONNECTION_TIMEOUT / 1000}s...`)
+			logger.info(`Reconnecting in ${WS_RECONNECTION_TIMEOUT / 1000}s...`)
 			this.retries++
 			setTimeout(() => this.connect(), WS_RECONNECTION_TIMEOUT)
 		}
-	}
-
-	// Logging
-	// TODO: replace with a proper logger or global logger with global debug flag
-	private log(...args: any[]) {
-		if (!this.settings.debug) return
-
-		console.log("[WS]", ...args)
 	}
 }

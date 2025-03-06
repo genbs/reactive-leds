@@ -136,7 +136,7 @@ class Protocol {
 
 		logger.debug(`\x1b[90m[Request (not sync)] Sending ${PacketTypeMap[type]} to ${ip}:${port}\x1b[0m`, data)
 
-		this.socket.send(message, 0, message.length, port, ip, err => err && console.error(err))
+		this.socket.send(message, 0, message.length, port, ip, err => err && logger.error(err))
 	}
 
 	/**

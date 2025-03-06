@@ -1,3 +1,4 @@
+import { LOG_LEVEL, logger } from "@shared"
 import { WorkerRequestType, WorkerRequestTypeMap } from "./comm"
 import WS from "./ws"
 
@@ -10,15 +11,19 @@ const ws: WS = new WS({
 })
 
 let connectionChangeRequest = 0
+
 self.addEventListener("message", async (e: any) => {
 	const requestId = e.data[0]
 	const type = e.data[1]
 	const message = e.data.slice(2)
-	console.log(`[Worker] recv from client [${requestId}] ${WorkerRequestTypeMap[type]}`, message)
+	logger.debug(`[Worker] recv from client [${requestId}] ${WorkerRequestTypeMap[type]}`, message)
 
 	switch (type) {
 		case WorkerRequestType.Connect:
 			const debug = message[message.length - 1] === 0x01
+
+			if (debug) logger.setLevel(LOG_LEVEL.DEBUG)
+
 			const serverUrl = String.fromCharCode(...message.slice(0, message.length - 1))
 			connectionChangeRequest = requestId
 			ws.settings.url = serverUrl
@@ -32,13 +37,13 @@ self.addEventListener("message", async (e: any) => {
 			ws.send(request)
 			break
 		default:
-			console.log("[Worker] Unknown request type")
+			logger.debug("[Worker] Unknown request type")
 			break
 	}
 })
 
 function handleConnectionChange(status: boolean) {
-	console.log("[Worker] websocket connection change", status)
+	logger.debug("[Worker] websocket connection change", status)
 	const packet = new Uint8Array(3)
 	packet[0] = connectionChangeRequest
 	packet[1] = WorkerRequestType.ConnectionChange
@@ -51,7 +56,7 @@ function handleMessage(packet: Uint8Array) {
 	const requestId = packet[0]
 	const message = packet.slice(1)
 
-	console.log(`[Worker] received from backend [${requestId}]`, message)
+	logger.debug(`[Worker] received from backend [${requestId}]`, message)
 
 	self.postMessage(packet)
 }

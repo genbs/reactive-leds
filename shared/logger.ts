@@ -1,13 +1,19 @@
-enum LOG_LEVEL {
+export enum LOG_LEVEL {
 	DEBUG,
 	INFO,
 	WARN,
 	ERROR,
 }
 
-const logLevel = LOG_LEVEL.DEBUG
+let logLevel = LOG_LEVEL.INFO
 
 const logger = {
+	setLevel: (level: LOG_LEVEL) => {
+		logLevel = level
+	},
+
+	getLevel: () => logLevel,
+
 	debug: (...args: any[]) => {
 		if (logLevel <= LOG_LEVEL.DEBUG) {
 			console.debug("\x1b[36m%s\x1b[0m", ...args)
@@ -16,7 +22,7 @@ const logger = {
 
 	info: (...args: any[]) => {
 		if (logLevel <= LOG_LEVEL.INFO) {
-			console.log("\x1b[37m%s\x1b[0m", ...args)
+			console.info("\x1b[37m%s\x1b[0m", ...args)
 		}
 	},
 

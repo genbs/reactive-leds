@@ -1,3 +1,4 @@
+import { logger } from "@shared"
 import { WorkerRequestType, WorkerRequestTypeMap } from "./comm"
 // @ts-ignore
 import Deamon from "./deamon.worker"
@@ -21,9 +22,8 @@ function onDeamonMessage(event: MessageEvent) {
 	const requestId = message[0]
 	const request = requests.find(r => r.requestId === requestId)
 
-	console.log(message, requests)
 	if (!request) {
-		console.log(`[Proxy] Unknown request id ${requestId}`)
+		logger.debug(`[Proxy] Unknown request id ${requestId}`)
 		return
 	}
 
@@ -32,9 +32,11 @@ function onDeamonMessage(event: MessageEvent) {
 }
 
 let requestId = 0
+const EMPTY_REQUEST_ID = 0
 
-export function send(data: Uint8Array): Promise<Uint8Array> {
+export function sendSync(data: Uint8Array): Promise<Uint8Array> {
 	if (!deamon) throw new Error("Worker not initialized")
+
 	requestId = (requestId + 1) % 255
 
 	let promise = new Promise<Uint8Array>(resolve => {
@@ -44,14 +46,26 @@ export function send(data: Uint8Array): Promise<Uint8Array> {
 		})
 	})
 
-	const buffer = new Uint8Array(1 + data.length)
+	const buffer = new Uint8Array(1 + 1 + data.length)
 	buffer[0] = requestId
 	buffer.set(data, 1)
 	deamon.postMessage(buffer)
 
-	console.log(`[Proxy] send [${requestId}] ${WorkerRequestTypeMap[buffer[1]]}`, buffer)
+	logger.debug(`[Proxy] sendSync [${requestId}] ${WorkerRequestTypeMap[buffer[1]]}`, buffer)
 
 	return promise
+}
+
+export function send(data: Uint8Array): void {
+	if (!deamon) throw new Error("Worker not initialized")
+
+	const buffer = new Uint8Array(1 + data.length)
+	buffer[0] = EMPTY_REQUEST_ID
+	buffer.set(data, 1)
+
+	logger.debug(`[Proxy] sendSynx [${requestId}] ${WorkerRequestTypeMap[buffer[1]]}`, buffer)
+
+	deamon.postMessage(buffer)
 }
 
 export function connect(serverURL: string, debug = false): Promise<boolean> {
@@ -59,13 +73,12 @@ export function connect(serverURL: string, debug = false): Promise<boolean> {
 		deamon = new Deamon()
 		deamon.addEventListener("message", onDeamonMessage)
 	}
-
 	const buffer = new Uint8Array(1 + serverURL.length + 1)
 	buffer[0] = WorkerRequestType.Connect
 	buffer.set(bufferFromString(serverURL), 1)
 	buffer[1 + serverURL.length] = debug ? 0x01 : 0x00
 
-	return send(buffer).then(response => response[0] === 0x01)
+	return sendSync(buffer).then(response => response[0] === 0x01)
 }
 
 function bufferFromString(str: string): Uint8Array {

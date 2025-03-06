@@ -10,26 +10,61 @@
 			setTimeout(async () => {
 				const leds = window.leds
 
-				await leds.begin("ws://localhost:8000", true)
+				await leds.begin("ws://localhost:8000", false)
 				console.log("[MAIN] Connected to server")
 
 				const devices = [
 					{
-						ip: "192.168.0.5",
+						ip: "192.168.1.118",
 						port: 4210,
 					},
 				]
 
 				for (const device of devices) {
 					const result = await leds.ping(device.ip, device.port)
-					console.log(`[MAIN] Pinged device ${device.ip}:${device.port} with result: ${result}`)
+					console.log(`[MAIN] Pinged device ${device.ip}:${device.port} with result: ${result}`, [result])
 
 					if (result) {
 						const config = await leds.getConfig(device.ip, device.port)
 						console.log(`[MAIN] Got config from device ${device.ip}:${device.port}:`, config)
+
+						if (config) {
+							// pixel_index, r, g, b, a, pixel_index, r, g, b, a, ...
+							const pixels = new Uint8Array(5 * config.num_leds)
+
+							console.log(pixels)
+							function sleep(ms) {
+								return new Promise(resolve => setTimeout(resolve, ms))
+							}
+
+							async function anim(time) {
+								const k = Math.abs(Math.cos(time / 20)) ** 3
+
+								for (let i = 0; i < config.num_leds; i++) {
+									const o = i / (config.num_leds - 1)
+									const pixel_index = i * 5
+									pixels[pixel_index + 0] = i
+									// pixels[pixel_index + 1] = Math.round(k * 255)
+									// pixels[pixel_index + 2] = Math.round(k * 255)
+									// pixels[pixel_index + 3] = Math.round(k * 255)
+									// pixels[pixel_index + 4] = Math.round(k * 255)
+
+									pixels[pixel_index + 1] = 255
+									pixels[pixel_index + 2] = 0
+									pixels[pixel_index + 3] = 0
+									pixels[pixel_index + 4] = 255
+								}
+
+								leds.setLEDs(device.ip, device.port, pixels)
+								console.log(`[MAIN] Set pixels on device ${device.ip}:${device.port}`, pixels)
+								await sleep(1000 / 60)
+								requestAnimationFrame(anim)
+							}
+							requestAnimationFrame(anim)
+						}
 					}
 				}
-			})
+			}, 100)
 		</script>
 	</body>
 </html>

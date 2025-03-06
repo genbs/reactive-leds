@@ -1,25 +1,23 @@
 import WebSocket from "ws"
-import { logger } from "../shared/logger"
+import { LOG_LEVEL, logger } from "../shared/logger"
 import { configToBuffer, PacketType, PacketTypeMap } from "../shared/protocol"
 import proto from "./protocol"
 
 export function serve() {
+	logger.setLevel(LOG_LEVEL.ERROR)
 	const wss = new WebSocket.Server({ port: 8000 })
 
 	wss.on("connection", ws => {
 		logger.info("New connection established")
 
 		ws.on("message", async (payload: Uint8Array) => {
-			logger.debug("Received message", payload)
-
 			const messageId = payload[0]
 			const ip = payload[1] + "." + payload[2] + "." + payload[3] + "." + payload[4]
 			const port = (payload[5] << 8) | payload[6]
 
-			console.log(`IP: ${ip}, Port: ${port}`)
-
 			const packetType = payload[7]
-			console.log(`Packet type: ${PacketTypeMap[packetType]}`)
+			const packet = payload.slice(8)
+			logger.debug(`IP: ${ip}, Port: ${port}, Packet type: ${PacketTypeMap[packetType]}`)
 
 			switch (packetType) {
 				case PacketType.PING:
@@ -43,6 +41,10 @@ export function serve() {
 						errorResponse[1] = 0
 						ws.send(errorResponse)
 					}
+					break
+				case PacketType.SET_LEDS:
+					await proto.setLEDs(ip, port, packet)
+					break
 			}
 		})
 

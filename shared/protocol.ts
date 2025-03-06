@@ -51,18 +51,19 @@ export function bufferToConfig(buffer: Uint8Array): Config {
 }
 
 export function configToBuffer(config: Config): Uint8Array {
-	const _port = Number(config.port)
 	const pin = Number(config.pin)
 	const num_leds = Number(config.num_leds)
 	const brightness = Number(config.brightness) // 0-255
+	const port = Number(config.port)
+	const hostname = config.hostname.substring(0, 32)
 
-	const packet = new Uint8Array(1 + 1 + 1 + 2 + config.hostname.length) // port_h, port_l, pin, num_leds, brightness, hostname
+	const packet = new Uint8Array(1 + 1 + 1 + 2 + hostname.length) // pin, num_leds, brightness, port_h, port_l, hostname
 	packet[0] = pin
 	packet[1] = num_leds
 	packet[2] = brightness
-	packet[3] = (_port >> 8) & 0xff
-	packet[4] = _port & 0xff
-	packet.set(bufferFromString(config.hostname), 5)
+	packet[3] = (port >> 8) & 0xff
+	packet[4] = port & 0xff
+	packet.set(bufferFromString(hostname), 5)
 
 	return packet
 }

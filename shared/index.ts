@@ -1,3 +1,3 @@
+export * from "./logger"
 export * from "./types"
 export * from "./utils/EventEmitter"
-export * from "./utils/Log"

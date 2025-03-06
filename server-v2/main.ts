@@ -53,7 +53,7 @@ async function main() {
 				const key = process.argv[5]
 				const value = process.argv[6]
 
-				if (key !== "hostname" && key !== "id" && key !== "num_leds" && key !== "port" && key !== "brightness") {
+				if (key !== "hostname" && key !== "pin" && key !== "num_leds" && key !== "port" && key !== "brightness") {
 					console.error("Invalid key")
 					process.exit(1)
 				}
