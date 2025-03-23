@@ -40,6 +40,7 @@ export const PacketTypeMap = {
 	[PacketType.BLINK]: "BLINK",
 }
 
+// convert a buffer to a config object
 export function bufferToConfig(buffer: Uint8Array): Config {
 	return {
 		pin: buffer[0],
@@ -50,11 +51,12 @@ export function bufferToConfig(buffer: Uint8Array): Config {
 	}
 }
 
+// convert a config object to a buffer, no validation
 export function configToBuffer(config: Config): Uint8Array {
-	const pin = Number(config.pin)
-	const num_leds = Number(config.num_leds)
-	const brightness = Number(config.brightness) // 0-255
-	const port = Number(config.port)
+	const pin = config.pin
+	const num_leds = config.num_leds
+	const brightness = config.brightness // 0-255
+	const port = config.port
 	const hostname = config.hostname.substring(0, 32)
 
 	const packet = new Uint8Array(1 + 1 + 1 + 2 + hostname.length) // pin, num_leds, brightness, port_h, port_l, hostname
@@ -63,25 +65,36 @@ export function configToBuffer(config: Config): Uint8Array {
 	packet[2] = brightness
 	packet[3] = (port >> 8) & 0xff
 	packet[4] = port & 0xff
+
 	packet.set(bufferFromString(hostname), 5)
 
 	return packet
 }
 
-export function bufferFromString(str: string): Uint8Array {
-	const buffer = new Uint8Array(str.length)
-	for (let i = 0; i < str.length; i++) buffer[i] = str.charCodeAt(i)
+// convert ip and port to a buffer
+export function addressToBuffer(ip: string, port: number): Uint8Array {
+	const buffer = new Uint8Array(4 + 2)
+	const parts = ip.split(".")
+
+	buffer[0] = +parts[0]
+	buffer[1] = +parts[1]
+	buffer[2] = +parts[2]
+	buffer[3] = +parts[3]
+	buffer[4] = (port >> 8) & 0xff
+	buffer[5] = port & 0xff
 
 	return buffer
 }
 
+const encoder = new TextEncoder()
+const decoder = new TextDecoder()
+
+export function bufferFromString(str: string): Uint8Array {
+	return encoder.encode(str)
+}
+
 export function bufferToString(buffer: Uint8Array): string {
-	let result = ""
-	for (let i = 0; i < buffer.length; i++) {
-		if (buffer[i] === 0) break
-
-		result += String.fromCharCode(buffer[i])
-	}
-
-	return result
+	return decoder.decode(
+		buffer.subarray(0, buffer.indexOf(0)) // break at the first \0
+	)
 }

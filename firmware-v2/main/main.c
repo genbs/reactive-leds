@@ -101,21 +101,27 @@ void ble_configuration_loop() {
     esp_restart();
 }
 
+/**
+ * Protocol loop task.
+ */
+void app_protocol_loop(void *param) {
+    while (1) {
+        protocol_loop();
+        delay(1);
+    }
+}
 
 /**
  * Main application loop.
- * While connected to wifi, read packets from the server.
+ * While connected to wifi, keep the connection alive.
+ * If the connection is lost, try to reconnect.
  */
 void app_loop(void *param) {
     wifi_credentials_t *credentials = (wifi_credentials_t *)param;
 
     while (1) {
         if (wifi_connected()) {
-
-            // read packets from the server
-            protocol_loop();
-            delay(1);
-
+            delay(1000);
         } else {
             ESP_LOGI(TAG, "Reconnecting to WiFi");
             wifi_connect(credentials->ssid, credentials->pass);
@@ -174,11 +180,17 @@ void app_main(void)
     ESP_LOGI(TAG, "MAC address: %s", wifi_mac());
 
     // Start protocol to handshake with the server and communicate with it
-    protocol_begin();
+    if (protocol_begin()) {   
+        // Create a task for app_loop to run on a different core    
+        xTaskCreatePinnedToCore(app_loop, "app_loop", 4096, &credentials, 1, NULL, 1);
 
-    // Create a task for app_loop to run on a different core    
-    xTaskCreatePinnedToCore(app_loop, "app_loop", 4096, &credentials, 5, NULL, 1);
-
-    // Delete the main task
-    vTaskDelete(NULL);
+        // Create a task to monitor the protocol
+        xTaskCreatePinnedToCore(app_protocol_loop, "app_protocol_loop", 4096, NULL, 7, NULL, 0);
+        
+        // Delete the main task
+        vTaskDelete(NULL);
+    } else {
+        ESP_LOGE(TAG, "Failed to start protocol");
+        esp_restart();
+    }
 }

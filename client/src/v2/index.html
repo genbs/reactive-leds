@@ -4,23 +4,142 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Document</title>
+		<script src="gydra.js"></script>
+		<style>
+			html,
+			body {
+				margin: 0;
+				height: 100%;
+				width: 100%;
+			}
+		</style>
 	</head>
 	<body>
+		<script>
+			window.gydra = Gydra({
+				width: 4,
+				height: 16,
+			})
+
+			window.gydra.eval(`
+				s0.initCam(0)
+				//solid(0).alpha(() => 0.2 + cos(time * 0.5) ** 2 * 0.6)
+				osc(3, 3).thresh(.6, .3).rotate(PI / 2)
+				.mult(solid(0, 1, 0))
+				.out()
+			`)
+		</script>
 		<script async defer>
 			setTimeout(async () => {
 				const leds = window.leds
 
-				await leds.begin("ws://localhost:8000", false)
+				await leds.begin("ws://0.0.0.0:8000", false)
 				console.log("[MAIN] Connected to server")
 
+				main2()
+			}, 100)
+
+			const gridSize = [2, 16]
+			const mappings = [
+				[gridSize[0] / 2, 0, gridSize[0], 0, gridSize[0], gridSize[1], gridSize[0] / 2, gridSize[1]],
+				[0, 0, gridSize[0] / 2, 0, gridSize[0] / 2, gridSize[1], 0, gridSize[1]],
+			]
+
+			function watch(devices) {
+				const canvas = document.querySelector("canvas")
+				const width = canvas.width
+				const height = canvas.height
+
+				async function render() {
+					const imageData = window.gydra.defaultOutput.pixels(undefined, false)
+
+					for (let i = 0; i < devices.length; i++) {
+						const { ip, port, mapping, config } = devices[i]
+
+						const data = leds.mapPixels(imageData, [width, height], gridSize, mapping, config.num_leds, false)
+						leds.setLEDs(ip, port, data)
+					}
+
+					requestAnimationFrame(render)
+				}
+
+				requestAnimationFrame(render)
+			}
+
+			async function main2() {
+				// Future implementation for main2
 				const devices = [
 					{
-						ip: "192.168.1.118",
+						ip: "192.168.1.3",
+						port: 4210,
+						mapping: mappings[0],
+					},
+					{
+						ip: "192.168.1.4",
+						port: 4210,
+						mapping: mappings[1], // sx
+					},
+				]
+				const realDevices = []
+
+				for (const deviceIndex in devices) {
+					const device = devices[deviceIndex]
+					if (!device || !device.ip) continue
+					const result = await leds.ping(device.ip, device.port)
+					console.log(`[MAIN] Pinged device ${device.ip}:${device.port} with result: ${result}`, [result])
+					if (result) {
+						const config = await leds.getConfig(device.ip, device.port)
+						console.log(`[MAIN] Got config from device ${device.ip}:${device.port}:`, config)
+
+						if (config) realDevices.push({ ...device, config })
+					}
+				}
+
+				for (const deviceIndex in realDevices) {
+					const device = realDevices[deviceIndex]
+					if (!device || !device.ip) continue
+					const config = device.config
+
+					watch(realDevices)
+				}
+			}
+
+			async function main() {
+				/*
+								genbs_net
+								const devices = [
+									{
+										ip: "192.168.1.2",
+										port: 4210,
+									},
+									{
+										ip: "192.168.1.3",
+										port: 4210,
+									},
+								]
+
+								ZTE_Luna
+								const devices = [
+									{
+										ip: "192.168.0.7",
+										port: 4210,
+									},
+								]
+								*/
+				const devices = [
+					{
+						ip: "192.168.0.7",
 						port: 4210,
 					},
 				]
 
-				for (const device of devices) {
+				let t = 0
+				const realDevices = []
+				console.log("devices", devices)
+				for (const deviceIndex in devices) {
+					const device = devices[deviceIndex]
+					if (!device || !device.ip) continue
+
 					const result = await leds.ping(device.ip, device.port)
 					console.log(`[MAIN] Pinged device ${device.ip}:${device.port} with result: ${result}`, [result])
 
@@ -29,42 +148,89 @@
 						console.log(`[MAIN] Got config from device ${device.ip}:${device.port}:`, config)
 
 						if (config) {
-							// pixel_index, r, g, b, a, pixel_index, r, g, b, a, ...
-							const pixels = new Uint8Array(5 * config.num_leds)
-
-							console.log(pixels)
-							function sleep(ms) {
-								return new Promise(resolve => setTimeout(resolve, ms))
-							}
-
-							async function anim(time) {
-								const k = Math.abs(Math.cos(time / 20)) ** 3
-
-								for (let i = 0; i < config.num_leds; i++) {
-									const o = i / (config.num_leds - 1)
-									const pixel_index = i * 5
-									pixels[pixel_index + 0] = i
-									// pixels[pixel_index + 1] = Math.round(k * 255)
-									// pixels[pixel_index + 2] = Math.round(k * 255)
-									// pixels[pixel_index + 3] = Math.round(k * 255)
-									// pixels[pixel_index + 4] = Math.round(k * 255)
-
-									pixels[pixel_index + 1] = 255
-									pixels[pixel_index + 2] = 0
-									pixels[pixel_index + 3] = 0
-									pixels[pixel_index + 4] = 255
-								}
-
-								leds.setLEDs(device.ip, device.port, pixels)
-								console.log(`[MAIN] Set pixels on device ${device.ip}:${device.port}`, pixels)
-								await sleep(1000 / 60)
-								requestAnimationFrame(anim)
-							}
-							requestAnimationFrame(anim)
+							realDevices.push({
+								ip: device.ip,
+								port: device.port,
+								config,
+							})
 						}
 					}
 				}
-			}, 100)
+
+				const maxLeds = realDevices.reduce((acc, d) => acc + d.config.num_leds, 0)
+
+				let startTime = 0
+				async function anim(time) {
+					t = time
+					if (!startTime) startTime = time
+					let p = 0
+
+					const rand = Math.random()
+					const rand2 = Math.random()
+					const rand3 = Math.random()
+					const rand4 = Math.random()
+					for (const deviceIndex in realDevices) {
+						const device = realDevices[deviceIndex]
+						if (!device || !device.ip) continue
+						const config = device.config
+						const pixels = new Uint8Array(5 * config.num_leds)
+						const ip = device.ip
+						const port = device.port
+
+						for (let i = 0; i < config.num_leds; i++) {
+							const pixel_index = i * 5
+							const po = p / maxLeds
+							const o = i / (config.num_leds - 1)
+							//const k = (((t * 3 - o * 20 - deviceIndex * 20) % 100) / 100) ** 1.6
+
+							let v = Math.abs(Math.cos(time * 0.01)) ** 5
+							v *= 255
+
+							// pixels[pixel_index + 0] = i
+							// pixels[pixel_index + 1] = Math.round(v) * (deviceIndex == 0 ? 1 : 0)
+							// pixels[pixel_index + 3] = Math.round(v) * (deviceIndex == 0 ? 0 : 1)
+							// pixels[pixel_index + 2] =
+							// 	(pixels[pixel_index + 1] || pixels[pixel_index + 3]) + Math.abs(Math.sin(t * 0.001)) * 25
+							// //pixels[pixel_index + 4] = Math.round(v) * (deviceIndex == 0 ? 0 : 0)
+							// pixels[pixel_index + 4] = 1 + Math.abs(Math.sin(t * 0.02)) ** 20 * 254
+
+							const effects = {
+								linear: (speed = 1, delay = 0) => {
+									const s = (time - delay - startTime) * 0.04 * speed
+									return s < 0 ? 0 : s > 255 ? 255 : s
+								},
+								blink: (speed = 1, speedE = speed, k = 1) => {
+									const s = ((time - startTime) * 0.04 * speed) ** 1
+									const e = Math.abs(Math.cos(time * 0.04 * speedE)) ** k
+									return (s > 255 ? 255 : s) * e
+								},
+							}
+
+							const r = effects.blink(20, 0.005, 0.6) * 1
+							const g = effects.blink(20, 0.8) * 0
+							const b = effects.blink(20, 0.8) * 0
+							const w = effects.blink(20, 0.0025, 1) * 0.5 + 60
+							pixels[pixel_index + 0] = i
+							pixels[pixel_index + 1] = r
+							pixels[pixel_index + 2] = g
+							pixels[pixel_index + 3] = b
+							pixels[pixel_index + 4] = w
+
+							p += 1
+						}
+
+						leds.setLEDs(device.ip, device.port, pixels)
+					}
+
+					await sleep(1000 / 60)
+					requestAnimationFrame(anim)
+				}
+				requestAnimationFrame(anim)
+			}
+
+			function sleep(ms) {
+				return new Promise(resolve => setTimeout(resolve, ms))
+			}
 		</script>
 	</body>
 </html>

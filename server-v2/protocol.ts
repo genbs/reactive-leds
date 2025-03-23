@@ -20,12 +20,45 @@ class Protocol {
 
 	private socket: dgram.Socket
 	private requestID: PacketID = 1
+	private pendingRequests = new Map<
+		number,
+		{
+			resolve: (data: Packet | null) => void
+			type: PacketType
+			timeout: NodeJS.Timeout
+			startTime: number
+		}
+	>()
 
 	/**
 	 * Create UDP socket to communicate with devices.
 	 */
 	constructor() {
-		this.socket = dgram.createSocket("udp4")
+		this.socket = dgram.createSocket({
+			type: "udp4",
+			reuseAddr: true,
+		})
+
+		this.socket.on("message", (msg: Packet) => this.handleMessage(msg))
+	}
+
+	private handleMessage(msg: Packet) {
+		const requestID = msg[0]
+		const requestType = msg[1]
+		const pending = this.pendingRequests.get(requestID)
+
+		if (pending && pending.type === requestType) {
+			clearTimeout(pending.timeout)
+			this.pendingRequests.delete(requestID)
+
+			logger.debug(
+				`\x1b[32m[Request:${requestID}] Received ${PacketTypeMap[requestType]} in ${
+					performance.now() - pending.startTime
+				}ms\x1b[0m`,
+				msg
+			)
+			pending.resolve(msg)
+		}
 	}
 
 	/**
@@ -147,7 +180,7 @@ class Protocol {
 	 * @param port device port
 	 * @param type PacketType
 	 * @param data any
-	 * @param timeout milliseconds to wait for response
+	 * @param timeoutDuration milliseconds to wait for response
 	 * @returns
 	 */
 	private sendSync(
@@ -155,62 +188,41 @@ class Protocol {
 		port: number,
 		type: PacketType,
 		data: Uint8Array | null = null,
-		timeout: number
+		timeoutDuration: number
 	): Promise<Packet | null> {
 		// from 1 to 255 with modulo (0 is reserved for empty message)
 		this.requestID = (this.requestID % 255) + 1
-
-		// grey text color
-		logger.debug(`\x1b[90m[Request:${this.requestID}] Sending ${PacketTypeMap[type]} to ${ip}:${port}\x1b[0m`, data)
-
 		const requestID = this.requestID
+
 		const message = new Uint8Array(1 + 1 + (data ? data.length : 0))
 		message[0] = requestID
 		message[1] = type
 		if (data) message.set(data, 2)
 
-		let closeTimeout: NodeJS.Timeout
+		logger.debug(`\x1b[90m[Request:${requestID}] Sending ${PacketTypeMap[type]} to ${ip}:${port}\x1b[0m`, data)
 
 		return new Promise(resolve => {
-			let closed = false
-
 			const startTime = performance.now()
-			const close = (data: Packet | null) => {
-				if (closed) return
+			const timeout = setTimeout(() => {
+				this.pendingRequests.delete(requestID)
+				logger.debug(
+					`\x1b[33m[Request:${requestID}] Timeout for ${PacketTypeMap[type]} after ${
+						performance.now() - startTime
+					}ms\x1b[0m`
+				)
+				resolve(null)
+			}, timeoutDuration)
 
-				if (data) {
-					logger.debug(
-						`\x1b[32m[Request:${requestID}] Received ${PacketTypeMap[type]} from ${ip}:${port} in ${
-							performance.now() - startTime
-						}ms\x1b[0m`,
-						data
-					)
-				} else {
-					logger.debug(
-						`\x1b[33m[Request:${requestID}] Timeout for ${PacketTypeMap[type]} from ${ip}:${port} in ${
-							performance.now() - startTime
-						}ms\x1b[0m`
-					)
+			this.pendingRequests.set(requestID, { resolve, type, timeout, startTime })
+
+			this.socket.send(message, 0, message.length, port, ip, err => {
+				if (err) {
+					clearTimeout(timeout)
+					this.pendingRequests.delete(requestID)
+					logger.error(err)
+					resolve(null)
 				}
-
-				// cleanup
-				closed = true
-				clearTimeout(closeTimeout)
-				this.socket.off("message", onMessage)
-
-				resolve(data)
-			}
-
-			const onMessage = (msg: Packet) => {
-				if (msg[0] === requestID && msg[1] === type) {
-					// graceful close
-					close(msg)
-				}
-			}
-
-			closeTimeout = setTimeout(() => close(null), timeout)
-			this.socket.on("message", onMessage)
-			this.socket.send(message, 0, message.length, port, ip, err => err && close(null))
+			})
 		})
 	}
 }

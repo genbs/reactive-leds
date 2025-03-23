@@ -25,9 +25,17 @@ void leds_begin()
     rmt_tx_channel_config_t tx_chan_config = {
         .clk_src = RMT_CLK_SRC_DEFAULT, // select source clock
         .gpio_num = config.pin, // select output GPIO
-        .mem_block_symbols = 64, // increase the block size can make the LED less flickering
+        .mem_block_symbols = MEM_BLOCK_SYMBOLS, // increase the block size can make the LED less flickering
         .resolution_hz = RMT_RESOLUTION_HZ,
-        .trans_queue_depth = 8, // set the number of transactions that can be pending in the background
+        .trans_queue_depth = TRANSFER_QUEUE_DEPTH, // set the number of transactions that can be pending in the background
+        .intr_priority = 1, // set the interrupt priority
+        .flags = {
+            .invert_out = 0,   
+            .with_dma = 1,     
+            .io_loop_back = 0, 
+            .io_od_mode = 0,   
+            .allow_pd = 0,     
+        }
     };
     ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &led_chan));
 
@@ -143,15 +151,15 @@ esp_err_t rmt_new_led_strip_encoder(const led_strip_encoder_config_t *config, rm
     rmt_bytes_encoder_config_t bytes_encoder_config = {
         .bit0 = {
             .level0 = 1,
-            .duration0 = 0.3 * config->resolution / 1000000, // T0H=0.3us
+            .duration0 = 0.25 * config->resolution / 1000000, // T0H=0.3us
             .level1 = 0,
-            .duration1 = 0.9 * config->resolution / 1000000, // T0L=0.9us
+            .duration1 = 1.0 * config->resolution / 1000000, // T0L=0.9us
         },
         .bit1 = {
             .level0 = 1,
-            .duration0 = 0.9 * config->resolution / 1000000, // T1H=0.9us
+            .duration0 = 1.0 * config->resolution / 1000000, // T1H=0.9us
             .level1 = 0,
-            .duration1 = 0.3 * config->resolution / 1000000, // T1L=0.3us
+            .duration1 = 0.25 * config->resolution / 1000000, // T1L=0.3us
         },
         .flags.msb_first = 1 // WS2812 transfer bit order: G7...G0R7...R0B7...B0
     };

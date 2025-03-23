@@ -10,6 +10,7 @@ export const WorkerRequestTypeMap = {
 	[WorkerRequestType.Send]: "Send",
 }
 
-export type WorkerRequest = Uint8Array
+export const TRUE = 0x01
+export const FALSE = 0x00
 
-export type WebsocketPacket = Uint8Array // [device_ip[4], device_port[2], Packet]
+export const EMPTY_REQUEST_ID = 0

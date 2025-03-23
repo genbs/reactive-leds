@@ -38,7 +38,6 @@ export default class WS {
 	 * Connects to the WebSocket server.
 	 */
 	public connect() {
-		console.log(this.settings)
 		logger.info("Connecting to", this.settings.url)
 
 		if (this.socket) {

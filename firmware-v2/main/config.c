@@ -18,32 +18,32 @@ void config_begin(void) {
     
     if (storage_has_key("config", "pin")) {
         len = sizeof(buf);
-        storage_get("config", "pin", buf, &len);
         memset(buf, 0, sizeof(buf));
+        storage_get("config", "pin", buf, &len);
         config.pin = (uint8_t)atoi(buf);
         ESP_LOGI(CONFIG_TAG, "Loaded pin: %u", config.pin);
     }
     
     if (storage_has_key("config", "num_leds")) {
         len = sizeof(buf);
-        storage_get("config", "num_leds", buf, &len);
         memset(buf, 0, sizeof(buf));
+        storage_get("config", "num_leds", buf, &len);
         config.num_leds = (uint8_t)atoi(buf);
         ESP_LOGI(CONFIG_TAG, "Loaded num_leds: %u", config.num_leds);
     }
 
     if (storage_has_key("config", "brightness")) {
         len = sizeof(buf);
-        storage_get("config", "brightness", buf, &len);
         memset(buf, 0, sizeof(buf));
+        storage_get("config", "brightness", buf, &len);
         config.brightness = (uint8_t)atoi(buf);
         ESP_LOGI(CONFIG_TAG, "Loaded brightness: %u", config.brightness);
     }
     
     if (storage_has_key("config", "port")) {
         len = sizeof(buf);
-        storage_get("config", "port", buf, &len);
         memset(buf, 0, sizeof(buf));
+        storage_get("config", "port", buf, &len);
         config.port = (uint16_t)atoi(buf);
         ESP_LOGI(CONFIG_TAG, "Loaded port: %u", config.port);
     }

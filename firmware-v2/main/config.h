@@ -12,7 +12,7 @@
 #define NUM_LEDS 16
 #define BRIGHTNESS 255
 #define PORT 4210
-#define HOSTNAME "esp32"
+#define HOSTNAME "esp32-3"
 
 typedef struct
 {

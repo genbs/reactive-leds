@@ -1,5 +1,5 @@
 {
-	"idf.port": "/dev/tty.usbmodem1101",
+	"idf.port": "/dev/tty.usbmodem101",
 	"idf.openOcdConfigs": ["board/esp32s3-builtin.cfg"],
 	"idf.flashType": "UART",
 	"idf.espIdfPath": "/Users/genbs/esp/esp-idf",

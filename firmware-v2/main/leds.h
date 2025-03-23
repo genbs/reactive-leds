@@ -19,6 +19,8 @@
 #define RMT_TX_CHANNEL    0        // RMT channel for TX
 #define RMT_CLK_DIV       2        // Clock divider for RMT
 #define RMT_RESOLUTION_HZ 10000000 // 10MHz resolution, 1 tick = 0.1us (led strip needs a high resolution)
+#define MEM_BLOCK_SYMBOLS  64       // number of symbols in one mem block
+#define TRANSFER_QUEUE_DEPTH 1     // how many transactions can be queued at once
 
 #define RMT_IDLE_LEVEL_LOW  0
 #define RMT_IDLE_LEVEL_HIGH 1
