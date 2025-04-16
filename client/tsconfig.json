@@ -1,0 +1,26 @@
+{
+	"compilerOptions": {
+		"baseUrl": ".",
+		"outDir": "./dist",
+		"module": "ESNext",
+		"jsx": "react-jsx",
+		"target": "ESNext",
+		"moduleResolution": "node",
+		"esModuleInterop": true,
+		"isolatedModules": false,
+		"useDefineForClassFields": false,
+		"declaration": true,
+		"types": ["node", "jest"],
+		"allowSyntheticDefaultImports": true,
+		"allowJs": true,
+		"lib": ["DOM", "ESNext"],
+		"resolveJsonModule": true,
+		"paths": {
+			"@shared": ["../shared/index"],
+			"@lib": ["./src/lib/index"],
+			"@mapping/*": ["./src/mapping/*"]
+		}
+	},
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "build", "dist"]
+}

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="initial-scale=1, width=device-width" />
+
+		<style>
+			html {
+				background: #111;
+				color: #555;
+				font-family: monospace;
+			}
+			html,
+			body,
+			#root {
+				margin: 0;
+				padding: 0;
+				height: 100%;
+			}
+			* {
+				user-select: none;
+				box-sizing: border-box;
+				outline: none;
+			}
+			canvas {
+				image-rendering: pixelated;
+			}
+			.flex {
+				display: flex;
+				flex-wrap: wrap;
+			}
+			.flex--v-center {
+				align-items: center;
+			}
+			.flex--column {
+				flex-direction: column;
+			}
+			.flex--justify-between {
+				justify-content: space-between;
+			}
+			.gap {
+				gap: 0.5rem;
+			}
+			.gap-m {
+				gap: 1rem;
+			}
+
+			.flex-1 {
+				flex: 1;
+			}
+
+			.ellipsis {
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+
+			.unicode {
+				line-height: 1;
+			}
+			.unicode--l {
+				line-height: 0.75;
+				font-size: 1.5rem;
+			}
+
+			input {
+				font-family: inherit;
+			}
+
+			.pd--1 {
+				padding: 1rem;
+			}
+			.pd--lr-1 {
+				padding-left: 1rem;
+				padding-right: 1rem;
+			}
+
+			.pointer {
+				cursor: pointer;
+			}
+
+			.expand {
+				width: 100%;
+				height: 100%;
+			}
+		</style>
+	</head>
+	<body>
+		<main id="root"></main>
+	</body>
+</html>
