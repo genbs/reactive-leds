@@ -15,7 +15,7 @@
 #define TAG "MAIN"
 
 #define WIFI_CONNECT_TIMEOUT 20000
-#define BLE_TIMEOUT_MS 300000 // 5 minutes
+#define BLE_TIMEOUT_MS 30000 // 30 sec
 
 // current wifi credentials
 typedef struct {
