@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Document</title>
+		<style>
+			* {
+				margin: 0;
+			}
+		</style>
+	</head>
+	<body>
+		<script src="gydra.js"></script>
+		<script src="lib.js"></script>
+		<script>
+			;(async () => {
+				await leds.begin("ws://localhost:8080")
+				const gydra = Gydra({
+					width: 600,
+					height: 600,
+					autoTick: true,
+				})
+				gydra.eval("noise(1).out()")
+
+				leds.show()
+				leds.watch(document.querySelector("canvas"), [10, 10])
+
+				// function send() {
+				// 	gydra.tick()
+
+				// 	requestAnimationFrame(send)
+				// }
+
+				// requestAnimationFrame(send)
+			})()
+		</script>
+	</body>
+</html>

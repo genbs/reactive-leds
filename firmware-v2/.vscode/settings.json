@@ -1,0 +1,15 @@
+{
+	"idf.port": "/dev/tty.usbmodem2101",
+	"idf.openOcdConfigs": ["board/esp32s3-builtin.cfg"],
+	"idf.flashType": "UART",
+	"idf.espIdfPath": "/Users/genbs/esp/esp-idf",
+	"idf.toolsPath": "/Users/genbs/.espressif",
+	"files.associations": {
+		"*.h": "cpp",
+		"*.tcc": "cpp",
+		"format": "cpp",
+		"limits": "cpp",
+		"chrono": "cpp",
+		"typeinfo": "cpp"
+	}
+}

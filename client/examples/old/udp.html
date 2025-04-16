@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Document</title>
+		<style>
+			* {
+				margin: 0;
+				overflow: hidden;
+				height: 100%;
+				width: 100%;
+			}
+
+			canvas {
+				width: 100%;
+				height: 100%;
+				image-rendering: pixelated;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas></canvas>
+		<script>
+			const ws = new WebSocket("ws://localhost:8080")
+			const NUM_LEDS = 16
+			const colors = new Array(NUM_LEDS).fill(0).map(() => [0, 0, 0])
+
+			ws.onopen = () => {
+				console.log("WebSocket connected")
+				// Invia dati al server
+				const type = 0 // NeoPixelMessage.GET_CONFIG
+				const data = []
+				const message = new Uint8Array([type, ...data])
+				ws.send(message)
+
+				const { ctx, canvas, draw } = createCanvas(NUM_LEDS)
+
+				function getArray(data, components = 4) {
+					const len = data.length / components
+					const final = new Uint8Array(len * 5)
+
+					for (let i = 0; i < len; i++) {
+						const r = data[i * components]
+						const g = data[i * components + 1]
+						const b = data[i * components + 2]
+
+						final[i * 5] = i
+						final[i * 5 + 1] = r
+						final[i * 5 + 2] = g
+						final[i * 5 + 3] = b
+						final[i * 5 + 4] = components === 3 ? Math.max(r, g, b) : data[i * components + 3]
+					}
+
+					return final
+				}
+
+				function setColor(pixels, components = 4) {
+					const data = getArray(pixels, components)
+					const type = 2 // NeoPixelMessage.SET_COLOR
+					const message = new Uint8Array([type, ...data])
+
+					ws.send(message)
+				}
+
+				async function send() {
+					draw()
+					const rowHeight = Math.floor(canvas.height / NUM_LEDS)
+					const canvasPixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+					const pixels = []
+					for (let i = 0; i < NUM_LEDS; i++) {
+						const color = colors[NUM_LEDS - i - 1]
+						pixels.push(...color)
+					}
+					setColor(pixels, 3)
+
+					requestAnimationFrame(send)
+				}
+
+				function sleep(ms) {
+					return new Promise(resolve => setTimeout(resolve, ms))
+				}
+
+				requestAnimationFrame(send)
+			}
+
+			ws.onmessage = event => {
+				console.log("Message from server:", event.data)
+			}
+
+			ws.onerror = error => {
+				console.error("WebSocket error:", error)
+			}
+
+			ws.onclose = () => {
+				console.log("WebSocket connection closed")
+			}
+
+			function createCanvas(leds) {
+				const canvas = document.querySelector("canvas")
+				const ctx = canvas.getContext("2d", {
+					willReadFrequently: true,
+					alpha: false,
+				})
+
+				canvas.width = 100
+				canvas.height = leds * 10
+
+				let k = 0,
+					s = 0,
+					l = 0.5
+
+				function getColor(index, offset, count) {
+					const time = Date.now()
+
+					const hue = Math.cos(-time * 0.005 + Math.PI * 0.1 * offset) * 0.5 + 0.5
+					//const saturation = 1 / count
+					const saturation = 1
+					const lightness = 0.5 //Math.cos(time * 0.001 + Math.PI * 2 * offset) * 0.5 + 0.5
+					function clamp(value, min = 0, max = 1) {
+						return Math.min(Math.max(value, min), max)
+					}
+					return {
+						h: clamp(hue),
+						s: clamp(saturation),
+						l: clamp(lightness),
+					}
+				}
+
+				function hslToRgb(h, s, l) {
+					let r, g, b
+
+					if (s === 0) {
+						r = g = b = l // achromatic
+					} else {
+						const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+						const p = 2 * l - q
+						r = hueToRgb(p, q, h + 1 / 3)
+						g = hueToRgb(p, q, h)
+						b = hueToRgb(p, q, h - 1 / 3)
+					}
+
+					return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)]
+				}
+
+				function hueToRgb(p, q, t) {
+					if (t < 0) t += 1
+					if (t > 1) t -= 1
+					if (t < 1 / 6) return p + (q - p) * 6 * t
+					if (t < 1 / 2) return q
+					if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+					return p
+				}
+
+				function draw(count) {
+					columnSize = canvas.height / count
+					for (let i = 0; i < count; i++) {
+						const { h, s, l } = getColor(i, i / count, count)
+						const rgb = hslToRgb(h, s, l)
+						const hex = rgb.map(c => c.toString(16).padStart(2, "0")).join("")
+						const color = `#${hex}`
+						ctx.fillStyle = color
+						colors[i] = rgb
+						ctx.fillRect(0, i * columnSize, canvas.width, columnSize)
+					}
+				}
+
+				return { ctx, canvas, draw: () => draw(leds) }
+			}
+		</script>
+	</body>
+</html>

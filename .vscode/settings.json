@@ -1,0 +1,27 @@
+{
+	"files.associations": {
+		"*.embeddedhtml": "html",
+		"*.h": "cpp",
+		"ostream": "cpp",
+		"print": "cpp",
+		"stdexcept": "cpp",
+		"string": "cpp",
+		"locale": "cpp",
+		"__bit_reference": "cpp",
+		"__hash_table": "cpp",
+		"__split_buffer": "cpp",
+		"array": "cpp",
+		"deque": "cpp",
+		"initializer_list": "cpp",
+		"string_view": "cpp",
+		"unordered_map": "cpp",
+		"vector": "cpp",
+		"istream": "cpp",
+		"cstddef": "cpp"
+	},
+	"cmake.sourceDirectory": "/Users/genbs/My Drive/Repositories/gydra/packages/gydra-led/firmware-v2",
+	"idf.espIdfPath": "/Users/genbs/esp/esp-idf",
+	"idf.toolsPath": "/Users/genbs/.espressif",
+	"idf.port": "/dev/tty.wchusbserial595B0083511",
+	"idf.openOcdConfigs": ["board/esp32s3-builtin.cfg"]
+}
