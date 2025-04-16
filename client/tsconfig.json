@@ -14,12 +14,7 @@
 		"allowSyntheticDefaultImports": true,
 		"allowJs": true,
 		"lib": ["DOM", "ESNext"],
-		"resolveJsonModule": true,
-		"paths": {
-			"@shared": ["../shared/index"],
-			"@lib": ["./src/lib/index"],
-			"@mapping/*": ["./src/mapping/*"]
-		}
+		"resolveJsonModule": true
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "build", "dist"]

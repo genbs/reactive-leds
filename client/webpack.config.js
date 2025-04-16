@@ -1,18 +1,12 @@
 const path = require("path")
 const webpack = require("webpack")
-const HtmlWebpackPlugin = require("html-webpack-plugin")
-const TsconfigPathsPlugin = require("tsconfig-paths-webpack-plugin")
 const fs = require("fs")
 
 module.exports = {
-	// entry: {
-	// 	mapping: "./src/mapping/index.tsx",
-	// 	lib: "./src/lib/index.ts",
-	// },
-	entry: "./src/v2/main.ts",
+	entry: "./src/main.ts",
 
 	output: {
-		libraryTarget: "umd", // Supporta sia CommonJS che ES6
+		libraryTarget: "umd",
 		filename: "[name].js",
 		path: __dirname + "/build",
 		library: {
@@ -30,8 +24,7 @@ module.exports = {
 					{
 						loader: "worker-loader",
 						options: {
-							esModule: true, // Questo garantisce l'export di default
-							inline: "fallback", // (Opzionale) Per gestione fallback
+							esModule: true,
 						},
 					},
 				],
@@ -44,12 +37,8 @@ module.exports = {
 	},
 	resolve: {
 		extensions: [".ts", ".tsx", ".js", ".json"],
-		plugins: [new TsconfigPathsPlugin()],
 	},
 	plugins: [
-		new HtmlWebpackPlugin({
-			template: "./src/v2/index.html",
-		}),
 		new webpack.DefinePlugin({
 			"process.env": JSON.stringify({ ...process.env }),
 		}),

@@ -3,8 +3,7 @@
     "version": "1.2.0",
     "description": "",
     "scripts": {
-        "start": "ts-node -r tsconfig-paths/register src/main.ts",
-        "format": "npx prettier ./src --write \"!**/*.json\" > /dev/null"
+        "start": "ts-node main.ts"
     },
     "publishConfig": {
         "@genbs:registry": "https://npm.pkg.github.com"
@@ -15,17 +14,15 @@
         "email": "gennaro.bs@gmail.com",
         "url": "https://github.com/genbs"
     },
-    "main": "./server/main.ts",
+    "main": "./main.ts",
     "license": "ISC",
     "devDependencies": {
-        "dns": "^0.2.2",
-        "nmap": "^1.1.0",
         "ts-loader": "^9.5.1",
         "ts-node": "^10.9.2",
-        "tsconfig-paths": "^4.2.0",
         "typescript": "^5.1.6"
     },
     "dependencies": {
-        "bonjour": "^3.5.0"
+        "@abandonware/noble": "^1.9.2-26",
+        "dgram": "^1.0.1"
     }
 }

@@ -10,18 +10,12 @@
 		"isolatedModules": false,
 		"useDefineForClassFields": false,
 		"declaration": true,
-		"types": ["node", "jest"],
+		"types": ["node"],
 		"allowSyntheticDefaultImports": true,
 		"allowJs": true,
 		"lib": ["DOM", "ESNext"],
 		"resolveJsonModule": true,
-		"paths": {
-			"@services/*": ["src/services/*"],
-			"@utils/*": ["../shared/utils/*"],
-			"@protocol": ["src/protocol/index"],
-			"@shared": ["../shared/index"]
-		}
+		"paths": {}
 	},
-	"include": ["src/**/*", "../shared/**/*"],
-	"exclude": ["node_modules", "build", "dist"]
+	"exclude": ["node_modules"]
 }
