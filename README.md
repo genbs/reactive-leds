@@ -13,9 +13,6 @@ Print result in hex
 # ping
 echo -n -e '\x01\x01' | nc -u -w1 192.168.x.x 4210 | hexdump -C
 
-# blink
-echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210 | hexdump -C
-
 # set led 1 to red
 echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210 | hexdump -C
 ```
@@ -42,6 +39,10 @@ per l'esp32s3 selezionare
 - Partition Scheme: 8MB
 
 ### Problems
+
+Problems:
+
+#### AsyncWebServer is no longer working, crashing with ESP32-S3 WROOM
 
 ```
 assert failed: tcp_alloc /IDF/components/lwip/lwip/src/core/tcp.c:1851 (Required to lock TCPIP core functionality!)
