@@ -78,33 +78,44 @@ export function bufferToConfig(buffer: Uint8Array): Config {
 		num_leds: buffer[1],
 		brightness: buffer[2],
 		port: (buffer[3] << 8) | buffer[4],
-		hostname: bufferToString(buffer.slice(5)),
+		hostname: decodeBuffer(buffer.slice(5)).substring(0, 32), // ensure hostname is at most 32 characters
 	}
 }
 
 // convert a config object to a buffer, no validation
-export function configToBuffer(config: Config): Uint8Array {
+export function configToBuffer(config: Config, dest?: Uint8Array): Uint8Array {
 	const pin = config.pin
 	const num_leds = config.num_leds
 	const brightness = config.brightness // 0-255
 	const port = config.port
 	const hostname = config.hostname.substring(0, 32)
 
-	const packet = new Uint8Array(1 + 1 + 1 + 2 + hostname.length) // pin, num_leds, brightness, port_h, port_l, hostname
+	const packetLength = 1 + 1 + 1 + 2 + hostname.length // pin, num_leds, brightness, port_h, port_l, hostname
+
+	let packet
+	if (typeof dest !== "undefined") {
+		// check if the destination buffer is large enough
+		if (dest.length < packetLength) throw new Error("Destination buffer is too small")
+
+		packet = dest
+	} else {
+		packet = new Uint8Array(packetLength)
+	}
+
 	packet[0] = pin
 	packet[1] = num_leds
 	packet[2] = brightness
 	packet[3] = (port >> 8) & 0xff
 	packet[4] = port & 0xff
 
-	packet.set(bufferFromString(hostname), 5)
+	encodeBuffer(hostname, packet, 5)
 
 	return packet
 }
 
 // convert ip and port to a buffer
-export function addressToBuffer(ip: DeviceAddress, port: number): Uint8Array {
-	const buffer = new Uint8Array(4 + 2)
+export function addressToBuffer(ip: DeviceAddress, port: number, dest?: Uint8Array): Uint8Array {
+	const buffer = dest || new Uint8Array(6) // 4 bytes for IP + 2 bytes for port
 	const parts = ip.split(".")
 
 	buffer[0] = +parts[0]
@@ -120,12 +131,32 @@ export function addressToBuffer(ip: DeviceAddress, port: number): Uint8Array {
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
-export function bufferFromString(str: string): Uint8Array {
-	return encoder.encode(str)
+/**
+ * Encode a string to a Uint8Array buffer.
+ * If a destination buffer is provided, it will encode the string into that buffer starting at the specified position.
+ * If no destination buffer is provided, it will return a new Uint8Array with the encoded string.
+ *
+ * NOTE: The encoded string will be null-terminated if the destination buffer is large enough and position is not specified.
+ */
+export function encodeBuffer(str: string, dest?: Uint8Array, position?: number): Uint8Array {
+	if (typeof dest !== "undefined") {
+		encoder.encodeInto(str, position ? dest.subarray(position | 0) : dest)
+
+		// if length of the destination buffer is more than the encoded string, add \0 termination
+		if (typeof position === "undefined" && dest.length > str.length) {
+			dest[(position || 0) + str.length] = 0 // add null termination
+		}
+
+		return dest
+	} else {
+		return encoder.encode(str)
+	}
 }
 
-export function bufferToString(buffer: Uint8Array): string {
-	return decoder.decode(
-		buffer.subarray(0, buffer.indexOf(0)) // break at the first \0
-	)
+export function decodeBuffer(buffer: Uint8Array): string {
+	// check if the buffer has \0 termination
+	const nullIndex = buffer.indexOf(0)
+	if (nullIndex !== -1) buffer = buffer.subarray(0, nullIndex)
+
+	return decoder.decode(buffer)
 }

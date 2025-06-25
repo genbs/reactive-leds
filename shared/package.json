@@ -1,0 +1,26 @@
+{
+    "private": true,
+    "name": "shared",
+    "version": "1.0.0",
+    "description": "shared library for LED control",
+    "main": "index.ts",
+    "scripts": {
+        "test": "jest"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "@types/jest": "^29.5.12",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.1.5",
+        "typescript": "^5.4.5"
+    },
+    "jest": {
+        "preset": "ts-jest",
+        "testMatch": [
+            "**/__tests__/**/*.ts",
+            "**/?(*.)+(spec|test).ts"
+        ]
+    }
+}
