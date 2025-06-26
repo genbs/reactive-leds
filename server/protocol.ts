@@ -1,17 +1,16 @@
-import dgram from "dgram"
-import { logger } from "../shared/logger"
 import {
 	bufferToConfig,
-	Color,
 	Config,
 	configToBuffer,
 	EMPTY_PACKET_ID,
+	logger,
 	Packet,
 	PacketID,
 	PacketStatus,
 	PacketType,
 	PacketTypeMap,
-} from "../shared/protocol"
+} from "@leds/shared"
+import dgram from "dgram"
 
 class Protocol {
 	static PING_TIMEOUT = 1000
@@ -29,6 +28,8 @@ class Protocol {
 			startTime: number
 		}
 	>()
+
+	private configBuffer: Uint8Array | null = null
 
 	/**
 	 * Create UDP socket to communicate with devices.
@@ -98,9 +99,16 @@ class Protocol {
 	 * @returns [MessageID, MessageType, Status (boolean)]
 	 */
 	async setConfig(ip: string, port: number, config: Config): Promise<boolean> {
-		const packet = configToBuffer(config)
+		const packetLength = 1 + 1 + 1 + 2 + config.hostname.length
+		if (!this.configBuffer || this.configBuffer.length < packetLength) this.configBuffer = configToBuffer(config)
 
-		const response = await this.sendSync(ip, port, PacketType.SET_CONFIG, packet, Protocol.SET_CONFIG_TIMEOUT)
+		const response = await this.sendSync(
+			ip,
+			port,
+			PacketType.SET_CONFIG,
+			this.configBuffer,
+			Protocol.SET_CONFIG_TIMEOUT
+		)
 
 		return response !== null && response.length >= 2 && response[2] === PacketStatus.OK
 	}
@@ -113,45 +121,8 @@ class Protocol {
 	 * @param data [led_index, r, g, b, brightness / whiteness, led_index, r, g, b, brightness / whiteness, ...]
 	 * @returns
 	 */
-	async setLEDs(ip: string, port: number, data: Uint8Array) {
+	setLEDs(ip: string, port: number, data: Uint8Array) {
 		return this.send(ip, port, PacketType.SET_LEDS, data)
-	}
-
-	/**
-	 * Blink the number of leds based on the id in the configuration.
-	 * You can set a base color and a blink color, the number and the delay between the blinks.
-	 *
-	 * @param ip
-	 * @param port
-	 * @param baseColor
-	 * @param blinkColor
-	 * @param count
-	 * @param delay
-	 * @returns
-	 */
-	async blink(
-		ip: string,
-		port: number,
-		baseColor: Color = [10, 10, 10, 10],
-		blinkColor: Color = [255, 255, 255, 255],
-		count: number = 3,
-		delay: number = 1000
-	) {
-		const data = new Uint8Array([
-			baseColor[0],
-			baseColor[1],
-			baseColor[2],
-			baseColor[3],
-			blinkColor[0],
-			blinkColor[1],
-			blinkColor[2],
-			blinkColor[3],
-			count,
-			delay >> 8,
-			delay & 0xff,
-		])
-
-		return this.send(ip, port, PacketType.BLINK, data)
 	}
 
 	/**

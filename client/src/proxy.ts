@@ -3,7 +3,7 @@
  * The client (browser) can send messages to the worker with this public functions.
  */
 
-import { bufferFromString, logger } from "../../shared"
+import { encodeBuffer, logger } from "../../shared"
 import { EMPTY_REQUEST_ID, FALSE, TRUE, WorkerRequestType, WorkerRequestTypeMap } from "./comm"
 // @ts-ignore
 import Deamon from "./deamon.worker"
@@ -73,7 +73,7 @@ export function connect(serverURL: string, debug = false): Promise<boolean> {
 	// create a packet to send to the worker [requestType, serverURL, debug]
 	const buffer = new Uint8Array(1 + serverURL.length + 1)
 	buffer[0] = WorkerRequestType.Connect
-	buffer.set(bufferFromString(serverURL), 1)
+	encodeBuffer(serverURL, buffer, 1)
 	buffer[1 + serverURL.length] = debug ? TRUE : FALSE
 
 	return sendSync(buffer).then(response => response[0] === TRUE)

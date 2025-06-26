@@ -47,12 +47,12 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
         char scanned_ssid[33] = {0};
         snprintf(scanned_ssid, sizeof(scanned_ssid), "%.*s", 32, networks[i].ssid);
 
-        ESP_LOGI(TAG, "Found SSID: %s, RSSI: %d, Channel: %d, Authmode: %d",
+        ESP_LOGV(TAG, "Found SSID: %s, RSSI: %d, Channel: %d, Authmode: %d",
             scanned_ssid, networks[i].rssi, networks[i].primary, networks[i].authmode);
 
         // check if the network is known
         if (storage_has_key("wifi", scanned_ssid)) {
-            ESP_LOGI(TAG, "Trying to connect to %s", scanned_ssid);
+            ESP_LOGV(TAG, "Trying to connect to %s", scanned_ssid);
                         
             // store the password and ssid in the credentials struct
             size_t pass_len = sizeof(credentials->pass) - 1;
@@ -177,6 +177,7 @@ void app_main(void)
     // Start application
     ESP_LOGI(TAG, "Connected to WiFi");
     ESP_LOGI(TAG, "IP address: %s", wifi_ip());
+    ESP_LOGI(TAG, "Hostname: %s", config.hostname);
     ESP_LOGI(TAG, "MAC address: %s", wifi_mac());
 
     // Start protocol to handshake with the server and communicate with it

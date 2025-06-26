@@ -21,7 +21,7 @@ void config_begin(void) {
         memset(buf, 0, sizeof(buf));
         storage_get("config", "pin", buf, &len);
         config.pin = (uint8_t)atoi(buf);
-        ESP_LOGI(CONFIG_TAG, "Loaded pin: %u", config.pin);
+        ESP_LOGV(CONFIG_TAG, "Loaded pin: %u", config.pin);
     }
     
     if (storage_has_key("config", "num_leds")) {
@@ -29,7 +29,7 @@ void config_begin(void) {
         memset(buf, 0, sizeof(buf));
         storage_get("config", "num_leds", buf, &len);
         config.num_leds = (uint8_t)atoi(buf);
-        ESP_LOGI(CONFIG_TAG, "Loaded num_leds: %u", config.num_leds);
+        ESP_LOGV(CONFIG_TAG, "Loaded num_leds: %u", config.num_leds);
     }
 
     if (storage_has_key("config", "brightness")) {
@@ -37,7 +37,7 @@ void config_begin(void) {
         memset(buf, 0, sizeof(buf));
         storage_get("config", "brightness", buf, &len);
         config.brightness = (uint8_t)atoi(buf);
-        ESP_LOGI(CONFIG_TAG, "Loaded brightness: %u", config.brightness);
+        ESP_LOGV(CONFIG_TAG, "Loaded brightness: %u", config.brightness);
     }
     
     if (storage_has_key("config", "port")) {
@@ -45,14 +45,14 @@ void config_begin(void) {
         memset(buf, 0, sizeof(buf));
         storage_get("config", "port", buf, &len);
         config.port = (uint16_t)atoi(buf);
-        ESP_LOGI(CONFIG_TAG, "Loaded port: %u", config.port);
+        ESP_LOGV(CONFIG_TAG, "Loaded port: %u", config.port);
     }
 
     if (storage_has_key("config", "hostname")) {
         len = sizeof(config.hostname);
         memset(buf, 0, sizeof(buf));
         storage_get("config", "hostname", config.hostname, &len);
-        ESP_LOGI(CONFIG_TAG, "Loaded hostname: %s", config.hostname);
+        ESP_LOGV(CONFIG_TAG, "Loaded hostname: %s", config.hostname);
     }
 }
 

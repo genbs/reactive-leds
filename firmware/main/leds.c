@@ -59,6 +59,7 @@ void leds_update(uint8_t pixel_index, uint8_t r, uint8_t g, uint8_t b, uint8_t w
         return;
     }
 
+    // The order of the data is W, R, G, B as required by the SK6812 chip specification  
     leds[pixel_index * 4] = w;
     leds[pixel_index * 4 + 1] = r;
     leds[pixel_index * 4 + 2] = g;

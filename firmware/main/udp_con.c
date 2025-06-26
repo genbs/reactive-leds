@@ -4,7 +4,7 @@ static int sock;
 static udp_packet packet;
 
 bool udp_con_begin(uint16_t port) {
-    ESP_LOGV(UDP_TAG, "Starting UDP server on port %d", port);
+    ESP_LOGI(UDP_TAG, "Starting UDP server on port %d", port);
 
     // Create a socket
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); 
@@ -32,7 +32,7 @@ bool udp_con_begin(uint16_t port) {
         ESP_LOGW(UDP_TAG, "Failed to set SO_RCVBUF: errno %d", errno);
         return false;
     }
-    ESP_LOGI(UDP_TAG, "Receive buffer size set to %d bytes", rcvbuf_size);
+    ESP_LOGV(UDP_TAG, "Receive buffer size set to %d bytes", rcvbuf_size);
 
     // Allow multiple sockets to use the same port
     int optval = 1;
@@ -52,13 +52,13 @@ bool udp_con_begin(uint16_t port) {
         return false;
     }
 
-    // struct timeval timeout;
-    // timeout.tv_sec = 0;
-    // timeout.tv_usec = UDP_TIMEOUT_US;
-    // if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
-    //     ESP_LOGE(UDP_TAG, "Failed to set socket timeout: errno %d", errno);
-    //     return false;
-    // }
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = UDP_TIMEOUT_US;
+    if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        ESP_LOGE(UDP_TAG, "Failed to set socket timeout: errno %d", errno);
+        return false;
+    }
 
     ESP_LOGI(UDP_TAG, "Socket bound, port %d", port);
     return true;
@@ -108,7 +108,7 @@ void udp_con_close() {
 }
 
 void udp_con_send(uint8_t *data, size_t len, struct sockaddr_storage *dest_addr) {
-    ESP_LOGI(UDP_TAG, "Sending data");
+    ESP_LOGV(UDP_TAG, "Sending data");
 
     int err = sendto(sock, data, len, 0, (struct sockaddr *)dest_addr, sizeof(*dest_addr));
     if (err < 0) {

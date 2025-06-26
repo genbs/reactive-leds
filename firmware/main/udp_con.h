@@ -12,7 +12,7 @@
 
 #define UDP_TAG "UDP_SERVICE"
 
-#define UDP_MAX_RETRIES 3
+#define UDP_MAX_RETRIES 2
 #define UDP_TIMEOUT_US (1000 / 60) * 1000 // 60Hz refresh rate
 
 typedef struct {

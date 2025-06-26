@@ -65,10 +65,10 @@ static void restart_timer_callback(TimerHandle_t xTimer)
 void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param){
     switch (event) {
     case ESP_GATTS_CONNECT_EVT:
-        ESP_LOGI(BLE_TAG, "Connected, conn_id %d", param->connect.conn_id);
+        ESP_LOGV(BLE_TAG, "Connected, conn_id %d", param->connect.conn_id);
         break;
     case ESP_GATTS_REG_EVT: 
-        ESP_LOGI(BLE_TAG, "Registered, status %d, app_id %d", param->reg.status, param->reg.app_id);
+        ESP_LOGV(BLE_TAG, "Registered, status %d, app_id %d", param->reg.status, param->reg.app_id);
         esp_gatt_srvc_id_t srvc_id = {
             .is_primary = true,
             .id = {
@@ -79,7 +79,7 @@ void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp
         esp_ble_gatts_create_service(gatts_if, &srvc_id, 10);
         break;
     case ESP_GATTS_CREATE_EVT:
-        ESP_LOGI(BLE_TAG, "Service created, handle %d", param->create.service_handle);
+        ESP_LOGV(BLE_TAG, "Service created, handle %d", param->create.service_handle);
         gatt_service_handle = param->create.service_handle;
         esp_ble_gatts_start_service(gatt_service_handle);
         esp_gatt_char_prop_t property = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
@@ -92,11 +92,11 @@ void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp
         }
         break;
     case ESP_GATTS_ADD_CHAR_EVT:
-        ESP_LOGI(BLE_TAG, "Characteristic added, handle %d", param->add_char.attr_handle);
+        ESP_LOGV(BLE_TAG, "Characteristic added, handle %d", param->add_char.attr_handle);
         gatt_char_handle = param->add_char.attr_handle;
         break;
     case ESP_GATTS_WRITE_EVT: 
-        ESP_LOGI(BLE_TAG, "Write received, conn_id %u, trans_id %u, handle %u",
+        ESP_LOGV(BLE_TAG, "Write received, conn_id %u, trans_id %u, handle %u",
                 (unsigned int)param->write.conn_id,
                 (unsigned int)param->write.trans_id,
                 (unsigned int)param->write.handle);
@@ -113,14 +113,14 @@ void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp
             if (err != ESP_OK) {
                 ESP_LOGE(BLE_TAG, "Failed to send response: %s", esp_err_to_name(err));
             } else {
-                ESP_LOGI(BLE_TAG, "Response sent");
+                ESP_LOGV(BLE_TAG, "Response sent");
             }
         }
         
         if (param->write.handle == gatt_char_handle && param->write.len > 0) {
             store_credentials(param->write.value, param->write.len);
 
-            ESP_LOGI(BLE_TAG, "Credentials stored, restarting...");
+            ESP_LOGV(BLE_TAG, "Credentials stored, restarting...");
             TimerHandle_t restart_timer = xTimerCreate("RestartTimer",
                 pdMS_TO_TICKS(2000),
                 pdFALSE,      // one-shot
@@ -135,7 +135,7 @@ void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp
         }
         break;
     case ESP_GATTS_DISCONNECT_EVT:
-        ESP_LOGI(BLE_TAG, "Client disconnected, restarting advertising");
+        ESP_LOGV(BLE_TAG, "Client disconnected, restarting advertising");
         esp_ble_gap_start_advertising(&adv_params);
         break;
     default:
@@ -147,17 +147,16 @@ void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
 {
     switch (event) {
     case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
-        ESP_LOGI(BLE_TAG, "Advertising data set");
+        ESP_LOGV(BLE_TAG, "Advertising data set");
         esp_ble_gap_start_advertising(&adv_params);
         break;
     case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
         if (param->adv_start_cmpl.status == ESP_BT_STATUS_SUCCESS) {
-            ESP_LOGI(BLE_TAG, "Advertising started");
+            ESP_LOGV(BLE_TAG, "Advertising started");
         } else {
             ESP_LOGE(BLE_TAG, "Advertising start error: %d", param->adv_start_cmpl.status);
         }
-        break
-        ;
+        break;
     default:
         break;
     }

@@ -1,11 +1,29 @@
+import { bufferToConfig, configToBuffer, logger, PacketType, PacketTypeMap } from "@leds/shared"
+import { Command } from "cmd"
+import { validateIP, validatePort } from "utils"
 import WebSocket from "ws"
-import { LOG_LEVEL, logger } from "../shared/logger"
-import { bufferToConfig, configToBuffer, PacketType, PacketTypeMap } from "../shared/protocol"
-import proto from "./protocol"
+import proto from "../protocol"
 
+const serveCommand: Command = {
+	name: "serve",
+	description:
+		"Start the WebSocket server.\nThis service will act as a proxy between the client and the firmware, routing packets between the two.",
+	args: [
+		{ required: false, name: "host", type: String, default: "0.0.0.0", validator: validateIP },
+		{ required: false, name: "port", type: Number, default: 8000, validator: validatePort },
+	],
+	execute: async (host, port) => serve(host as string, port as number),
+}
+
+const STATUS_RESPONSE_SUCCESS = new Uint8Array([0, 1])
+const STATUS_RESPONSE_FAILURE = new Uint8Array([0, 0])
+
+/**
+ * Start the WebSocket server.
+ * Proxy between the client and the firmware.
+ * Ping, SetConfig, GetConfig has synchronous responses, SetLEDs is asynchronous.
+ */
 export function serve(host = "0.0.0.0", port = 8000) {
-	logger.setLevel(LOG_LEVEL.ERROR)
-
 	const wss = new WebSocket.Server({
 		port,
 		host,
@@ -19,15 +37,14 @@ export function serve(host = "0.0.0.0", port = 8000) {
 			const requestId = payload[0]
 			const ip = payload[1] + "." + payload[2] + "." + payload[3] + "." + payload[4]
 			const port = (payload[5] << 8) | payload[6]
-			const packetType = payload[7]
+			const packetType = payload[7] as PacketType
 			const packet = payload.slice(8)
 
 			logger.debug(`IP: ${ip}, Port: ${port}, Packet type: ${PacketTypeMap[packetType]}`)
 
 			function statusResponse(status: 1 | true | 0 | false) {
-				const response = new Uint8Array(1 + 1) // responseId, status
+				const response = status ? STATUS_RESPONSE_SUCCESS : STATUS_RESPONSE_FAILURE
 				response[0] = requestId
-				response[1] = status ? 1 : 0
 				ws.send(response)
 			}
 
@@ -57,11 +74,13 @@ export function serve(host = "0.0.0.0", port = 8000) {
 					} else {
 						statusResponse(0)
 					}
+
 					break
 				}
 
 				case PacketType.SET_LEDS: {
 					proto.setLEDs(ip, port, packet)
+					// no response
 					break
 				}
 
@@ -77,15 +96,20 @@ export function serve(host = "0.0.0.0", port = 8000) {
 		})
 	})
 
-	process.on("SIGINT", () => {
-		wss.close()
-		process.exit(0)
-	})
+	// graceful shutdown
+	function shutdown() {
+		logger.info("Shutting down WebSocket server...")
 
-	process.on("SIGTERM", () => {
-		wss.close()
-		process.exit(0)
-	})
+		wss.close(() => {
+			logger.info("WebSocket server closed")
+			process.exit(0)
+		})
+	}
 
-	console.log(`Server started on ws://${host}:${port}`)
+	process.on("SIGINT", shutdown)
+	process.on("SIGTERM", shutdown)
+
+	logger.info(`Server started on ws://${host}:${port}`)
 }
+
+export default serveCommand

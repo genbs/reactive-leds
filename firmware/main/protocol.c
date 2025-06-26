@@ -57,7 +57,7 @@ void protocol_loop()
  */
 void protocol_ping(udp_packet *packet)
 {
-    ESP_LOGI(PROTOCOL_TAG, "PING");
+    ESP_LOGV(PROTOCOL_TAG, "PING");
 
     // PONG
     protocol_response[0] = packet->data[0]; // PACKET_ID
@@ -70,7 +70,7 @@ void protocol_ping(udp_packet *packet)
 
 void protocol_get_config(udp_packet *packet)
 {
-    ESP_LOGI(PROTOCOL_TAG, "GET_CONFIG");
+    ESP_LOGV(PROTOCOL_TAG, "GET_CONFIG");
 
     uint8_t *data = packet->data;
 
@@ -99,7 +99,7 @@ void protocol_set_config(udp_packet *packet)
         return;
     }
 
-    ESP_LOGI(PROTOCOL_TAG, "SET_CONFIG");
+    ESP_LOGV(PROTOCOL_TAG, "SET_CONFIG");
 
     config.pin = data[2];
     config.num_leds = data[3];
@@ -121,14 +121,14 @@ void protocol_set_config(udp_packet *packet)
     if (config_store())
     {
         protocol_response[2] = 1;
-        ESP_LOGI(PROTOCOL_TAG, "SET_CONFIG: Configuration saved successfully");
-
+        ESP_LOGV(PROTOCOL_TAG, "SET_CONFIG: Configuration saved successfully");
+        // TODO: update stripe service or restart
         //strip_update(config.num_leds, config.brightness);
     }
     else
     {
         protocol_response[2] = 0;
-        ESP_LOGI(PROTOCOL_TAG, "SET_CONFIG: Configuration save failed.");
+        ESP_LOGV(PROTOCOL_TAG, "SET_CONFIG: Configuration save failed.");
     }
 
     udp_con_send(protocol_response, 3, &packet->source_addr);

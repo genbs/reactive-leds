@@ -59,7 +59,7 @@ export enum PacketStatus {
 	ERROR = 0,
 }
 
-export type DeviceAddress = string
+export type DeviceAddress = string | Uint8Array // [number, number, number, number]
 
 export const EMPTY_PACKET_ID = 0
 
@@ -116,7 +116,7 @@ export function configToBuffer(config: Config, dest?: Uint8Array): Uint8Array {
 // convert ip and port to a buffer
 export function addressToBuffer(ip: DeviceAddress, port: number, dest?: Uint8Array): Uint8Array {
 	const buffer = dest || new Uint8Array(6) // 4 bytes for IP + 2 bytes for port
-	const parts = ip.split(".")
+	const parts = typeof ip === "string" ? ip.split(".") : ip
 
 	buffer[0] = +parts[0]
 	buffer[1] = +parts[1]

@@ -52,7 +52,22 @@ function createMessage(level: LOG_LEVEL, options: LoggerOptions) {
 	return colors ? `\x1b[${colors[level]}m${timestamp}${levelStr}%s\x1b[0m` : `${timestamp}${levelStr}%s`
 }
 
-const logger = {
+export interface Logger {
+	options: LoggerOptions
+	setOptions: (options?: Partial<LoggerOptions>) => void
+	level: LOG_LEVEL
+	setLevel: (level: LOG_LEVEL) => void
+	getLevel: () => LOG_LEVEL
+	outputStream: OutputStream
+	setOutputStream: (stream: OutputStream) => void
+	debug: (...args: any[]) => void
+	info: (...args: any[]) => void
+	warn: (...args: any[]) => void
+	error: (...args: any[]) => void
+	log: (level: LOG_LEVEL, ...args: any[]) => void
+}
+
+const logger: Logger = {
 	options: defaultOptions,
 
 	setOptions: (options: Partial<typeof logger.options> = defaultOptions) => {

@@ -12,7 +12,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT) {
         switch (event_id) {
             case WIFI_EVENT_STA_START:
-                ESP_LOGI(WIFI_TAG, "WIFI_EVENT_STA_START => connecting...");
+                ESP_LOGV(WIFI_TAG, "WIFI_EVENT_STA_START => connecting...");
                 esp_wifi_connect();
                 break;
 
@@ -22,7 +22,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 
                 if (retry_num < MAX_RETRY) {
                     retry_num++;
-                    ESP_LOGI(WIFI_TAG, "Retrying to connect... Attempt #%d/%d",
+                    ESP_LOGV(WIFI_TAG, "Retrying to connect... Attempt #%d/%d",
                     retry_num, MAX_RETRY);
                     esp_wifi_connect();
                 } else {
@@ -35,7 +35,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 break;
 
             default:
-                ESP_LOGI(WIFI_TAG, "Unhandled WIFI_EVENT (%d)", (int)event_id);
+                ESP_LOGV(WIFI_TAG, "Unhandled WIFI_EVENT (%d)", (int)event_id);
                 break;
         }
     } else if (event_base == IP_EVENT) {
@@ -45,7 +45,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 
                 // Store IP address
                 snprintf(ip_address_str, sizeof(ip_address_str), IPSTR, IP2STR(&event->ip_info.ip));
-                ESP_LOGI(WIFI_TAG, "IP_EVENT_STA_GOT_IP => %s", ip_address_str);
+                ESP_LOGV(WIFI_TAG, "IP_EVENT_STA_GOT_IP => %s", ip_address_str);
 
                 connected = true;
                 retry_num = 0;
@@ -53,7 +53,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             }
 
             default:
-                ESP_LOGI(WIFI_TAG, "Unhandled IP_EVENT (%" PRId32 ")", event_id);
+                ESP_LOGV(WIFI_TAG, "Unhandled IP_EVENT (%" PRId32 ")", event_id);
                 break;
         }
     }
@@ -78,7 +78,7 @@ void wifi_init_sta()
         const char *hostname = config.hostname;
         esp_err_t err = esp_netif_set_hostname(netif, hostname);
         if (err == ESP_OK) {
-            ESP_LOGI(WIFI_TAG, "Hostname set to %s", hostname);
+            ESP_LOGV(WIFI_TAG, "Hostname set to %s", hostname);
         } else {
             ESP_LOGE(WIFI_TAG, "Failed to set hostname: %s", esp_err_to_name(err));
         }
@@ -91,7 +91,21 @@ void wifi_init_sta()
 
 void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
 {   
-    ESP_LOGI(WIFI_TAG, "Connecting to WiFi network: %s-%s", WIFI_SSID, WIFI_PASS);
+    char wifi_pass_hidden[WIFI_PASS_MAX_LEN + 1]; // +1 per il carattere null
+    size_t pass_len = strlen(WIFI_PASS);
+
+    // Controlla la lunghezza della password per un mascheramento sicuro
+    if (pass_len <= 4) { // Se la password è 4 caratteri o meno, la mascheriamo completamente
+                         // Puoi decidere tu la soglia, es. 3, 5, ecc.
+        snprintf(wifi_pass_hidden, sizeof(wifi_pass_hidden), "********"); // O "---" o solo "***"
+    } else {
+        // Mostra i primi 3 caratteri, puntini, e l'ultimo carattere
+        // Es: "abc...z" per una password lunga
+        snprintf(wifi_pass_hidden, sizeof(wifi_pass_hidden), "%.3s...%c", 
+                 WIFI_PASS, WIFI_PASS[pass_len - 1]);
+    }
+    
+    ESP_LOGV(WIFI_TAG, "Connecting to WiFi network: %s-%s", WIFI_SSID, wifi_pass_hidden);
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;

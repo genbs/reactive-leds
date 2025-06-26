@@ -14,6 +14,7 @@
 
 #define MAX_RETRY 10  // Maximum number of retries to connect to WiFi
 #define MAX_AP_SCAN 10 // Maximum number of APs to scan
+#define WIFI_PASS_MAX_LEN 64
 
 void wifi_disable_sleep();
 void wifi_init_sta();

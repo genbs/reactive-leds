@@ -1,6 +1,10 @@
 {
+	"extends": "../tsconfig.json",
 	"compilerOptions": {
+		"composite": true,
+		"declarationMap": true,
 		"baseUrl": ".",
+		"rootDir": "./",
 		"outDir": "./dist",
 		"module": "CommonJS",
 		"jsx": "react-jsx",
@@ -10,7 +14,7 @@
 		"isolatedModules": false,
 		"useDefineForClassFields": false,
 		"declaration": true,
-		"types": ["node"],
+		"types": ["jest", "node"],
 		"allowSyntheticDefaultImports": true,
 		"allowJs": true,
 		"lib": ["DOM", "ESNext"],
