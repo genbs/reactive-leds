@@ -14,13 +14,14 @@
 
 #define TAG "MAIN"
 
-#define WIFI_CONNECT_TIMEOUT 20000
-#define BLE_TIMEOUT_MS 30000 // 30 sec
+#define CHECK_CONNECTED_TIMEOUT 100 // check in 100 ms if wifi/ble is connected
+#define WIFI_CONNECT_TIMEOUT 20000 // 20 seconds to connect to wifi
+#define BLE_TIMEOUT_MS 30000 // Reboot after 30 seconds if no BLE connection is established
 
 // current wifi credentials
 typedef struct {
     char ssid[32];
-    char pass[32];
+    char pass[WIFI_PASS_MAX_LEN];
 } wifi_credentials_t;
 
 void delay(uint32_t ms)
@@ -34,15 +35,16 @@ void delay(uint32_t ms)
 bool connect_to_known_networks(wifi_credentials_t *credentials) {
     int num_networks;
 
-    // scan wifi networks
+    ESP_LOGI(TAG, "Scanning for WiFi networks...");
+    // scan wifi networks and get the list of available networks
     wifi_ap_record_t *networks = wifi_scan(&num_networks);
-    ESP_LOGV(TAG, "Found %d networks", num_networks);
-
+    
     if (num_networks <= 0) {
         ESP_LOGI(TAG, "No networks found.");
         return false;
     }
 
+    ESP_LOGV(TAG, "Found %d networks", num_networks);
     for (int i = 0; i < num_networks; i++) {
         char scanned_ssid[33] = {0};
         snprintf(scanned_ssid, sizeof(scanned_ssid), "%.*s", 32, networks[i].ssid);
@@ -70,12 +72,12 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
                     return true;
                 }
 
-                delay(100);
+                delay(CHECK_CONNECTED_TIMEOUT);
             }
 
             ESP_LOGW(TAG, "Failed to connect to %s", credentials->ssid);
 
-            // remove the network from the known networks, maybe the password is wrong
+            // TODO: remove the network from the known networks, maybe the password is wrong
             //storage_delete("wifi", scanned_ssid);
         } else {
             ESP_LOGI(TAG, "Network %s is unknown", scanned_ssid);
@@ -94,7 +96,7 @@ void ble_configuration_loop() {
     
     uint32_t start_time = esp_log_timestamp();
     while (esp_log_timestamp() - start_time < BLE_TIMEOUT_MS) { 
-        delay(100);
+        delay(CHECK_CONNECTED_TIMEOUT);
     }
 
     ESP_LOGW(TAG, "BLE timeout, rebooting");
@@ -107,33 +109,31 @@ void ble_configuration_loop() {
 void app_protocol_loop(void *param) {
     while (1) {
         protocol_loop();
-        delay(1);
     }
 }
 
 /**
- * Main application loop.
  * While connected to wifi, keep the connection alive.
  * If the connection is lost, try to reconnect.
  */
-void app_loop(void *param) {
+void wifi_reconnect_task(void *param) {
     wifi_credentials_t *credentials = (wifi_credentials_t *)param;
 
     while (1) {
         if (wifi_connected()) {
-            delay(1000);
+            delay(CHECK_CONNECTED_TIMEOUT);
         } else {
             ESP_LOGI(TAG, "Reconnecting to WiFi");
             wifi_connect(credentials->ssid, credentials->pass);
 
             uint32_t start_time = esp_log_timestamp();
             while (!wifi_connected()) {
-                delay(10);
+                delay(CHECK_CONNECTED_TIMEOUT);
 
                 if (esp_log_timestamp() - start_time > WIFI_CONNECT_TIMEOUT) {
                     ESP_LOGW(TAG, "WiFi connection timeout, rebooting");
                     
-                    // TODO: off the leds
+                    // TODO: off the leds?
                     esp_restart();
                 }
             }
@@ -181,17 +181,17 @@ void app_main(void)
     ESP_LOGI(TAG, "MAC address: %s", wifi_mac());
 
     // Start protocol to handshake with the server and communicate with it
-    if (protocol_begin()) {   
-        // Create a task for app_loop to run on a different core    
-        xTaskCreatePinnedToCore(app_loop, "app_loop", 4096, &credentials, 1, NULL, 1);
-
-        // Create a task to monitor the protocol
-        xTaskCreatePinnedToCore(app_protocol_loop, "app_protocol_loop", 4096, NULL, 7, NULL, 0);
-        
-        // Delete the main task
-        vTaskDelete(NULL);
-    } else {
+    if (!protocol_begin()) {   
         ESP_LOGE(TAG, "Failed to start protocol");
         esp_restart();
     }
+
+    // Keep connected to WiFi and handle reconnections
+    xTaskCreatePinnedToCore(wifi_reconnect_task, "wifi_reconnect_task", 4096, &credentials, 1, NULL, 1);
+
+    // Create a task to monitor the protocol
+    xTaskCreatePinnedToCore(app_protocol_loop, "app_protocol_loop", 4096, NULL, 7, NULL, 0);
+    
+    // Delete the main task
+    vTaskDelete(NULL);
 }

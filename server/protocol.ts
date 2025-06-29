@@ -53,9 +53,7 @@ class Protocol {
 			this.pendingRequests.delete(requestID)
 
 			logger.debug(
-				`\x1b[32m[Request:${requestID}] Received ${PacketTypeMap[requestType]} in ${
-					performance.now() - pending.startTime
-				}ms\x1b[0m`,
+				`[Request:${requestID}] Received ${PacketTypeMap[requestType]} in ${performance.now() - pending.startTime}ms`,
 				msg
 			)
 			pending.resolve(msg)
@@ -138,7 +136,7 @@ class Protocol {
 		message[1] = type
 		message.set(data, 2)
 
-		logger.debug(`\x1b[90m[Request (not sync)] Sending ${PacketTypeMap[type]} to ${ip}:${port}\x1b[0m`, data)
+		logger.debug(`[Request (not sync)] Sending ${PacketTypeMap[type]} to ${ip}:${port}`, data)
 
 		this.socket.send(message, 0, message.length, port, ip, err => err && logger.error(err))
 	}
@@ -170,16 +168,14 @@ class Protocol {
 		message[1] = type
 		if (data) message.set(data, 2)
 
-		logger.debug(`\x1b[90m[Request:${requestID}] Sending ${PacketTypeMap[type]} to ${ip}:${port}\x1b[0m`, data)
+		logger.debug(`[Request:${requestID}] Sending ${PacketTypeMap[type]} to ${ip}:${port}`, data)
 
 		return new Promise(resolve => {
 			const startTime = performance.now()
 			const timeout = setTimeout(() => {
 				this.pendingRequests.delete(requestID)
 				logger.debug(
-					`\x1b[33m[Request:${requestID}] Timeout for ${PacketTypeMap[type]} after ${
-						performance.now() - startTime
-					}ms\x1b[0m`
+					`[Request:${requestID}] Timeout for ${PacketTypeMap[type]} after ${performance.now() - startTime}ms`
 				)
 				resolve(null)
 			}, timeoutDuration)

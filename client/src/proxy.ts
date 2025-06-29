@@ -3,7 +3,7 @@
  * The client (browser) can send messages to the worker with this public functions.
  */
 
-import { encodeBuffer, logger } from "../../shared"
+import { encodeBuffer, logger } from "@leds/shared"
 import { EMPTY_REQUEST_ID, FALSE, TRUE, WorkerRequestType, WorkerRequestTypeMap } from "./comm"
 // @ts-ignore
 import Deamon from "./deamon.worker"
@@ -61,11 +61,13 @@ export function checkConnected() {
 	if (!deamon) throw new Error("Worker not initialized")
 }
 
-// Send a connect request to the worker.
+// Send a connection request to the web worker.
 export function connect(serverURL: string, debug = false): Promise<boolean> {
 	if (!deamon) {
 		deamon = new Deamon()
-		deamon.addEventListener("message", handleResponse)
+		checkConnected()
+
+		deamon!.addEventListener("message", handleResponse)
 
 		logger.debug("[Proxy] Worker created")
 	}
@@ -76,6 +78,8 @@ export function connect(serverURL: string, debug = false): Promise<boolean> {
 	encodeBuffer(serverURL, buffer, 1)
 	buffer[1 + serverURL.length] = debug ? TRUE : FALSE
 
+	// handshake with the worker
+	logger.debug(`[Proxy] connect to ${serverURL} with debug=${debug}`, buffer)
 	return sendSync(buffer).then(response => response[0] === TRUE)
 }
 
@@ -84,8 +88,8 @@ export function sendSync(data: Uint8Array): Promise<Uint8Array> {
 	checkConnected()
 
 	let [promise, buffer, requestId] = createRequest(data)
-	logger.debug(`[Proxy] sendSync [${requestId}] ${WorkerRequestTypeMap[buffer[1]]}`, buffer)
-	deamon.postMessage(buffer)
+	logger.debug(`[Proxy] sendSync [${requestId}] ${WorkerRequestTypeMap[buffer[1] as WorkerRequestType]}`, buffer)
+	deamon!.postMessage(buffer)
 
 	return promise
 }
@@ -99,6 +103,6 @@ export function send(data: Uint8Array): void {
 	buffer[0] = EMPTY_REQUEST_ID
 	buffer.set(data, 1)
 
-	logger.debug(`[Proxy] send ${WorkerRequestTypeMap[buffer[1]]}`, buffer)
-	deamon.postMessage(buffer)
+	logger.debug(`[Proxy] send ${WorkerRequestTypeMap[buffer[1] as WorkerRequestType]}`, buffer)
+	deamon!.postMessage(buffer)
 }

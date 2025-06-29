@@ -14,7 +14,7 @@
 
 #define MAX_RETRY 10  // Maximum number of retries to connect to WiFi
 #define MAX_AP_SCAN 10 // Maximum number of APs to scan
-#define WIFI_PASS_MAX_LEN 64
+#define WIFI_PASS_MAX_LEN 32
 
 void wifi_disable_sleep();
 void wifi_init_sta();
@@ -25,5 +25,7 @@ char *wifi_mac();
 void wifi_disconnect();
 void wifi_stop();
 wifi_ap_record_t* wifi_scan(int *num_networks);
+
+char* mask_wifi_password(const char *password);
 
 #endif

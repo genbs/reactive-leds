@@ -1,6 +1,4 @@
-/**
- * Comunication between client and worker
- */
+// Comunication between client and worker
 
 // Message types that the client can send to the worker
 export enum WorkerRequestType {

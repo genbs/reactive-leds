@@ -1,3 +1,4 @@
+#include "wifi.h"
 #include "ble.h"
 
 static uint16_t gatt_service_handle = 0;
@@ -36,7 +37,7 @@ void store_credentials(uint8_t *value, size_t len)
 {
     char buf[128] = {0};
     char ssid[32];
-    char password[64];
+    char password[WIFI_PASS_MAX_LEN];
 
     if (len < sizeof(buf)) {
         memcpy(buf, value, len);
@@ -52,7 +53,7 @@ void store_credentials(uint8_t *value, size_t len)
         return;
     }
 
-    ESP_LOGI(BLE_TAG, "Received: SSID='%s', PWD='%s'", ssid, password);
+    ESP_LOGI(BLE_TAG, "Received: SSID='%s', PWD='%s'", ssid, mask_wifi_password(password));
     storage_set("wifi", ssid, password);
 }
 

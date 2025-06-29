@@ -1,4 +1,6 @@
-import { logger } from "@shared"
+// Connects to a WebSocket server and handles messages and reconnections. Used by the deamon worker to communicate with the server.
+
+import { logger } from "@leds/shared"
 
 // Delay after closing the connection before trying to reconnect is 2 seconds * 30 retries = 60 seconds
 const WS_RECONNECTION_TIMEOUT = 2000
@@ -39,15 +41,15 @@ export default class WS {
 	 * Connects to the WebSocket server.
 	 */
 	public connect() {
-		logger.info("Connecting to", this.settings.url)
+		logger.info("[WS] Connecting to", this.settings.url)
 
 		if (this.socket) {
-			logger.warn("Warning: already connected, closing existing connection")
+			logger.warn("[WS] Warning: already connected, closing existing connection")
 			this.socket.close()
 		}
 
 		const onOpen = (e: Event) => {
-			logger.info("Connection established", e)
+			logger.debug("[WS] Connection established", e)
 
 			this.connected = true
 			this.retries = 0
@@ -59,12 +61,13 @@ export default class WS {
 			if (e.data.length <= 0) return
 
 			const data = new Uint8Array(e.data)
-			logger.debug("Received", data)
+			logger.debug("[WS] Received", data)
 
 			this.settings.onMessage?.(data)
 		}
 
 		this.socket = new WebSocket(this.settings.url)
+
 		this.socket.binaryType = "arraybuffer"
 		this.socket.addEventListener("open", onOpen)
 		this.socket.addEventListener("message", onMessage)
@@ -77,19 +80,19 @@ export default class WS {
 	}
 
 	public close() {
-		logger.info("Gracefully closing")
+		logger.info("[WS] Closing connection")
+
 		this.connected = false
 		this.socket?.close()
 	}
 
-	public send(payload) {
+	public send(payload: string | ArrayBufferLike | Blob | ArrayBufferView) {
 		if (!this.socket) {
-			logger.warn("Error: not connected, can't send message")
+			logger.error("[WS] Send error, not connected, can't send message")
 			return
 		}
 
-		logger.debug("Sending", payload)
-
+		logger.debug("[WS] Sending", payload)
 		this.socket.send(payload)
 	}
 
@@ -102,7 +105,7 @@ export default class WS {
 	 * @returns
 	 */
 	private onSocketClose(e: CloseEvent) {
-		logger.info("Connection closed", e)
+		logger.debug("[WS] Connection closed", e)
 
 		this.settings.onConnectionChange?.(false)
 
@@ -113,11 +116,11 @@ export default class WS {
 
 		if (shouldReconnect) {
 			if (this.retries >= WS_RECONNECTION_MAX_RETRIES) {
-				logger.info("Max retries reached, not reconnecting")
+				logger.info("[WS] Max retries reached, not reconnecting")
 				return
 			}
 
-			logger.info(`Reconnecting in ${WS_RECONNECTION_TIMEOUT / 1000}s...`)
+			logger.info(`[WS] Reconnecting in ${WS_RECONNECTION_TIMEOUT / 1000}s...`)
 			this.retries++
 			setTimeout(() => this.connect(), WS_RECONNECTION_TIMEOUT)
 		}

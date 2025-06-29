@@ -28,14 +28,14 @@ export const configCommand: Command = {
 		if (typeof key !== "undefined" && typeof value !== "undefined") {
 			const result = await proto.setConfig(ip as string, port as number, { ...config, [key as string]: value })
 			if (result) {
-				logger.info("Config updated successfully")
+				logger.log("Config updated successfully")
 			} else {
 				logger.error("Failed to update config")
 				status = false
 			}
 		}
 
-		logger.info(`Config: 
+		logger.log(`Config: 
 			\r\t- pin: ${config.pin}
 			\r\t- Num LEDs: ${config.num_leds}
 			\r\t- Brightness: ${config.brightness}
@@ -98,7 +98,7 @@ export const ledsCommand: Command = {
 		const data = new Uint8Array(ledData)
 		proto.setLEDs(ip as string, port as number, data)
 
-		logger.info("LEDs set successfully")
+		logger.log("LEDs set successfully")
 		process.exit(0)
 	},
 }

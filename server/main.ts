@@ -5,7 +5,7 @@ import serveCommand from "cmd/server"
 import { pingCommand, scanCommand } from "cmd/wifi"
 import { configCommand, ledsCommand } from "./cmd/device"
 
-logger.setLevel(LOG_LEVEL.DEBUG)
+logger.setLevel(LOG_LEVEL.ERROR)
 
 // create a list of commands
 const commands = [
@@ -28,7 +28,8 @@ if (process.argv.length < 3) {
 const commandName = process.argv[2]
 const command = commands.find(cmd => cmd.name === commandName)
 if (!command) {
-	logger.error(`Unknown command: ${commandName}`)
+	if (commandName !== "help") logger.log(`Unknown command: ${commandName}`)
+
 	help()
 
 	process.exit(0)
@@ -65,7 +66,7 @@ executeCommand(command, Object.values(validationResult.args))
 
 function help(commandName?: string) {
 	const command = commandName ? commands.find(cmd => cmd.name === commandName) : null
-	logger.info(command ? usage(command) : `Usage:\n\t- ${commands.map(shortUsage).join("\n\t- ")}`)
+	logger.log(command ? usage(command) : `Usage:\n\t- ${commands.map(shortUsage).join("\n\t- ")}`)
 }
 
 async function executeCommand(command: Command, args: any[]) {

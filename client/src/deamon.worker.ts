@@ -1,4 +1,4 @@
-import { LOG_LEVEL, logger } from "@shared"
+import { LOG_LEVEL, logger } from "@leds/shared"
 import { FALSE, TRUE, WorkerRequestType, WorkerRequestTypeMap } from "./comm"
 import WS from "./ws"
 
@@ -20,16 +20,21 @@ self.addEventListener("message", async (e: any) => {
 	const requestId = e.data[0]
 	const type = e.data[1]
 	const message = e.data.slice(2)
-	logger.debug(`[Worker] recv from client [${requestId}] ${WorkerRequestTypeMap[type]}`, message, logger.getLevel())
+	logger.debug(
+		`[Worker] recv from client [${requestId}] ${WorkerRequestTypeMap[type as WorkerRequestType]}`,
+		message,
+		logger.getLevel()
+	)
 
 	switch (type) {
 		// handle connection request [WorkerRequestType.Connect, serverUrl, debug]
 		case WorkerRequestType.Connect:
 			const debug = message[message.length - 1] === TRUE
-			console.log("RECEIVED DEBUG", debug, message[message.length - 1])
+			const serverUrl = String.fromCharCode(...message.slice(0, message.length - 1))
+
+			logger.debug(`[Worker] connect request to server="${serverUrl}" with debug=${debug}`)
 			logger.setLevel(debug ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR)
 
-			const serverUrl = String.fromCharCode(...message.slice(0, message.length - 1))
 			connectionChangeRequestId = requestId
 			ws.settings.url = serverUrl
 			ws.settings.debug = debug

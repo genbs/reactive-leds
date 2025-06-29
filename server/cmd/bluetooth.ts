@@ -17,7 +17,7 @@ export const btScanCommand: Command = {
 	execute: async () => {
 		const devices = await get_bluetooth_devices()
 		if (devices.length === 0) {
-			logger.info("No devices found")
+			logger.log("No devices found")
 		} else {
 			printDevices(devices)
 		}
@@ -33,8 +33,8 @@ export const btCredentialCommand: Command = {
 	name: "bt-credential",
 	description: "Send Wi-Fi credentials to a Bluetooth device",
 	args: [
-		{ name: "host", required: false },
-		{ name: "ssid", required: false },
+		{ name: "host", required: false, type: String },
+		{ name: "ssid", required: false, type: String, validator: (v: string) => v.length > 0 && v.length <= 32 },
 	],
 	execute: async (host, ssid) => {
 		const devices = await get_bluetooth_devices()
@@ -59,7 +59,7 @@ export const btCredentialCommand: Command = {
 				host = devices[index].advertisement.localName || devices[index].address
 			}
 
-			// otherwise host is localname
+			// otherwise host is a string representing the device name or address
 		}
 
 		const device = findDevice(devices, host as string)
@@ -85,7 +85,7 @@ export const btCredentialCommand: Command = {
 //////////
 
 function printDevices(devices: Peripheral[]) {
-	logger.info(
+	logger.log(
 		`Devices:\n${devices.map((d, i) => `${i + 1}) ${d.advertisement.localName || d.address || d.uuid}`).join("\n")}`
 	)
 }
@@ -167,7 +167,7 @@ async function scanDevices(timeout = SCAN_TIMEOUT): Promise<Peripheral[]> {
 
 		noble.on("discover", onDiscover)
 
-		logger.info("Scanning for devices...")
+		logger.log("Scanning for devices...")
 
 		setTimeout(() => {
 			noble.removeListener("discover", onDiscover)

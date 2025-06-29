@@ -41,10 +41,14 @@ void protocol_process_packet(udp_packet *packet)
     }
 }
 
+/**
+ * Protocol loop.
+ * Reads UDP packets and processes them if they are valid.
+ */
 void protocol_loop()
 {
     udp_packet *packet = udp_con_read();
-    if (is_valid_packet(packet, 2)) {
+    if (is_valid_packet(packet)) {
         ESP_LOGV(PROTOCOL_TAG, "Received %d bytes from %s:", packet->len, inet_ntoa(((struct sockaddr_in *)&packet->source_addr)->sin_addr));
         
         protocol_process_packet(packet);

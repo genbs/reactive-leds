@@ -6,6 +6,7 @@ export enum LOG_LEVEL {
 }
 
 interface OutputStream {
+	log: (...args: any[]) => void
 	debug: (...args: any[]) => void
 	info: (...args: any[]) => void
 	warn: (...args: any[]) => void
@@ -64,7 +65,7 @@ export interface Logger {
 	info: (...args: any[]) => void
 	warn: (...args: any[]) => void
 	error: (...args: any[]) => void
-	log: (level: LOG_LEVEL, ...args: any[]) => void
+	log: (...args: any[]) => void
 }
 
 const logger: Logger = {
@@ -110,24 +111,8 @@ const logger: Logger = {
 		}
 	},
 
-	log: (level: LOG_LEVEL, ...args: any[]) => {
-		if (logger.level <= level) {
-			const timestamp = getTimestamp()
-			switch (level) {
-				case LOG_LEVEL.DEBUG:
-					logger.outputStream.debug(createMessage(LOG_LEVEL.DEBUG, logger.options), ...args)
-					break
-				case LOG_LEVEL.INFO:
-					logger.outputStream.info(createMessage(LOG_LEVEL.INFO, logger.options), ...args)
-					break
-				case LOG_LEVEL.WARN:
-					logger.outputStream.warn(createMessage(LOG_LEVEL.WARN, logger.options), ...args)
-					break
-				case LOG_LEVEL.ERROR:
-					logger.outputStream.error(createMessage(LOG_LEVEL.ERROR, logger.options), ...args)
-					break
-			}
-		}
+	log: (...args: any[]) => {
+		logger.outputStream.log(createMessage(LOG_LEVEL.INFO, logger.options), ...args)
 	},
 }
 

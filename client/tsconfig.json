@@ -1,8 +1,10 @@
 {
+	"extends": "../tsconfig.json",
 	"compilerOptions": {
 		"composite": true,
 		"baseUrl": ".",
 		"outDir": "./dist",
+		"rootDir": "./",
 		"module": "ESNext",
 		"jsx": "react-jsx",
 		"target": "ESNext",

@@ -19,7 +19,7 @@ export const scanCommand: Command = {
 			})
 			.join("\n\t- ")}`
 
-		logger.info(message)
+		logger.log(message)
 	},
 }
 

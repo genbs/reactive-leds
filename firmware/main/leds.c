@@ -20,7 +20,7 @@ void leds_begin()
     }
     memset(leds, 0, sizeof(uint8_t) * config.num_leds * 4);
     
-    // Configure RMT
+    // Configure RMT (credits: https://github.com/espressif/esp-idf/blob/master/examples/peripherals/rmt/led_strip/main/led_strip_example_main.c)
     ESP_LOGV(LEDS_TAG, "Create RMT TX channel");
     rmt_tx_channel_config_t tx_chan_config = {
         .clk_src = RMT_CLK_SRC_DEFAULT, // select source clock
@@ -59,7 +59,7 @@ void leds_update(uint8_t pixel_index, uint8_t r, uint8_t g, uint8_t b, uint8_t w
         return;
     }
 
-    // The order of the data is W, R, G, B as required by the SK6812 chip specification  
+    // TODO: the order of colors might be different depending on the type of LED
     leds[pixel_index * 4] = w;
     leds[pixel_index * 4 + 1] = r;
     leds[pixel_index * 4 + 2] = g;

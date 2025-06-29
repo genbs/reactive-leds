@@ -18,10 +18,6 @@
         "typescript": "^5.4.5"
     },
     "jest": {
-        "preset": "ts-jest",
-        "testMatch": [
-            "**/__tests__/**/*.ts",
-            "**/?(*.)+(spec|test).ts"
-        ]
+        "preset": "ts-jest"
     }
 }

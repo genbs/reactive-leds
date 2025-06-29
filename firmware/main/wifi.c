@@ -91,21 +91,7 @@ void wifi_init_sta()
 
 void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
 {   
-    char wifi_pass_hidden[WIFI_PASS_MAX_LEN + 1]; // +1 per il carattere null
-    size_t pass_len = strlen(WIFI_PASS);
-
-    // Controlla la lunghezza della password per un mascheramento sicuro
-    if (pass_len <= 4) { // Se la password è 4 caratteri o meno, la mascheriamo completamente
-                         // Puoi decidere tu la soglia, es. 3, 5, ecc.
-        snprintf(wifi_pass_hidden, sizeof(wifi_pass_hidden), "********"); // O "---" o solo "***"
-    } else {
-        // Mostra i primi 3 caratteri, puntini, e l'ultimo carattere
-        // Es: "abc...z" per una password lunga
-        snprintf(wifi_pass_hidden, sizeof(wifi_pass_hidden), "%.3s...%c", 
-                 WIFI_PASS, WIFI_PASS[pass_len - 1]);
-    }
-    
-    ESP_LOGV(WIFI_TAG, "Connecting to WiFi network: %s-%s", WIFI_SSID, wifi_pass_hidden);
+    ESP_LOGV(WIFI_TAG, "Connecting to WiFi network: %s-%s", WIFI_SSID, mask_wifi_password(WIFI_PASS));
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
@@ -186,4 +172,18 @@ wifi_ap_record_t* wifi_scan(int *num_networks) {
     ESP_LOGI(WIFI_TAG, "WiFi scan complete, found %d networks", ap_num);
     
     return ap_records;
+}
+
+char* mask_wifi_password(const char *password) {
+    static char masked_password[WIFI_PASS_MAX_LEN + 1]; 
+    size_t pass_len = strlen(password);
+
+    if (pass_len <= 4) {
+        snprintf(masked_password, sizeof(masked_password), "********");
+    } else {
+        snprintf(masked_password, sizeof(masked_password), "%.3s...%c", 
+                 password, password[pass_len - 1]);
+    }
+    
+    return masked_password;
 }

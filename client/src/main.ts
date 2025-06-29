@@ -7,7 +7,7 @@
  * The packets must be sent to the server through the worker, so the packet needs to be modified by adding an enumerator
  * that helps the worker understand what to do with the message, whether to handle it internally (like a 'connect' request) or route it to the server.
  */
-import { addressToBuffer, bufferToConfig, Config, DeviceAddress, LOG_LEVEL, logger, PacketType } from "../../shared"
+import { addressToBuffer, bufferToConfig, Config, DeviceAddress, LOG_LEVEL, logger, PacketType } from "@leds/shared"
 import { FALSE, TRUE, WorkerRequestType } from "./comm"
 import { mapPixels } from "./mapping"
 import { connect, send, sendSync } from "./proxy"

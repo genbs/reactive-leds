@@ -6,6 +6,7 @@ describe("Logger", () => {
 		info: jest.Mock
 		warn: jest.Mock
 		error: jest.Mock
+		log: jest.Mock
 	}
 
 	// Before each test, reset the mock stream and the logger's output and level.
@@ -15,6 +16,7 @@ describe("Logger", () => {
 			info: jest.fn(),
 			warn: jest.fn(),
 			error: jest.fn(),
+			log: jest.fn(),
 		}
 		logger.setOutputStream(stream)
 
@@ -156,6 +158,7 @@ describe("Logger", () => {
 			info: jest.fn(),
 			warn: jest.fn(),
 			error: jest.fn(),
+			log: jest.fn(),
 		}
 		logger.setOutputStream(customStream)
 		// Ensure the level allows logging info.

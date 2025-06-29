@@ -22,8 +22,8 @@ typedef struct {
     socklen_t socklen;
 } udp_packet;
 
-static inline bool is_valid_packet(udp_packet *packet, size_t min_length) {
-    return packet != NULL && packet->len >= min_length;
+static inline bool is_valid_packet(udp_packet *packet) {
+    return packet != NULL && packet->len >= 2; // At least 2 bytes: message_id and command
 }
 
 bool udp_con_begin(uint16_t port);

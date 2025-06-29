@@ -7,7 +7,7 @@
         "start": "ts-node -r tsconfig-paths/register ./main.ts",
         "test": "jest"
     },
-    "main": "./main.ts",
+    "main": "./dist/main.js",
     "license": "ISC",
     "devDependencies": {
         "@jest/globals": "^29.7.0",
