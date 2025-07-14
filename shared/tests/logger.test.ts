@@ -18,20 +18,20 @@ describe("Logger", () => {
 			error: jest.fn(),
 			log: jest.fn(),
 		}
-		logger.setOutputStream(stream)
+		logger.outputStream = stream
 
 		// Reset the logger level to INFO before each test to ensure a clean slate.
-		logger.setLevel(LOG_LEVEL.INFO)
+		logger.level = LOG_LEVEL.INFO
 
-		logger.setOptions() // reset options to default
+		logger.options = {} // reset options to default
 	})
 
 	test("should display messages according to the set level", () => {
-		logger.setOptions({
+		logger.options = {
 			colors: false,
 			timestamp: false,
 			level: false,
-		})
+		}
 
 		// Default level is INFO, so debug messages should be hidden.
 		logger.debug("This is a debug message")
@@ -55,13 +55,13 @@ describe("Logger", () => {
 	})
 
 	test("should display all messages when the level is DEBUG", () => {
-		logger.setOptions({
+		logger.options = {
 			colors: false,
 			timestamp: false,
 			level: false,
-		})
+		}
 
-		logger.setLevel(LOG_LEVEL.DEBUG)
+		logger.level = LOG_LEVEL.DEBUG
 
 		// All log levels should be displayed.
 		logger.debug("Debug message")
@@ -84,13 +84,13 @@ describe("Logger", () => {
 	})
 
 	test("should hide DEBUG and INFO messages when the level is WARN", () => {
-		logger.setOptions({
+		logger.options = {
 			colors: false,
 			timestamp: false,
 			level: false,
-		})
+		}
 
-		logger.setLevel(LOG_LEVEL.WARN)
+		logger.level = LOG_LEVEL.WARN
 
 		// DEBUG and INFO messages should be hidden.
 		logger.debug("Debug message, should be hidden")
@@ -114,13 +114,13 @@ describe("Logger", () => {
 	})
 
 	test("should only show ERROR messages when the level is ERROR", () => {
-		logger.setOptions({
+		logger.options = {
 			colors: false,
 			timestamp: false,
 			level: false,
-		})
+		}
 
-		logger.setLevel(LOG_LEVEL.ERROR)
+		logger.level = LOG_LEVEL.ERROR
 
 		// DEBUG, INFO, and WARN messages should be hidden.
 		logger.debug("Debug message, should be hidden")
@@ -145,11 +145,11 @@ describe("Logger", () => {
 
 	test("should return the current log level", () => {
 		// Initial level after beforeEach is INFO.
-		expect(logger.getLevel()).toBe(LOG_LEVEL.INFO)
+		expect(logger.level).toBe(LOG_LEVEL.INFO)
 
 		// Verify level after setting it to ERROR.
-		logger.setLevel(LOG_LEVEL.ERROR)
-		expect(logger.getLevel()).toBe(LOG_LEVEL.ERROR)
+		logger.level = LOG_LEVEL.ERROR
+		expect(logger.level).toBe(LOG_LEVEL.ERROR)
 	})
 
 	test("should allow changing the output stream", () => {
@@ -160,15 +160,15 @@ describe("Logger", () => {
 			error: jest.fn(),
 			log: jest.fn(),
 		}
-		logger.setOutputStream(customStream)
+		logger.outputStream = customStream
 		// Ensure the level allows logging info.
-		logger.setLevel(LOG_LEVEL.INFO)
+		logger.level = LOG_LEVEL.INFO
 
-		logger.setOptions({
+		logger.options = {
 			colors: false,
 			timestamp: false,
 			level: false,
-		})
+		}
 
 		logger.info("Message on custom stream")
 		expect(customStream.info).toHaveBeenCalledWith("%s", "Message on custom stream")
@@ -178,19 +178,19 @@ describe("Logger", () => {
 	})
 
 	test("should handle custom options", () => {
-		logger.setOptions({
+		logger.options = {
 			colors: false,
 			timestamp: false,
 			level: true,
-		})
-		logger.setLevel(LOG_LEVEL.DEBUG)
+		}
+		logger.level = LOG_LEVEL.DEBUG
 
-		logger.setOutputStream(stream)
+		logger.outputStream = stream
 
 		logger.debug("Custom debug message")
 		expect(stream.debug).toHaveBeenCalledWith("[DEBUG] %s", "Custom debug message")
 
-		logger.setOptions({
+		logger.options = {
 			colors: {
 				[LOG_LEVEL.DEBUG]: "36",
 				[LOG_LEVEL.INFO]: "37",
@@ -199,7 +199,7 @@ describe("Logger", () => {
 			},
 			timestamp: false,
 			level: true,
-		})
+		}
 
 		logger.debug("Custom debug message with options")
 		expect(stream.debug).toHaveBeenCalledWith("\x1b[36m[DEBUG] %s\x1b[0m", "Custom debug message with options")

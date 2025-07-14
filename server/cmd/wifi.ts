@@ -23,6 +23,24 @@ export const scanCommand: Command = {
 	},
 }
 
+export const pingCommand: Command = {
+	name: "ping",
+	description: "Ping a device over Wi-Fi",
+
+	args: [
+		{ name: "ip", required: true, validator: validateIP },
+		{ name: "port", type: Number, required: false, default: 4210, validator: validatePort },
+	],
+
+	execute: async (ip, port) => {
+		const pingResult = await proto.ping(ip as string, port as number)
+
+		logger.log(pingResult ? "Device is online" : "Device is offline")
+	},
+}
+
+////////////////////////////
+
 type ScanResult = {
 	ip: string
 	mac: string
@@ -60,20 +78,4 @@ function scan(port: number): Promise<ScanResult[]> {
 			resolve(devices.filter(Boolean) as ScanResult[])
 		})
 	})
-}
-
-export const pingCommand: Command = {
-	name: "ping",
-	description: "Ping a device over Wi-Fi",
-
-	args: [
-		{ name: "ip", required: true, validator: validateIP },
-		{ name: "port", type: Number, required: false, default: 4210, validator: validatePort },
-	],
-
-	execute: async (ip, port) => {
-		const pingResult = await proto.ping(ip as string, port as number)
-
-		logger.info(pingResult ? "Device is online" : "Device is offline")
-	},
 }

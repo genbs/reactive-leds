@@ -10,7 +10,7 @@ bool protocol_begin() {
         return false;
     }
 
-    if (udp_con_begin(4210)) {
+    if (udp_con_begin(config.port)) {
         leds_begin();
 
         return 1;
@@ -126,9 +126,7 @@ void protocol_set_config(udp_packet *packet)
     {
         protocol_response[2] = 1;
         ESP_LOGV(PROTOCOL_TAG, "SET_CONFIG: Configuration saved successfully");
-        // TODO: update stripe service or restart
-        //strip_update(config.num_leds, config.brightness);
-    }
+        // TODO: restart device
     else
     {
         protocol_response[2] = 0;

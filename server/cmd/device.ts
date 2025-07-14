@@ -1,4 +1,4 @@
-import { logger } from "@leds/shared"
+import { availableConfigKeys, logger } from "@leds/shared"
 import { Command } from "cmd"
 import { validateIP, validatePort } from "utils"
 import proto from "../protocol"
@@ -21,17 +21,17 @@ export const configCommand: Command = {
 	execute: async (ip, port, key?, value?) => {
 		const config = await proto.getConfig(ip as string, port as number)
 		if (!config) {
-			throw new Error(`Failed to get config for ${ip}:${port}`)
+			logger.log(`Failed to get config for ${ip}:${port}`)
+			return false
 		}
 
-		let status = true
 		if (typeof key !== "undefined" && typeof value !== "undefined") {
 			const result = await proto.setConfig(ip as string, port as number, { ...config, [key as string]: value })
 			if (result) {
 				logger.log("Config updated successfully")
 			} else {
-				logger.error("Failed to update config")
-				status = false
+				logger.log("Failed to update config")
+				return false
 			}
 		}
 
@@ -42,14 +42,37 @@ export const configCommand: Command = {
 			\r\t- Port: ${config.port}
 			\r\t- Hostname: ${config.hostname}
 		`)
-
-		return status
 	},
 }
 
-const availableConfigKeys = ["hostname", "pin", "num_leds", "port", "brightness"] // TODO: I don't like them being static here.
+export const ledsCommand: Command = {
+	name: "leds",
+	description:
+		"Set the LEDs on the device at <ip>:<port>.\nThe <led_package> argument must be a comma-separated list of values in the format <led_index>,<r>,<g>,<b>,<brightness/whiteness>.",
+	examples: ["leds 192.168.1.1 4210 0,255,0,128,0,1,0,255,128,0"],
+	args: [
+		{ required: true, name: "ip", type: String, validator: validateIP },
+		{ required: false, name: "udp_port", type: Number, validator: validatePort, default: 4210 },
+		{
+			required: true,
+			name: "leds_package",
+			type: String /* by now array is not supported */,
+			validator: validateLedsPackage,
+		},
+	],
+	execute: async (ip, port, ledsPackage) => {
+		const ledData = (ledsPackage as string).split(",").map(Number) // validated
 
-function validateConfigKey(key: string): boolean {
+		const data = new Uint8Array(ledData)
+		proto.setLEDs(ip as string, port as number, data)
+
+		logger.log("LEDs request sent")
+	},
+}
+
+//////////////////////
+
+function validateConfigKey(key: (typeof availableConfigKeys)[number]): boolean {
 	return !!(key && availableConfigKeys.includes(key))
 }
 
@@ -75,32 +98,6 @@ function validateConfigValue(key: string, value: string): boolean | string {
 	}
 
 	return true
-}
-
-export const ledsCommand: Command = {
-	name: "leds",
-	description:
-		"Set the LEDs on the device at <ip>:<port>.\nThe <led_package> argument must be a comma-separated list of values in the format <led_index>,<r>,<g>,<b>,<brightness/whiteness>.",
-	examples: ["leds 192.168.1.1 4210 0,255,0,128,0,1,0,255,128,0"],
-	args: [
-		{ required: true, name: "ip", type: String, validator: validateIP },
-		{ required: false, name: "udp_port", type: Number, validator: validatePort, default: 4210 },
-		{
-			required: true,
-			name: "leds_package",
-			type: String /* by now array is not supported */,
-			validator: validateLedsPackage,
-		},
-	],
-	execute: async (ip, port, ledsPackage) => {
-		const ledData = (ledsPackage as string).split(",").map(Number) // validated
-
-		const data = new Uint8Array(ledData)
-		proto.setLEDs(ip as string, port as number, data)
-
-		logger.log("LEDs set successfully")
-		process.exit(0)
-	},
 }
 
 function validateLedsPackage(ledsPackage: string): boolean | string {

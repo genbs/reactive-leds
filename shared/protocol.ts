@@ -51,6 +51,8 @@ export type Config = {
 	brightness: number // default 255
 }
 
+export const availableConfigKeys: (keyof Config)[] = ["hostname", "pin", "num_leds", "port", "brightness"] as const
+
 export type LEDs = Uint8Array // [pixel_index, r, g, b, b/w, pixel_index, r, g, b, b/w, ...] (5 bytes per LED)
 
 // Used by the device to send the response status
@@ -59,7 +61,8 @@ export enum PacketStatus {
 	ERROR = 0,
 }
 
-export type DeviceAddress = string | Uint8Array // [number, number, number, number]
+export type DeviceIP = string | [number, number, number, number]
+export type DeviceAddress = Uint8Array // [number, number, number, number, number, number]
 
 export const EMPTY_PACKET_ID = 0
 
@@ -113,15 +116,22 @@ export function configToBuffer(config: Config, dest?: Uint8Array): Uint8Array {
 	return packet
 }
 
-// convert ip and port to a buffer
-export function addressToBuffer(ip: DeviceAddress, port: number, dest?: Uint8Array): Uint8Array {
+/**
+ * Convert address (ip + port) to buffer, not validating input
+ */
+export function addressToBuffer(ip: DeviceIP, port: number, dest?: DeviceAddress): DeviceAddress {
 	const buffer = dest || new Uint8Array(6) // 4 bytes for IP + 2 bytes for port
-	const parts = typeof ip === "string" ? ip.split(".") : ip
 
-	buffer[0] = +parts[0]
-	buffer[1] = +parts[1]
-	buffer[2] = +parts[2]
-	buffer[3] = +parts[3]
+	if (typeof ip === "string") {
+		const parts = ip.split(".")
+		buffer[0] = +parts[0] // Il '+' converte la stringa in numero
+		buffer[1] = +parts[1]
+		buffer[2] = +parts[2]
+		buffer[3] = +parts[3]
+	} else {
+		buffer.set(ip, 0)
+	}
+
 	buffer[4] = (port >> 8) & 0xff
 	buffer[5] = port & 0xff
 

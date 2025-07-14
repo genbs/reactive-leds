@@ -15,14 +15,12 @@ export const btScanCommand: Command = {
 	description: "Find devices over Bluetooth",
 	args: [],
 	execute: async () => {
-		const devices = await get_bluetooth_devices()
+		const devices = await scanDevices()
 		if (devices.length === 0) {
 			logger.log("No devices found")
 		} else {
 			printDevices(devices)
 		}
-
-		process.exit(0)
 	},
 }
 
@@ -37,10 +35,10 @@ export const btCredentialCommand: Command = {
 		{ name: "ssid", required: false, type: String, validator: (v: string) => v.length > 0 && v.length <= 32 },
 	],
 	execute: async (host, ssid) => {
-		const devices = await get_bluetooth_devices()
+		const devices = await scanDevices()
 		if (devices.length === 0) {
-			console.error("No devices found")
-			process.exit(1)
+			logger.log("No devices found")
+			return false
 		}
 
 		// if host is not provided, prompt for it
@@ -52,20 +50,20 @@ export const btCredentialCommand: Command = {
 			if (!isNaN(Number(host))) {
 				const index = Number(host) - 1
 				if (index < 0 || index >= devices.length) {
-					console.error("Device not found")
-					process.exit(1)
+					logger.log("Device not found")
+					return false
 				}
-
-				host = devices[index].advertisement.localName || devices[index].address
+				host = devices[index].advertisement.localName || devices[index].address || devices[index].uuid
 			}
 
 			// otherwise host is a string representing the device name or address
 		}
 
+		console.log(host)
 		const device = findDevice(devices, host as string)
 		if (!device) {
-			console.error(`Device ${host} not found`)
-			process.exit(1)
+			logger.log(`Device ${host} not found`)
+			return false
 		}
 
 		if (!ssid) ssid = await ask("Insert SSID: ")
@@ -73,12 +71,14 @@ export const btCredentialCommand: Command = {
 
 		if (!ssid || !password) {
 			console.error("Invalid credentials")
-			process.exit(1)
+			return false
 		}
 
-		await send_bluetooth_credentials(device, ssid as string, password)
-
-		process.exit(0)
+		try {
+			await sendBluetoothCredentials(device, ssid as string, password)
+		} catch {
+			return false
+		}
 	},
 }
 
@@ -94,22 +94,19 @@ function findDevice(devices: Peripheral[], host: string): Peripheral | undefined
 	host = host.toLowerCase()
 	return devices.find(
 		d =>
-			d.advertisement.localName.toLowerCase().indexOf(host) !== -1 ||
+			d.advertisement.localName?.toLowerCase().indexOf(host) !== -1 ||
 			d.address.toLowerCase().indexOf(host) !== -1 ||
 			d.uuid.toLowerCase().indexOf(host) !== -1
 	)
 }
 
-export async function get_bluetooth_devices() {
-	return scanDevices()
-}
-
-export async function send_bluetooth_credentials(peripheral: Peripheral, ssid: string, password: string) {
+async function sendBluetoothCredentials(peripheral: Peripheral, ssid: string, password: string) {
 	logger.debug(
 		`Sending credentials (${ssid}:${password.replace(/./g, "*")}) to ${
 			peripheral.advertisement.localName || peripheral.address
 		}`
 	)
+
 	try {
 		await startBLE()
 
@@ -133,16 +130,17 @@ export async function send_bluetooth_credentials(peripheral: Peripheral, ssid: s
 		await wifiCharacteristic.writeAsync(data, false)
 
 		await peripheral.disconnectAsync()
-	} catch (error: any) {
-		logger.error(`Failed to send Bluetooth credentials: ${error.message}`)
+	} catch {
+		logger.error(`Failed to send Bluetooth credentials`)
+		return false
 	}
 	return true
 }
 
-let _bluetooth_started: Promise<void> | undefined
+let bluetooth_started: Promise<void> | undefined
 async function startBLE() {
-	if (!_bluetooth_started) {
-		_bluetooth_started = new Promise<void>(resolve => {
+	if (!bluetooth_started) {
+		bluetooth_started = new Promise<void>(resolve => {
 			noble.on("stateChange", state => {
 				const ok = state === "poweredOn"
 				if (!ok) throw new Error("Bluetooth not available")
@@ -152,7 +150,7 @@ async function startBLE() {
 		})
 	}
 
-	return _bluetooth_started
+	return bluetooth_started
 }
 
 async function scanDevices(timeout = SCAN_TIMEOUT): Promise<Peripheral[]> {

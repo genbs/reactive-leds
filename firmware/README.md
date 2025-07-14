@@ -1,20 +1,66 @@
 # Firmware
 
+```mermaid
+graph TD
+    subgraph Initialization
+        A((Firmware Start)) --> B{Scan for known Wi-Fi networks};
+        B -- Network Found --> C[Connect to Wi-Fi];
+        B -- Not Found --> D[Start BLE Service];
+        D --> E[Wait for Wi-Fi credentials via BLE];
+        E --> C;
+    end
+
+    subgraph "UDP Runtime Loop"
+        C --> F[Initialize UDP Server & LEDs<br><br><span style='font-family: monospace; font-size: 0.9em;'>protocol_begin()</span>];
+        F --> G{Enter Main Loop<br><br><span style='font-family: monospace; font-size: 0.9em;'>protocol_loop()</span>};
+        G --> H[Read UDP Packet];
+        H --> I{Is packet valid?};
+        I -- No --> G;
+        I -- Yes --> J[Process Packet by Type<br><br><span style='font-family: monospace; font-size: 0.9em;'>protocol_process_packet()</span>];
+    end
+
+    subgraph "UDP Message Handling"
+        J -- PING --> K[<b>PING</b><br>Respond with PONG];
+        J -- GET_CONFIG --> L[<b>GET_CONFIG</b><br>Respond with device configuration];
+        J -- SET_CONFIG --> M[<b>SET_CONFIG</b><br>Update & save config, then respond];
+        J -- SET_LEDS --> N[<b>SET_LEDS</b><br>Update LED strip colors];
+    end
+
+    K --> G;
+    L --> G;
+    M --> G;
+    N --> G;
+```
+
 ## Requirements
 
 - CMake
 - Python 3
 - [ESP-IDF](https://github.com/espressif/esp-idf) - [Installation guide](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/index.html#installation)
 
-## Build
+## Config & Build
 
-Menuconfig
+⚠️ Note: I'm primarily a software developer, not a firmware expert. The following configuration is tested for my ESP32-S3 device. Suggestions are welcome
 
-enable:
+1. Menuconfig
+   Run idf.py menuconfig and enable the following option:
 
-- BLE_42_FEATURE_SUPPORT
+Component config -> Bluetooth -> Bluedroid Options -> [*] BLE_42_FEATURE_SUPPORT
 
-## Config
+2. Build the project
+
+```bash
+idf.py build
+```
+
+3. Flash the device
+
+```bash
+# Replace /dev/tty.usbmodem1101 with your device's port
+idf.py -p /dev/tty.usbmodem1101 flash
+```
+
+### VSCode configuration
 
 .vscode/c_cpp_properties.json
 
@@ -49,8 +95,6 @@ enable:
 	"idf.flashType": "UART"
 }
 ```
-
-## Protocol
 
 ## TODO
 

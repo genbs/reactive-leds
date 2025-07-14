@@ -14,9 +14,9 @@
 
 #define TAG "MAIN"
 
-#define CHECK_CONNECTED_TIMEOUT 100 // check in 100 ms if wifi/ble is connected
-#define WIFI_CONNECT_TIMEOUT 20000 // 20 seconds to connect to wifi
-#define BLE_TIMEOUT_MS 30000 // Reboot after 30 seconds if no BLE connection is established
+#define CHECK_CONNECTED_TIMEOUT 100 // delay to check if wifi/ble is connected
+#define WIFI_CONNECT_TIMEOUT 20000 // Timeout to enstablish wifi connection
+#define BLE_TIMEOUT_MS 30000 // Reboot if no BLE connection is established
 
 // current wifi credentials
 typedef struct {
@@ -78,7 +78,7 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
             ESP_LOGW(TAG, "Failed to connect to %s", credentials->ssid);
 
             // TODO: remove the network from the known networks, maybe the password is wrong
-            //storage_delete("wifi", scanned_ssid);
+            // storage_delete("wifi", scanned_ssid);
         } else {
             ESP_LOGI(TAG, "Network %s is unknown", scanned_ssid);
         }

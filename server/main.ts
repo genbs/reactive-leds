@@ -5,7 +5,7 @@ import serveCommand from "cmd/server"
 import { pingCommand, scanCommand } from "cmd/wifi"
 import { configCommand, ledsCommand } from "./cmd/device"
 
-logger.setLevel(LOG_LEVEL.ERROR)
+logger.level = LOG_LEVEL.ERROR
 
 // create a list of commands
 const commands = [
@@ -70,10 +70,13 @@ function help(commandName?: string) {
 }
 
 async function executeCommand(command: Command, args: any[]) {
-	try {
-		await command.execute(...args)
-	} catch (error: Error | any) {
-		logger.error(`Failed to execute command ${command.name}:\n${error.message}`)
+	const result = await command.execute(...args)
+	if (result) {
+		logger.log(`Command ${command.name} executed succesfully`)
+		//process.exit(0)
+	} else {
+		logger.error(`Failed to execute command ${command.name}`)
+		//process.exit(1)
 	}
 
 	process.exit(0)

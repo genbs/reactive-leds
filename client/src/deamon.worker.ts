@@ -23,7 +23,7 @@ self.addEventListener("message", async (e: any) => {
 	logger.debug(
 		`[Worker] recv from client [${requestId}] ${WorkerRequestTypeMap[type as WorkerRequestType]}`,
 		message,
-		logger.getLevel()
+		logger.level
 	)
 
 	switch (type) {
@@ -33,7 +33,7 @@ self.addEventListener("message", async (e: any) => {
 			const serverUrl = String.fromCharCode(...message.slice(0, message.length - 1))
 
 			logger.debug(`[Worker] connect request to server="${serverUrl}" with debug=${debug}`)
-			logger.setLevel(debug ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR)
+			logger.level = debug ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR
 
 			connectionChangeRequestId = requestId
 			ws.settings.url = serverUrl

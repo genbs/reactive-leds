@@ -38,6 +38,8 @@ const defaultOptions: LoggerOptions = {
 }
 
 function createMessage(level: LOG_LEVEL, options: LoggerOptions) {
+	options = { ...defaultOptions, ...options }
+
 	const colors =
 		typeof options.colors === "string"
 			? {
@@ -55,12 +57,9 @@ function createMessage(level: LOG_LEVEL, options: LoggerOptions) {
 
 export interface Logger {
 	options: LoggerOptions
-	setOptions: (options?: Partial<LoggerOptions>) => void
 	level: LOG_LEVEL
-	setLevel: (level: LOG_LEVEL) => void
-	getLevel: () => LOG_LEVEL
 	outputStream: OutputStream
-	setOutputStream: (stream: OutputStream) => void
+
 	debug: (...args: any[]) => void
 	info: (...args: any[]) => void
 	warn: (...args: any[]) => void
@@ -70,22 +69,8 @@ export interface Logger {
 
 const logger: Logger = {
 	options: defaultOptions,
-
-	setOptions: (options: Partial<typeof logger.options> = defaultOptions) => {
-		logger.options = { ...logger.options, ...options }
-	},
-
 	level: LOG_LEVEL.INFO,
-	setLevel: (level: LOG_LEVEL) => {
-		logger.level = level
-	},
-
-	getLevel: () => logger.level,
-
 	outputStream: console as OutputStream,
-	setOutputStream: (stream: OutputStream) => {
-		logger.outputStream = stream
-	},
 
 	debug: (...args: any[]) => {
 		if (logger.level <= LOG_LEVEL.DEBUG) {
