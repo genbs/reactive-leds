@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "string.h"
 
 #include "storage.h"
 #include "wifi.h"
@@ -16,7 +17,7 @@
 
 #define CHECK_CONNECTED_TIMEOUT 100 // delay to check if wifi/ble is connected
 #define WIFI_CONNECT_TIMEOUT 20000 // Timeout to enstablish wifi connection
-#define BLE_TIMEOUT_MS 30000 // Reboot if no BLE connection is established
+#define BLE_TIMEOUT_MS 60000 // Reboot if no BLE connection is established
 
 // current wifi credentials
 typedef struct {
@@ -41,6 +42,7 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
     
     if (num_networks <= 0) {
         ESP_LOGI(TAG, "No networks found.");
+        free(networks);
         return false;
     }
 
@@ -69,6 +71,7 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
             while (esp_log_timestamp() - start < WIFI_CONNECT_TIMEOUT) {
                 if (wifi_connected()) {
                     ESP_LOGI(TAG, "Connected to %s", credentials->ssid);
+                    free(networks);
                     return true;
                 }
 
@@ -83,7 +86,8 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
             ESP_LOGI(TAG, "Network %s is unknown", scanned_ssid);
         }
     }
-
+    
+    free(networks);
     return false;
 }
 
@@ -109,6 +113,8 @@ void ble_configuration_loop() {
 void app_protocol_loop(void *param) {
     while (1) {
         protocol_loop();
+
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -190,7 +196,7 @@ void app_main(void)
     xTaskCreatePinnedToCore(wifi_reconnect_task, "wifi_reconnect_task", 4096, &credentials, 1, NULL, 1);
 
     // Create a task to monitor the protocol
-    xTaskCreatePinnedToCore(app_protocol_loop, "app_protocol_loop", 4096, NULL, 7, NULL, 0);
+    xTaskCreatePinnedToCore(app_protocol_loop, "app_protocol_loop", 4096, NULL, 5, NULL, 0);
     
     // Delete the main task
     vTaskDelete(NULL);

@@ -47,6 +47,15 @@ graph TD
 
 Component config -> Bluetooth -> Bluedroid Options -> [*] BLE_42_FEATURE_SUPPORT
 
+Setup the "Device configuration"
+
+- Pin: GPIO pin connected to the LED strip (default: 4)
+- Number of LEDs: Number of LEDs in the strip (default: 60)
+- Brightness: Brightness level (0-255, default: 128)
+- Port: UDP port for communication (default: 12345)
+
+NOTE: The hostname is set to CONFIG_LWIP_LOCAL_HOSTNAME, the default is "espressif".
+
 2. Build the project
 
 ```bash

@@ -1,44 +1,37 @@
 #include "protocol.h"
 
+#include "config.h"
+#include "udp_con.h"
+#include "leds.h"
+#include "esp_log.h"
+#include <string.h>
+#include <arpa/inet.h>
 
-uint8_t *protocol_response = NULL;
+#define PROTOCOL_TAG "PROTOCOL"
+
+static udp_packet s_packet_buffer;
+
+enum ProtocolMessageType
+{
+    PING = 0,
+    GET_CONFIG = 1,
+    SET_CONFIG = 2,
+    SET_LEDS = 3,
+};
+
+static bool is_protocol_packet_valid(const udp_packet* packet);
+static void protocol_process_packet(udp_packet* packet);
+static void protocol_ping(const udp_packet* request);
+static void protocol_get_config(const udp_packet* request);
+static void protocol_set_config(const udp_packet* request);
+static void protocol_set_leds(const udp_packet* request);
 
 bool protocol_begin() {
-    protocol_response = (uint8_t *)malloc(1 + 1 + config.num_leds * 5);
-    if (protocol_response == NULL) {
-        ESP_LOGE(PROTOCOL_TAG, "Failed to allocate memory for protocol response");
-        return false;
-    }
-
     if (udp_con_begin(config.port)) {
-        leds_begin();
-
-        return 1;
+        return leds_begin();
     }
 
-    return 0;
-}
-
-void protocol_process_packet(udp_packet *packet)
-{
-    switch (packet->data[1])
-    {
-    case PING:
-        protocol_ping(packet);
-        break;
-    case GET_CONFIG:
-        protocol_get_config(packet);
-        break;
-    case SET_CONFIG:
-        protocol_set_config(packet);
-        break;
-    case SET_LEDS:
-        protocol_set_leds(packet);
-        break;
-    default:
-        ESP_LOGW(PROTOCOL_TAG, "Unknown message type");
-        break;
-    }
+    return false;
 }
 
 /**
@@ -47,123 +40,125 @@ void protocol_process_packet(udp_packet *packet)
  */
 void protocol_loop()
 {
-    udp_packet *packet = udp_con_read();
-    if (is_valid_packet(packet)) {
-        ESP_LOGV(PROTOCOL_TAG, "Received %d bytes from %s:", packet->len, inet_ntoa(((struct sockaddr_in *)&packet->source_addr)->sin_addr));
-        
-        protocol_process_packet(packet);
-    } 
+    if (udp_con_read(&s_packet_buffer)) {
+        if (is_protocol_packet_valid(&s_packet_buffer)) {
+            ESP_LOGV(PROTOCOL_TAG, "Received %d valid bytes.", s_packet_buffer.len);
+            protocol_process_packet(&s_packet_buffer);
+        } else {
+            ESP_LOGW(PROTOCOL_TAG, "Received invalid packet of size %d.", s_packet_buffer.len);
+        }
+    }
 }
 
+static bool is_protocol_packet_valid(const udp_packet* packet) {
+    return packet != NULL && packet->len >= 2; // At least 2 bytes: message_id and command
+}
+
+static void protocol_process_packet(udp_packet* packet)
+{
+    switch (packet->data[1]) { // The second byte is the command
+        case PING:       protocol_ping(packet); break;
+        case GET_CONFIG: protocol_get_config(packet); break;
+        case SET_CONFIG: protocol_set_config(packet); break;
+        case SET_LEDS:   protocol_set_leds(packet); break;
+        default:         ESP_LOGW(PROTOCOL_TAG, "Unknown message type: %d", packet->data[1]); break;
+    }
+}
 
 /**
  * When receving [PACKET_ID, PING], respond with [PACKET_ID, PING, 1]
  */
-void protocol_ping(udp_packet *packet)
+static void protocol_ping(const udp_packet* request)
 {
     ESP_LOGV(PROTOCOL_TAG, "PING");
 
-    // PONG
-    protocol_response[0] = packet->data[0]; // PACKET_ID
-    protocol_response[1] = PING; 
-    protocol_response[2] = 1; 
+    udp_packet response;
+    response.source_addr = request->source_addr; // L'indirizzo di destinazione è la sorgente della richiesta
 
-    udp_con_send(protocol_response, 3, &packet->source_addr);
+    response.data[0] = request->data[0]; // Ripeti il PACKET_ID
+    response.data[1] = PING;
+    response.data[2] = 1; // PONG
+    response.len = 3;
+
+    udp_con_send(&response);
 }
 
 
-void protocol_get_config(udp_packet *packet)
+static void protocol_get_config(const udp_packet* request)
 {
     ESP_LOGV(PROTOCOL_TAG, "GET_CONFIG");
 
-    uint8_t *data = packet->data;
-
-    protocol_response[0] = data[0];
-    protocol_response[1] = GET_CONFIG;
-    protocol_response[2] = config.pin; 
-    protocol_response[3] = config.num_leds;
-    protocol_response[4] = config.brightness;
-    protocol_response[5] = (config.port >> 8) & 0xFF;
-    protocol_response[6] = config.port & 0xFF;
+    udp_packet response;
+    response.source_addr = request->source_addr;
+    
+    response.data[0] = request->data[0];
+    response.data[1] = GET_CONFIG;
+    response.data[2] = config.pin;
+    response.data[3] = config.num_leds;
+    response.data[4] = config.brightness;
+    response.data[5] = (config.port >> 8) & 0xFF;
+    response.data[6] = config.port & 0xFF;
 
     size_t hostname_len = strlen(config.hostname);
-    memcpy(&protocol_response[7], config.hostname, hostname_len);
+    memcpy(&response.data[7], config.hostname, hostname_len);
+    response.len = 7 + hostname_len;
 
-    udp_con_send(protocol_response, 7 + hostname_len, &packet->source_addr);
+    udp_con_send(&response);
 }
 
-void protocol_set_config(udp_packet *packet)
+static void protocol_set_config(const udp_packet* request)
 {
-    uint8_t *data = packet->data;
-    size_t len = packet->len;
+    const uint8_t *data = request->data;
+    size_t len = request->len;
 
-    if (len < 3)
-    {
-        ESP_LOGW(PROTOCOL_TAG, "Invalid SET_CONFIG packet");
+    if (len < 7) {
+        ESP_LOGW(PROTOCOL_TAG, "Invalid SET_CONFIG packet: too short");
         return;
     }
 
     ESP_LOGV(PROTOCOL_TAG, "SET_CONFIG");
 
+    // TODO: when config is set, restart the device
+
     config.pin = data[2];
     config.num_leds = data[3];
     config.brightness = data[4];
-    config.port = (data[5] << 8) | data[6]; // TODO: if port changes, restart the server
+    config.port = (data[5] << 8) | data[6]; 
 
-    size_t hostname_length = len - 7;
-    if (hostname_length >= sizeof(config.hostname))
-    {
-        ESP_LOGW(PROTOCOL_TAG, "Hostname too long, truncating");
-        hostname_length = sizeof(config.hostname) - 1;
-    }
-    memcpy(config.hostname, &data[7], hostname_length);
-    config.hostname[hostname_length] = '\0';
+    size_t hostname_len_from_packet = len - 7;
+    size_t len_to_copy = (hostname_len_from_packet < sizeof(config.hostname)) ? hostname_len_from_packet : (sizeof(config.hostname) - 1);
+    
+    memcpy(config.hostname, &data[7], len_to_copy);
+    config.hostname[len_to_copy] = '\0';
 
-    protocol_response[0] = data[0];
-    protocol_response[1] = SET_CONFIG;
+    udp_packet response;
+    response.source_addr = request->source_addr;
+    response.data[0] = data[0];
+    response.data[1] = SET_CONFIG;
+    response.data[2] = config_store() ? 1 : 0;
+    response.len = 3;
 
-    if (config_store())
-    {
-        protocol_response[2] = 1;
-        ESP_LOGV(PROTOCOL_TAG, "SET_CONFIG: Configuration saved successfully");
-        // TODO: restart device
-    else
-    {
-        protocol_response[2] = 0;
-        ESP_LOGV(PROTOCOL_TAG, "SET_CONFIG: Configuration save failed.");
-    }
-
-    udp_con_send(protocol_response, 3, &packet->source_addr);
+    udp_con_send(&response);
 }
 
-void protocol_set_leds(udp_packet *packet)
+static void protocol_set_leds(const udp_packet* request)
 {
-    uint8_t *data = packet->data;
-    size_t len = packet->len;
+    const uint8_t *data = request->data;
+    size_t len = request->len;
 
-    if (len < 2 + 5 /* pixel_index + RGBW */)
-    {
-        ESP_LOGW(PROTOCOL_TAG, "Invalid SET_LEDS packet");
+    if (len < 2 + 5) { // Header + at least one LED (5 bytes per LED - index + R + G + B + W)
+        ESP_LOGW(PROTOCOL_TAG, "Invalid SET_LEDS packet: too short");
         return;
     }
 
-    uint8_t pixel_index, r, g, b, w;
-    for (int i = 2; i < len; i += 5)
-    {
-        pixel_index = data[i];
-
+    for (int i = 2; i + 4 < len; i += 5) {
+        uint8_t pixel_index = data[i];
         if (pixel_index >= config.num_leds) {
             ESP_LOGW(PROTOCOL_TAG, "LED index %d out of range", pixel_index);
-            continue;  
+            continue;
         }
-
-        r = data[i + 1];
-        g = data[i + 2];
-        b = data[i + 3];
-        w = data[i + 4];
-
-        leds_update(pixel_index, r, g, b, w);
+        leds_update(pixel_index, data[i+1] /* R */, data[i+2] /* G */, data[i+3] /* B */, data[i+4] /* W */);
     }
 
-    leds_show(); 
+    leds_show();
 }

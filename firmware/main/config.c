@@ -1,62 +1,62 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "config.h"
+#include "sdkconfig.h"
 #include "storage.h"
 
-config_t config = {
-    LED_PIN,
-    NUM_LEDS,
-    BRIGHTNESS,
-    PORT,     
-    HOSTNAME
-};
+#include "esp_log.h"
+#include <string.h>    
+#include <stdio.h>     
+#include <stdlib.h>    
 
+#define CONFIG_TAG "CONFIG_SERVICE"
+
+config_t config;
 
 void config_begin(void) {
+    ESP_LOGI(CONFIG_TAG, "Loading configuration...");
+
+    // Initialize default values
+    config.pin = CONFIG_LED_PIN;
+    config.num_leds = CONFIG_NUM_LEDS;
+    config.brightness = CONFIG_BRIGHTNESS;
+    config.port = CONFIG_PORT;
+    strncpy(config.hostname, CONFIG_LWIP_LOCAL_HOSTNAME, sizeof(config.hostname) - 1);
+    config.hostname[sizeof(config.hostname) - 1] = '\0'; 
+
+    // overwrite with stored values if they exist
     char buf[32];
-    size_t len;
+    size_t len = sizeof(buf);
     
     if (storage_has_key("config", "pin")) {
-        len = sizeof(buf);
-        memset(buf, 0, sizeof(buf));
         storage_get("config", "pin", buf, &len);
         config.pin = (uint8_t)atoi(buf);
-        ESP_LOGV(CONFIG_TAG, "Loaded pin: %u", config.pin);
     }
     
     if (storage_has_key("config", "num_leds")) {
-        len = sizeof(buf);
-        memset(buf, 0, sizeof(buf));
         storage_get("config", "num_leds", buf, &len);
         config.num_leds = (uint8_t)atoi(buf);
-        ESP_LOGV(CONFIG_TAG, "Loaded num_leds: %u", config.num_leds);
     }
 
     if (storage_has_key("config", "brightness")) {
-        len = sizeof(buf);
-        memset(buf, 0, sizeof(buf));
         storage_get("config", "brightness", buf, &len);
         config.brightness = (uint8_t)atoi(buf);
-        ESP_LOGV(CONFIG_TAG, "Loaded brightness: %u", config.brightness);
     }
     
     if (storage_has_key("config", "port")) {
         len = sizeof(buf);
-        memset(buf, 0, sizeof(buf));
         storage_get("config", "port", buf, &len);
         config.port = (uint16_t)atoi(buf);
-        ESP_LOGV(CONFIG_TAG, "Loaded port: %u", config.port);
     }
 
     if (storage_has_key("config", "hostname")) {
         len = sizeof(config.hostname);
-        memset(buf, 0, sizeof(buf));
         storage_get("config", "hostname", config.hostname, &len);
-        ESP_LOGV(CONFIG_TAG, "Loaded hostname: %s", config.hostname);
     }
+
+    ESP_LOGI(CONFIG_TAG, "Configuration loaded successfully.");
 }
 
 bool config_store() {
+    ESP_LOGI(CONFIG_TAG, "Storing configuration...");
     char tmp[32];
 
     snprintf(tmp, sizeof(tmp), "%u", config.pin);
@@ -73,6 +73,7 @@ bool config_store() {
 
     storage_set("config", "hostname", config.hostname);
 
+    ESP_LOGI(CONFIG_TAG, "Configuration stored successfully.");
     return true;
 }
 

@@ -3,16 +3,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "esp_log.h"
-#include "storage.h"
-
-#define CONFIG_TAG "CONFIG_SERVICE"
-
-#define LED_PIN 18
-#define NUM_LEDS 16
-#define BRIGHTNESS 255
-#define PORT 4210
-#define HOSTNAME "esp32-4"
 
 typedef struct
 {
@@ -29,4 +19,4 @@ void config_begin();
 bool config_store();
 void config_print();
 
-#endif
+#endif // CONFIG_H

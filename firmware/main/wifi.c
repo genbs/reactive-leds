@@ -1,9 +1,19 @@
 #include "wifi.h"
+#include "utils.h"
+#include "config.h" 
+#include <string.h>
+#include "esp_wifi.h"
+#include "esp_netif.h"
+#include "esp_log.h"
 
-static int retry_num = 0;
-static bool connected = false;
-static char ip_address_str[16] = "0.0.0.0"; 
-static char mac_address_str[18] = "00:00:00:00:00:00";
+#define WIFI_TAG "WIFI_SERVICE"
+#define MAX_RETRY 10  
+#define MAX_AP_SCAN 10
+
+static int s_retry_num = 0;
+static bool s_connected = false;
+static char s_ip_address_str[16] = "0.0.0.0"; 
+static char s_mac_address_str[18] = "00:00:00:00:00:00";
 
 
 static void event_handler(void* arg, esp_event_base_t event_base,
@@ -20,17 +30,17 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 wifi_event_sta_disconnected_t *disconn = (wifi_event_sta_disconnected_t *) event_data;
                 ESP_LOGW(WIFI_TAG, "WIFI_EVENT_STA_DISCONNECTED => reason=%d", disconn->reason);
 
-                if (retry_num < MAX_RETRY) {
-                    retry_num++;
+                if (s_retry_num < MAX_RETRY) {
+                    s_retry_num++;
                     ESP_LOGV(WIFI_TAG, "Retrying to connect... Attempt #%d/%d",
-                    retry_num, MAX_RETRY);
+                    s_retry_num, MAX_RETRY);
                     esp_wifi_connect();
                 } else {
                     ESP_LOGE(WIFI_TAG, "Failed to connect after %d attempts", MAX_RETRY);
-                    connected = false;
+                    s_connected = false;
 
                     // clear IP address
-                    snprintf(ip_address_str, sizeof(ip_address_str), "0.0.0.0");
+                    snprintf(s_ip_address_str, sizeof(s_ip_address_str), "0.0.0.0");
                 }
                 break;
 
@@ -44,11 +54,11 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
 
                 // Store IP address
-                snprintf(ip_address_str, sizeof(ip_address_str), IPSTR, IP2STR(&event->ip_info.ip));
-                ESP_LOGV(WIFI_TAG, "IP_EVENT_STA_GOT_IP => %s", ip_address_str);
+                snprintf(s_ip_address_str, sizeof(s_ip_address_str), IPSTR, IP2STR(&event->ip_info.ip));
+                ESP_LOGV(WIFI_TAG, "IP_EVENT_STA_GOT_IP => %s", s_ip_address_str);
 
-                connected = true;
-                retry_num = 0;
+                s_connected = true;
+                s_retry_num = 0;
                 break;
             }
 
@@ -113,25 +123,14 @@ void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
     esp_wifi_get_mac(ESP_IF_WIFI_STA, mac);
 
     // store MAC address
-    snprintf(mac_address_str, sizeof(mac_address_str), "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    snprintf(s_mac_address_str, sizeof(s_mac_address_str), "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     ESP_ERROR_CHECK(esp_wifi_connect());
 }
 
-bool wifi_connected()
-{
-    return connected;
-}
-
-char* wifi_ip()
-{
-    return ip_address_str;
-}
-
-char* wifi_mac()
-{
-    return mac_address_str;
-}
+bool wifi_connected(){ return s_connected; }
+char* wifi_ip(){ return s_ip_address_str; }
+char* wifi_mac(){ return s_mac_address_str; }
 
 void wifi_disconnect()
 {

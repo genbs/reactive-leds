@@ -1,26 +1,37 @@
-#include "wifi.h"
 #include "ble.h"
+#include "config.h"
+#include "storage.h"
+#include "utils.h"
+#include "wifi.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/timers.h"
+#include "esp_system.h"
+#include "esp_log.h"
+#include "esp_bt.h"
+#include "esp_gap_ble_api.h"
+#include "esp_gatts_api.h"
+#include "esp_bt_main.h"
+
+#define BLE_TAG "BLE"
+#define GATTS_APP_ID 0
+
+const uint8_t SERVICE_UUID_128[ESP_UUID_LEN_128] = {
+    0xe8, 0x8f, 0xf4, 0xac, 0x7f, 0x94, 0xdc, 0x81,
+    0xd7, 0x41, 0x36, 0x84, 0x56, 0x1f, 0xca, 0xa9
+};
+
+static const uint8_t CHARACTERISTIC_UUID_128[ESP_UUID_LEN_128] = {
+    0x5c, 0xba, 0x85, 0x36, 0x1a, 0xb5, 0xd3, 0xa4,
+    0x0c, 0x45, 0x61, 0x2f, 0x20, 0x5e, 0x4c, 0x47
+};
 
 static uint16_t gatt_service_handle = 0;
 static uint16_t gatt_char_handle = 0;
-
-static esp_bt_uuid_t service_uuid = {
-    .len = ESP_UUID_LEN_128,
-    .uuid.uuid128 = {
-        0xe8, 0x8f, 0xf4, 0xac,
-        0x7f, 0x94, 0xdc, 0x81,
-        0xd7, 0x41, 0x36, 0x84,
-        0x56, 0x1f, 0xca, 0xa9
-    }
-};
-
-static esp_bt_uuid_t characteristic_uuid = {
-    .len = ESP_UUID_LEN_128,
-    .uuid.uuid128 = {
-        0x5c, 0xba, 0x85, 0x36, 0x1a, 0xb5, 0xd3, 0xa4,
-        0x0c, 0x45, 0x61, 0x2f, 0x20, 0x5e, 0x4c, 0x47
-    }
-};
 
 static esp_ble_adv_params_t adv_params = {
     .adv_int_min       = 0x20,
@@ -35,25 +46,30 @@ static esp_ble_adv_params_t adv_params = {
 // TODO: Could be a problem if the client sends too many credentials - maybe invalid - and occupies unnecessary memory
 void store_credentials(uint8_t *value, size_t len)
 {
-    char buf[128] = {0};
-    char ssid[32];
-    char password[WIFI_PASS_MAX_LEN];
+    const char *separator = (const char *)memchr(value, ',', len);
 
-    if (len < sizeof(buf)) {
-        memcpy(buf, value, len);
-        buf[len] = '\0';
-    } else {
-        memcpy(buf, value, sizeof(buf) - 1);
-        buf[sizeof(buf) - 1] = '\0';
-    }
-
-    sscanf(buf, "%[^,],%s", ssid, password);
-    if (strlen(ssid) == 0 || strlen(password) == 0) {
-        ESP_LOGW(BLE_TAG, "Invalid credentials received");
+    if (separator == NULL) {
+        ESP_LOGW(BLE_TAG, "Invalid credentials format: separator ',' not found.");
         return;
     }
 
-    ESP_LOGI(BLE_TAG, "Received: SSID='%s', PWD='%s'", ssid, mask_wifi_password(password));
+    size_t ssid_len = separator - (const char *)value;
+    size_t pass_len = len - (ssid_len + 1);
+    if (ssid_len == 0 || pass_len == 0 || ssid_len >= WIFI_SSID_MAX_LEN || pass_len >= WIFI_PASS_MAX_LEN) {
+        ESP_LOGW(BLE_TAG, "Invalid credentials length: ssid_len=%d, pass_len=%d", ssid_len, pass_len);
+        return;
+    }
+
+    char ssid[WIFI_SSID_MAX_LEN];
+    char password[WIFI_PASS_MAX_LEN];
+
+    strncpy(ssid, (const char *)value, ssid_len);
+    ssid[ssid_len] = '\0';
+
+    strncpy(password, separator + 1, pass_len);
+    password[pass_len] = '\0';
+
+    ESP_LOGI(BLE_TAG, "Received credentials: SSID='%s', PWD='%s'", ssid, mask_wifi_password(password));
     storage_set("wifi", ssid, password);
 }
 
@@ -70,22 +86,25 @@ void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp
         break;
     case ESP_GATTS_REG_EVT: 
         ESP_LOGV(BLE_TAG, "Registered, status %d, app_id %d", param->reg.status, param->reg.app_id);
-        esp_gatt_srvc_id_t srvc_id = {
-            .is_primary = true,
-            .id = {
-                .inst_id = 0,
-                .uuid = service_uuid
-            },
-        };
+        esp_gatt_srvc_id_t srvc_id;
+        srvc_id.is_primary = true;
+        srvc_id.id.inst_id = 0;
+        srvc_id.id.uuid.len = ESP_UUID_LEN_128;
+        memcpy(srvc_id.id.uuid.uuid.uuid128, SERVICE_UUID_128, ESP_UUID_LEN_128);
         esp_ble_gatts_create_service(gatts_if, &srvc_id, 10);
         break;
     case ESP_GATTS_CREATE_EVT:
         ESP_LOGV(BLE_TAG, "Service created, handle %d", param->create.service_handle);
         gatt_service_handle = param->create.service_handle;
         esp_ble_gatts_start_service(gatt_service_handle);
+
+        esp_bt_uuid_t char_uuid;
+        char_uuid.len = ESP_UUID_LEN_128;
+        memcpy(char_uuid.uuid.uuid128, CHARACTERISTIC_UUID_128, ESP_UUID_LEN_128);
+
         esp_gatt_char_prop_t property = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
         esp_err_t add_char_ret = esp_ble_gatts_add_char(
-            gatt_service_handle, &characteristic_uuid,
+            gatt_service_handle, &char_uuid,
             ESP_GATT_PERM_WRITE, property, NULL, NULL
         );
         if (add_char_ret != ESP_OK) {
@@ -202,8 +221,8 @@ void ble_begin()
 
     esp_ble_gap_set_device_name(config.hostname);
     static esp_ble_adv_data_t adv_data = {
-        .set_scan_rsp = true,
-        .include_name = true,
+        .set_scan_rsp = false,
+        .include_name = false,
         .include_txpower = false,
         .min_interval        = 0x20,
         .max_interval        = 0x40,
@@ -212,12 +231,21 @@ void ble_begin()
         .p_manufacturer_data = NULL,
         .service_data_len    = 0,
         .p_service_data      = NULL,
-        .service_uuid_len    = 16,
-        .p_service_uuid = (uint8_t *)SERVICE_UUID_128,
+        .service_uuid_len    = ESP_UUID_LEN_128,
+        .p_service_uuid      = (uint8_t *)SERVICE_UUID_128,
         .flag                = (ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT),
     };
-    esp_ble_gap_config_adv_data(&adv_data);
-    esp_ble_gap_start_advertising(&adv_params);
+    
+    static esp_ble_adv_data_t scan_rsp_data = {
+        .set_scan_rsp = true,       
+        .include_name = true,       
+        .include_txpower = true,
+        .appearance = 0,
+    };
+
+    ESP_ERROR_CHECK(esp_ble_gap_config_adv_data(&adv_data));
+    ESP_ERROR_CHECK(esp_ble_gap_config_adv_data(&scan_rsp_data));
+
     ESP_LOGI(BLE_TAG, "BLE ready");
 }
 

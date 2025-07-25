@@ -71,7 +71,7 @@ function help(commandName?: string) {
 
 async function executeCommand(command: Command, args: any[]) {
 	const result = await command.execute(...args)
-	if (result) {
+	if (result !== false) {
 		logger.log(`Command ${command.name} executed succesfully`)
 		//process.exit(0)
 	} else {

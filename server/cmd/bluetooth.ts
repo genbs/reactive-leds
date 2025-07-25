@@ -59,7 +59,6 @@ export const btCredentialCommand: Command = {
 			// otherwise host is a string representing the device name or address
 		}
 
-		console.log(host)
 		const device = findDevice(devices, host as string)
 		if (!device) {
 			logger.log(`Device ${host} not found`)
@@ -161,7 +160,10 @@ async function scanDevices(timeout = SCAN_TIMEOUT): Promise<Peripheral[]> {
 
 		let peripherals: Peripheral[] = []
 
-		const onDiscover = (p: Peripheral) => peripherals.push(p)
+		const onDiscover = (p: Peripheral) => {
+			if (peripherals.includes(p)) return
+			peripherals.push(p)
+		}
 
 		noble.on("discover", onDiscover)
 

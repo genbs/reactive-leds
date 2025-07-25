@@ -1,80 +1,105 @@
 #include "leds.h"
+#include "config.h"
 
-static uint8_t* leds;
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_check.h"
+#include "esp_log.h"
+#include "driver/rmt_tx.h"
+#include "driver/rmt_encoder.h"
+#include <string.h>
 
-rmt_channel_handle_t led_chan = NULL;
-rmt_encoder_handle_t led_encoder = NULL;
-rmt_transmit_config_t tx_config = {
-    .loop_count = 0, // no transfer loop
+#define LEDS_TAG "LEDS_SERVICE"
+#define RMT_RESOLUTION_HZ 10000000 // 10MHz
+#define TRANSFER_QUEUE_DEPTH 4
+#define MEM_BLOCK_SYMBOLS 64
+
+static size_t rmt_encode_led_strip(rmt_encoder_t *encoder, rmt_channel_handle_t channel, const void *primary_data, size_t data_size, rmt_encode_state_t *ret_state);
+static esp_err_t rmt_del_led_strip_encoder(rmt_encoder_t *encoder);
+static esp_err_t rmt_led_strip_encoder_reset(rmt_encoder_t *encoder);
+esp_err_t rmt_new_led_strip_encoder(rmt_encoder_handle_t *ret_encoder); 
+
+static uint8_t* s_led_buffer = NULL;
+static rmt_channel_handle_t s_led_chan = NULL;
+static rmt_encoder_handle_t s_led_encoder = NULL;
+static rmt_transmit_config_t s_tx_config = {
+    .loop_count = 0, //  no transfer loop
 };
 
-void leds_begin()
+
+bool leds_begin()
 {
-    ESP_LOGI(LEDS_TAG, "LEDs driver initializing");
+    ESP_LOGI(LEDS_TAG, "Initializing RMT for LED strip");
 
     // Buffer initialization
-    leds = (uint8_t*)malloc(sizeof(uint8_t) * config.num_leds * 4);
-    if (leds == NULL) {
-        ESP_LOGE(LEDS_TAG, "Failed to allocate memory for LEDs");
-        return;
+    size_t buffer_size = config.num_leds * 4;
+    s_led_buffer = malloc(buffer_size);
+    if (!s_led_buffer) {
+        ESP_LOGE(LEDS_TAG, "Failed to allocate memory for LED buffer");
+        return false;
     }
-    memset(leds, 0, sizeof(uint8_t) * config.num_leds * 4);
+    memset(s_led_buffer, 0, buffer_size);
     
     // Configure RMT (credits: https://github.com/espressif/esp-idf/blob/master/examples/peripherals/rmt/led_strip/main/led_strip_example_main.c)
     ESP_LOGV(LEDS_TAG, "Create RMT TX channel");
     rmt_tx_channel_config_t tx_chan_config = {
-        .clk_src = RMT_CLK_SRC_DEFAULT, // select source clock
-        .gpio_num = config.pin, // select output GPIO
-        .mem_block_symbols = MEM_BLOCK_SYMBOLS, // increase the block size can make the LED less flickering
+        .clk_src = RMT_CLK_SRC_DEFAULT,
+        .gpio_num = config.pin,
+        .mem_block_symbols = MEM_BLOCK_SYMBOLS,
         .resolution_hz = RMT_RESOLUTION_HZ,
-        .trans_queue_depth = TRANSFER_QUEUE_DEPTH, // set the number of transactions that can be pending in the background
-        .intr_priority = 1, // set the interrupt priority
-        .flags = {
-            .invert_out = 0,   
-            .with_dma = 1,     
-            .io_loop_back = 0, 
-            .io_od_mode = 0,   
-            .allow_pd = 0,     
-        }
+        .trans_queue_depth = TRANSFER_QUEUE_DEPTH, 
     };
-    ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &led_chan));
 
-    ESP_LOGV(LEDS_TAG, "Install led strip encoder");
-    led_strip_encoder_config_t encoder_config = {
-        .resolution = RMT_RESOLUTION_HZ,
-    };
-    ESP_ERROR_CHECK(rmt_new_led_strip_encoder(&encoder_config, &led_encoder));
-
-    ESP_LOGV(LEDS_TAG, "Enable RMT TX channel");
-    ESP_ERROR_CHECK(rmt_enable(led_chan));
-
+    ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &s_led_chan));
+    ESP_ERROR_CHECK(rmt_new_led_strip_encoder(&s_led_encoder));
+    ESP_ERROR_CHECK(rmt_enable(s_led_chan));
 
     ESP_LOGI(LEDS_TAG, "LEDs driver installed successfully");
+    return true;
+}
+
+void leds_end()
+{
+    if (s_led_chan) rmt_disable(s_led_chan);
+    if (s_led_encoder) rmt_del_encoder(s_led_encoder);
+    if (s_led_chan) rmt_del_channel(s_led_chan);
+    if (s_led_buffer) free(s_led_buffer);
+    
+    s_led_chan = NULL;
+    s_led_encoder = NULL;
+    s_led_buffer = NULL;
+    ESP_LOGI(LEDS_TAG, "LEDs driver de-initialized.");
 }
 
 void leds_update(uint8_t pixel_index, uint8_t r, uint8_t g, uint8_t b, uint8_t w)
 {
-    if (pixel_index >= config.num_leds) {
-        ESP_LOGE(LEDS_TAG, "Pixel index out of range");
+    if (!s_led_buffer || pixel_index >= config.num_leds) {
         return;
     }
-
+    
     // TODO: the order of colors might be different depending on the type of LED
-    leds[pixel_index * 4] = w;
-    leds[pixel_index * 4 + 1] = r;
-    leds[pixel_index * 4 + 2] = g;
-    leds[pixel_index * 4 + 3] = b;
+    size_t index = pixel_index * 4;
+    s_led_buffer[index] = w;
+    s_led_buffer[index + 1] = r; 
+    s_led_buffer[index + 2] = g; 
+    s_led_buffer[index + 3] = b; 
 }
 
 void leds_clear()
 {
-    memset(leds, 0, config.num_leds * 4);
+    if (s_led_buffer) {
+        memset(s_led_buffer, 0, config.num_leds * 4);
+    }
 }
 
 void leds_show()
 {
-    ESP_ERROR_CHECK(rmt_transmit(led_chan, led_encoder, leds, config.num_leds * 4, &tx_config));
-    ESP_ERROR_CHECK(rmt_tx_wait_all_done(led_chan, portMAX_DELAY));
+    if (!s_led_chan || !s_led_encoder || !s_led_buffer) {
+        return;
+    }
+
+    ESP_ERROR_CHECK(rmt_transmit(s_led_chan, s_led_encoder, s_led_buffer, config.num_leds * 4, &s_tx_config));
+    ESP_ERROR_CHECK(rmt_tx_wait_all_done(s_led_chan, portMAX_DELAY));
 }
 
 
@@ -82,6 +107,14 @@ void leds_show()
 // Encoding functions 
 // credits: https://github.com/espressif/esp-idf/tree/master/examples/peripherals/rmt/led_strip/main
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+typedef struct {
+    rmt_encoder_t base;
+    rmt_encoder_t *bytes_encoder;
+    rmt_encoder_t *copy_encoder;
+    int state;
+    rmt_symbol_word_t reset_code;
+} rmt_led_strip_encoder_t;
 
 
 static size_t rmt_encode_led_strip(rmt_encoder_t *encoder, rmt_channel_handle_t channel, const void *primary_data, size_t data_size, rmt_encode_state_t *ret_state)
@@ -103,7 +136,7 @@ static size_t rmt_encode_led_strip(rmt_encoder_t *encoder, rmt_channel_handle_t 
             goto out; // yield if there's no free space for encoding artifacts
         }
     // fall-through
-    case 1: // send reset code
+    case 1: // send reset code 
         encoded_symbols += copy_encoder->encode(copy_encoder, channel, &led_encoder->reset_code,
                                                 sizeof(led_encoder->reset_code), &session_state);
         if (session_state & RMT_ENCODING_COMPLETE) {
@@ -138,45 +171,45 @@ static esp_err_t rmt_led_strip_encoder_reset(rmt_encoder_t *encoder)
     return ESP_OK;
 }
 
-esp_err_t rmt_new_led_strip_encoder(const led_strip_encoder_config_t *config, rmt_encoder_handle_t *ret_encoder)
+esp_err_t rmt_new_led_strip_encoder(rmt_encoder_handle_t *ret_encoder)
 {
     esp_err_t ret = ESP_OK;
     rmt_led_strip_encoder_t *led_encoder = NULL;
-    ESP_GOTO_ON_FALSE(config && ret_encoder, ESP_ERR_INVALID_ARG, err, LEDS_TAG, "invalid argument");
+    ESP_GOTO_ON_FALSE(ret_encoder, ESP_ERR_INVALID_ARG, err, LEDS_TAG, "invalid argument");
+
     led_encoder = rmt_alloc_encoder_mem(sizeof(rmt_led_strip_encoder_t));
     ESP_GOTO_ON_FALSE(led_encoder, ESP_ERR_NO_MEM, err, LEDS_TAG, "no mem for led strip encoder");
+    
     led_encoder->base.encode = rmt_encode_led_strip;
     led_encoder->base.del = rmt_del_led_strip_encoder;
     led_encoder->base.reset = rmt_led_strip_encoder_reset;
+    
     // different led strip might have its own timing requirements, following parameter is for WS2812
     rmt_bytes_encoder_config_t bytes_encoder_config = {
         .bit0 = {
-            .level0 = 1,
-            .duration0 = 0.25 * config->resolution / 1000000, // T0H=0.3us
-            .level1 = 0,
-            .duration1 = 1.0 * config->resolution / 1000000, // T0L=0.9us
+            .level0 = 1, .duration0 = 0.3 * RMT_RESOLUTION_HZ / 1000000, // T0H
+            .level1 = 0, .duration1 = 0.9 * RMT_RESOLUTION_HZ / 1000000, // T0L
         },
         .bit1 = {
-            .level0 = 1,
-            .duration0 = 1.0 * config->resolution / 1000000, // T1H=0.9us
-            .level1 = 0,
-            .duration1 = 0.25 * config->resolution / 1000000, // T1L=0.3us
+            .level0 = 1, .duration0 = 0.9 * RMT_RESOLUTION_HZ / 1000000, // T1H
+            .level1 = 0, .duration1 = 0.3 * RMT_RESOLUTION_HZ / 1000000, // T1L
         },
-        .flags.msb_first = 1 // WS2812 transfer bit order: G7...G0R7...R0B7...B0
+        .flags.msb_first = 1
     };
     ESP_GOTO_ON_ERROR(rmt_new_bytes_encoder(&bytes_encoder_config, &led_encoder->bytes_encoder), err, LEDS_TAG, "create bytes encoder failed");
+    
     rmt_copy_encoder_config_t copy_encoder_config = {};
     ESP_GOTO_ON_ERROR(rmt_new_copy_encoder(&copy_encoder_config, &led_encoder->copy_encoder), err, LEDS_TAG, "create copy encoder failed");
 
-    uint32_t reset_ticks = config->resolution / 1000000 * 50 / 2; // reset code duration defaults to 50us
+    uint32_t reset_ticks = RMT_RESOLUTION_HZ / 1000000 * 50 / 2;
     led_encoder->reset_code = (rmt_symbol_word_t) {
-        .level0 = 0,
-        .duration0 = reset_ticks,
-        .level1 = 0,
-        .duration1 = reset_ticks,
+        .level0 = 0, .duration0 = reset_ticks,
+        .level1 = 0, .duration1 = reset_ticks,
     };
+
     *ret_encoder = &led_encoder->base;
     return ESP_OK;
+
 err:
     if (led_encoder) {
         if (led_encoder->bytes_encoder) {
