@@ -74,25 +74,25 @@ const logger: Logger = {
 
 	debug: (...args: any[]) => {
 		if (logger.level <= LOG_LEVEL.DEBUG) {
-			logger.outputStream.debug(createMessage(LOG_LEVEL.DEBUG, logger.options), ...args)
+			logger.outputStream.log(createMessage(LOG_LEVEL.DEBUG, logger.options), ...args)
 		}
 	},
 
 	info: (...args: any[]) => {
 		if (logger.level <= LOG_LEVEL.INFO) {
-			logger.outputStream.info(createMessage(LOG_LEVEL.INFO, logger.options), ...args)
+			logger.outputStream.log(createMessage(LOG_LEVEL.INFO, logger.options), ...args)
 		}
 	},
 
 	warn: (...args: any[]) => {
 		if (logger.level <= LOG_LEVEL.WARN) {
-			logger.outputStream.warn(createMessage(LOG_LEVEL.WARN, logger.options), ...args)
+			logger.outputStream.log(createMessage(LOG_LEVEL.WARN, logger.options), ...args)
 		}
 	},
 
 	error: (...args: any[]) => {
 		if (logger.level <= LOG_LEVEL.ERROR) {
-			logger.outputStream.error(createMessage(LOG_LEVEL.ERROR, logger.options), ...args)
+			logger.outputStream.log(createMessage(LOG_LEVEL.ERROR, logger.options), ...args)
 		}
 	},
 

@@ -11,28 +11,26 @@
 		</style>
 	</head>
 	<body>
-		<script src="gydra.js"></script>
-		<script src="lib.js"></script>
+		<div>Connected: <span id="connected">No</span></div>
+
+		<script src="leds.js"></script>
 		<script>
 			;(async () => {
-				await leds.begin("ws://localhost:8080")
-				const gydra = Gydra({
-					width: 600,
-					height: 600,
-					autoTick: true,
-				})
-				gydra.eval("noise(1).out()")
+				const connectedSpan = document.getElementById("connected")
 
-				leds.show()
-				leds.watch(document.querySelector("canvas"), [10, 10])
+				try {
+					const result = await leds.begin("ws://localhost:8000", false)
+					main()
 
-				// function send() {
-				// 	gydra.tick()
+					leds.onConnectionChange(connected => main())
 
-				// 	requestAnimationFrame(send)
-				// }
-
-				// requestAnimationFrame(send)
+					function main() {
+						connectedSpan.textContent = leds.isConnected() ? "Yes" : "No"
+					}
+				} catch (error) {
+					console.error("Error connecting to LED server:", error)
+					connectedSpan.textContent = "No"
+				}
 			})()
 		</script>
 	</body>

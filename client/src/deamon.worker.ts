@@ -1,17 +1,12 @@
 import { LOG_LEVEL, logger } from "@leds/shared"
-import { FALSE, TRUE, WorkerRequestType, WorkerRequestTypeMap } from "./comm"
+import { CONNECTION_CHANGE_REQUEST_ID, FALSE, TRUE, WorkerRequestType, WorkerRequestTypeMap } from "./comm"
 import WS from "./ws"
 
 // single instance to communicate with the server
-const ws: WS = new WS({
-	autoConnect: false,
-	shouldReconnect: true,
-	onMessage: handleMessage,
-	onConnectionChange: handleConnectionChange,
-})
+let globalWS: WS | null = null
 
 // The syncronous request id for 'connect' request
-let connectionChangeRequestId = 0
+let connectionChangeRequestId: number | null = null
 
 // handle messages from the client
 // Packet format: [requestId, type, ...message]
@@ -32,23 +27,36 @@ self.addEventListener("message", async (e: any) => {
 			const debug = message[message.length - 1] === TRUE
 			const serverUrl = String.fromCharCode(...message.slice(0, message.length - 1))
 
-			logger.debug(`[Worker] connect request to server="${serverUrl}" with debug=${debug}`)
 			logger.level = debug ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR
+			logger.debug(`[Worker] connect request to server="${serverUrl}" with debug=${debug}`)
+
+			if (!globalWS) {
+				globalWS = new WS({
+					autoConnect: false,
+					shouldReconnect: true,
+					onConnectionChange: handleConnectionChange,
+					onMessage: handleMessage,
+				})
+			}
 
 			connectionChangeRequestId = requestId
-			ws.settings.url = serverUrl
-			ws.settings.debug = debug
 
 			// this request is handled by handleConnectionChange callback
-			ws.connect()
+			globalWS.settings.url = serverUrl
+			globalWS.connect()
 			break
 
 		// handle send message to server [WorkerRequestType.Send, ...message]
 		case WorkerRequestType.Send:
+			if (!globalWS) {
+				logger.error("[Worker] Send error, not connected, can't send message")
+				return
+			}
+
 			const request = new Uint8Array(message.length + 1)
 			request[0] = requestId
 			request.set(message, 1)
-			ws.send(request)
+			globalWS.send(request)
 			break
 		default:
 			logger.debug("[Worker] Unknown request type")
@@ -61,7 +69,14 @@ function handleConnectionChange(status: boolean) {
 	logger.debug("[Worker] websocket connection change", status)
 
 	const packet = new Uint8Array(3)
-	packet[0] = connectionChangeRequestId
+	if (connectionChangeRequestId) {
+		// Only "connect" request can have a requestId
+		packet[0] = connectionChangeRequestId
+		connectionChangeRequestId = null
+	} else {
+		// otherwise call handleConnectionChange
+		packet[0] = CONNECTION_CHANGE_REQUEST_ID
+	}
 	packet[1] = WorkerRequestType.ConnectionChange
 	packet[2] = status ? TRUE : FALSE
 

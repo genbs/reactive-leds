@@ -7,7 +7,7 @@ module.exports = {
 
 	output: {
 		libraryTarget: "umd",
-		filename: "[name].js",
+		filename: "leds.js",
 		path: __dirname + "/build",
 		library: {
 			name: "leds",
@@ -32,6 +32,9 @@ module.exports = {
 			{
 				test: /\.tsx?$/,
 				loader: "ts-loader",
+				options: {
+					projectReferences: true,
+				},
 			},
 		],
 	},
@@ -44,26 +47,24 @@ module.exports = {
 		}),
 		{
 			apply: compiler => {
-				compiler.hooks.afterEmit.tap("AfterEmitPlugin", compilation => {
-					let filePath = path.resolve(__dirname, "build", "main.js")
-					fs.copyFileSync(filePath, path.resolve("examples/lib.js"))
-					fs.copyFileSync(filePath, path.resolve("../../../exts/leds.js"))
-
-					filePath = path.resolve(__dirname, "build", "main.js.map")
-					fs.copyFileSync(filePath, path.resolve("examples/lib.js.map"))
-					fs.copyFileSync(filePath, path.resolve("../../../exts/leds.map.js"))
-
-					filePath = path.resolve(__dirname, "build", "deamon.worker.worker.js")
-					fs.copyFileSync(filePath, path.resolve("../../../exts/deamon.worker.worker.js"))
-				})
+				// compiler.hooks.afterEmit.tap("AfterEmitPlugin", compilation => {
+				// 	let filePath = path.resolve(__dirname, "build", "main.js")
+				// 	fs.copyFileSync(filePath, path.resolve("examples/lib.js"))
+				// 	fs.copyFileSync(filePath, path.resolve("../../../exts/leds.js"))
+				// 	filePath = path.resolve(__dirname, "build", "main.js.map")
+				// 	fs.copyFileSync(filePath, path.resolve("examples/lib.js.map"))
+				// 	fs.copyFileSync(filePath, path.resolve("../../../exts/leds.map.js"))
+				// 	filePath = path.resolve(__dirname, "build", "deamon.worker.worker.js")
+				// 	fs.copyFileSync(filePath, path.resolve("../../../exts/deamon.worker.worker.js"))
+				// })
 			},
 		},
 	],
 	devServer: {
 		static: {
-			directory: path.join(__dirname, "public"),
+			directory: path.join(__dirname, "examples"),
 		},
 		compress: true,
-		port: 4210,
+		port: 3000,
 	},
 }

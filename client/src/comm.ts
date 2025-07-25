@@ -17,3 +17,5 @@ export const TRUE = 0x01
 export const FALSE = 0x00
 
 export const EMPTY_REQUEST_ID = 0
+export const CONNECTION_CHANGE_REQUEST_ID = 1
+export const FIRST_REQUEST_ID = 2

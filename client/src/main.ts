@@ -20,7 +20,7 @@ import {
 } from "@leds/shared"
 import { FALSE, TRUE, WorkerRequestType } from "./comm"
 import { mapPixels } from "./mapping"
-import { connect, send, sendSync } from "./proxy"
+import { connect, isConnected, onConnectionChange, send, sendSync } from "./proxy"
 
 // Internal map of address to buffer
 const addressBufferMap = new Map<DeviceIP, DeviceAddress>()
@@ -93,6 +93,9 @@ function setLEDs(ip: DeviceIP, port = 4210, leds: Uint8Array) {
 
 const leds = {
 	begin,
+	onConnectionChange,
+	isConnected,
+
 	ping,
 	getConfig,
 	setConfig,

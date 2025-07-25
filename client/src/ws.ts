@@ -8,7 +8,6 @@ const WS_RECONNECTION_MAX_RETRIES = 30
 
 export interface WSSettings {
 	url: string // WebSocket URL
-	debug: boolean // Enable debug logs
 	autoConnect: boolean // Automatically connect on instantiation
 	shouldReconnect: boolean | (() => boolean) // Reconnect on close
 
@@ -17,7 +16,6 @@ export interface WSSettings {
 }
 
 const defaultSettings: Partial<WSSettings> = {
-	debug: false,
 	autoConnect: true,
 	shouldReconnect: true,
 }
@@ -104,10 +102,14 @@ export default class WS {
 	 * @param e
 	 * @returns
 	 */
-	private onSocketClose(e: CloseEvent) {
+	private onSocketClose(e: CloseEvent | Event) {
 		logger.debug("[WS] Connection closed", e)
 
-		this.settings.onConnectionChange?.(false)
+		this.socket = null
+		if (this.connected) {
+			this.settings.onConnectionChange?.(false)
+			this.connected = false
+		}
 
 		const shouldReconnect =
 			typeof this.settings.shouldReconnect === "function"

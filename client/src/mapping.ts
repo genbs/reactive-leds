@@ -16,7 +16,7 @@ function step(t: number, xStart: number, yStart: number, xEnd: number, yEnd: num
  * @param polygon mapping (x0, y0, x1, y1, x2, y2, x3, y3) on destination grid [TL, TR, BR, BL]
  * @param steps number of LEDs to map
  * @param wa if w is number is white/brightness mapping function or value, if boolean is alpha value
- * @param output output buffer, if not provided a new one will be created
+ * @param output [pixel_index,r,g,b,w, pixel_index,r,g,b,w ...] output buffer, if not provided a new one will be created
  * @returns
  */
 export function mapPixels(
@@ -79,5 +79,6 @@ export function mapPixels(
 				? pixels[srcIndex + 3] // Use source Alpha if 'wa' is true
 				: 0 // Default to 0 otherwise
 	}
+
 	return output
 }
