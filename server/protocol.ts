@@ -124,6 +124,19 @@ class Protocol {
 	}
 
 	/**
+	 * Resets all the Wi-Fi credentials of the device.
+	 *
+	 * @param ip device ip
+	 * @param port device port
+	 * @returns
+	 */
+	resetWifi(ip: string, port: number): Promise<boolean> {
+		return this.sendSync(ip, port, PacketType.RESET_WIFI, null, Protocol.SET_CONFIG_TIMEOUT).then(
+			response => response !== null && response.length >= 2 && response[2] === PacketStatus.OK
+		)
+	}
+
+	/**
 	 * send UDP message to device, no response expected.
 	 *
 	 * @param ip device ip

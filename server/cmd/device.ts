@@ -1,7 +1,7 @@
 import { availableConfigKeys, logger } from "@leds/shared"
-import { Command } from "cmd"
-import { validateIP, validatePort } from "utils"
+import { Command } from "../cmd"
 import proto from "../protocol"
+import { validateIP, validatePort } from "../utils"
 
 export const configCommand: Command = {
 	name: "config",
@@ -60,11 +60,14 @@ export const ledsCommand: Command = {
 			validator: validateLedsPackage,
 		},
 	],
-	execute: async (ip, port, ledsPackage) => {
+	execute: async (ip: string, port: number, ledsPackage: string) => {
 		const ledData = (ledsPackage as string).split(",").map(Number) // validated
-
-		const data = new Uint8Array(ledData)
-		proto.setLEDs(ip as string, port as number, data)
+		const retryCount = 5
+		for (let i = 0; i < retryCount; i++) {
+			const data = new Uint8Array(ledData)
+			proto.setLEDs(ip as string, port, data)
+			await new Promise(resolve => setTimeout(resolve, 100))
+		}
 
 		logger.log("LEDs request sent")
 	},

@@ -55,21 +55,21 @@ void config_begin(void) {
     ESP_LOGI(CONFIG_TAG, "Configuration loaded successfully.");
 }
 
+
+static void config_set_uint(const char* key, unsigned int value) {
+    char tmp[32];
+    snprintf(tmp, sizeof(tmp), "%u", value);
+    storage_set("config", key, tmp);
+}
+
+
 bool config_store() {
     ESP_LOGI(CONFIG_TAG, "Storing configuration...");
-    char tmp[32];
-
-    snprintf(tmp, sizeof(tmp), "%u", config.pin);
-    storage_set("config", "pin", tmp);
-
-    snprintf(tmp, sizeof(tmp), "%u", config.num_leds);
-    storage_set("config", "num_leds", tmp);
-
-    snprintf(tmp, sizeof(tmp), "%u", config.brightness);
-    storage_set("config", "brightness", tmp);
-
-    snprintf(tmp, sizeof(tmp), "%u", config.port);
-    storage_set("config", "port", tmp);
+    
+    config_set_uint("pin", config.pin);
+    config_set_uint("num_leds", config.num_leds);
+    config_set_uint("brightness", config.brightness);
+    config_set_uint("port", config.port);
 
     storage_set("config", "hostname", config.hostname);
 

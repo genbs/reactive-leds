@@ -1,11 +1,11 @@
 import { LOG_LEVEL, logger } from "@leds/shared"
-import { Command, requiredArguments, shortUsage, usage, validate } from "cmd"
-import { btCredentialCommand, btScanCommand } from "cmd/bluetooth"
-import serveCommand from "cmd/server"
-import { pingCommand, scanCommand } from "cmd/wifi"
+import { Command, requiredArguments, shortUsage, usage, validate } from "./cmd"
+import { btCredentialCommand, btScanCommand } from "./cmd/bluetooth"
 import { configCommand, ledsCommand } from "./cmd/device"
+import serveCommand from "./cmd/server"
+import { pingCommand, resetWifiCommand, scanCommand } from "./cmd/wifi"
 
-logger.level = LOG_LEVEL.ERROR
+logger.level = LOG_LEVEL.INFO
 
 // create a list of commands
 const commands = [
@@ -13,10 +13,11 @@ const commands = [
 	serveCommand,
 	scanCommand,
 	pingCommand,
+	resetWifiCommand,
 	ledsCommand,
 	btScanCommand,
 	btCredentialCommand,
-]
+] as Command[]
 
 // check if command is provided
 if (process.argv.length < 3) {
@@ -63,7 +64,6 @@ if (!validationResult.status) {
 executeCommand(command, Object.values(validationResult.args))
 
 // Functions
-
 function help(commandName?: string) {
 	const command = commandName ? commands.find(cmd => cmd.name === commandName) : null
 	logger.log(command ? usage(command) : `Usage:\n\t- ${commands.map(shortUsage).join("\n\t- ")}`)
@@ -73,10 +73,8 @@ async function executeCommand(command: Command, args: any[]) {
 	const result = await command.execute(...args)
 	if (result !== false) {
 		logger.log(`Command ${command.name} executed succesfully`)
-		//process.exit(0)
 	} else {
 		logger.error(`Failed to execute command ${command.name}`)
-		//process.exit(1)
 	}
 
 	process.exit(0)

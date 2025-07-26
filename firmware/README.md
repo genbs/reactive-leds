@@ -1,37 +1,5 @@
 # Firmware
 
-```mermaid
-graph TD
-    subgraph Initialization
-        A((Firmware Start)) --> B{Scan for known Wi-Fi networks};
-        B -- Network Found --> C[Connect to Wi-Fi];
-        B -- Not Found --> D[Start BLE Service];
-        D --> E[Wait for Wi-Fi credentials via BLE];
-        E --> C;
-    end
-
-    subgraph "UDP Runtime Loop"
-        C --> F[Initialize UDP Server & LEDs<br><br><span style='font-family: monospace; font-size: 0.9em;'>protocol_begin()</span>];
-        F --> G{Enter Main Loop<br><br><span style='font-family: monospace; font-size: 0.9em;'>protocol_loop()</span>};
-        G --> H[Read UDP Packet];
-        H --> I{Is packet valid?};
-        I -- No --> G;
-        I -- Yes --> J[Process Packet by Type<br><br><span style='font-family: monospace; font-size: 0.9em;'>protocol_process_packet()</span>];
-    end
-
-    subgraph "UDP Message Handling"
-        J -- PING --> K[<b>PING</b><br>Respond with PONG];
-        J -- GET_CONFIG --> L[<b>GET_CONFIG</b><br>Respond with device configuration];
-        J -- SET_CONFIG --> M[<b>SET_CONFIG</b><br>Update & save config, then respond];
-        J -- SET_LEDS --> N[<b>SET_LEDS</b><br>Update LED strip colors];
-    end
-
-    K --> G;
-    L --> G;
-    M --> G;
-    N --> G;
-```
-
 ## Requirements
 
 - CMake
@@ -45,7 +13,10 @@ graph TD
 1. Menuconfig
    Run idf.py menuconfig and enable the following option:
 
-Component config -> Bluetooth -> Bluedroid Options -> [*] BLE_42_FEATURE_SUPPORT
+Component config -> Bluetooth -> Bluedroid Options -> [*] CONFIG_BT_BLE_42_FEATURES_SUPPORTED
+CONFIG_LWIP_UDP_RECVMBOX_SIZE=64
+CONFIG_LWIP_TCPIP_TASK_PRIO=1
+CONFIG_UDP_RECVMBOX_SIZE=64
 
 Setup the "Device configuration"
 

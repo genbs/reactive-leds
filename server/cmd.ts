@@ -8,31 +8,33 @@ export interface Command<Args extends readonly CommandArg[] = CommandArg[]> {
 	execute: (...args: CommandArgsToTuple<Args>) => Promise<boolean | void> | boolean | void
 }
 
-type CommandArg<T = any> = {
-	required: boolean
-	name: string
-	type?: T
-	validator?: (value: T, args: string[]) => boolean | string // Custom validation function, if string returned, it will be treated as an error message
-	default?: T
-}
-
-type CommandArgsToTuple<Args extends readonly CommandArg[]> = {
-	[K in keyof Args]: Args[K] extends CommandArg
-		? Args[K]["required"] extends true
-			? ArgValue<Args[K]>
-			: ArgValue<Args[K]> | undefined
-		: never
-}
-
-type ArgValue<A extends CommandArg> = ConstructorToType<A["type"]>
-
-type ConstructorToType<T> = T extends StringConstructor
+type ArgValue<T> = T extends StringConstructor
 	? string
 	: T extends NumberConstructor
 	? number
 	: T extends BooleanConstructor
 	? boolean
-	: never
+	: any // Fallback for other types
+
+export interface CommandArg<T = any> {
+	required: boolean
+	name: string
+	type?: T
+	validator?: (value: any, args: string[]) => boolean | string
+	default?: any
+}
+
+// This utility type converts the CommandArg array into a strongly-typed tuple for the execute function's parameters
+type CommandArgsToTuple<Args extends readonly CommandArg[]> = {
+	[K in keyof Args]: Args[K] extends CommandArg<infer T>
+		? Args[K]["required"] extends true
+			? ArgValue<T> // Required args are always present
+			: // For optional args, check if a default value exists
+			"default" extends keyof Args[K]
+			? ArgValue<T> // If default exists, it will never be undefined
+			: ArgValue<T> | undefined // If no default, it can be undefined
+		: never
+}
 
 // stop at first required: false
 export function requiredArguments(cdm: Command): number {

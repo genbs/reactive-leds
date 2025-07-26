@@ -1,8 +1,8 @@
 import { bufferToConfig, configToBuffer, logger, PacketType, PacketTypeMap } from "@leds/shared"
-import { Command } from "cmd"
-import { validateIP, validatePort } from "utils"
 import WebSocket from "ws"
+import { Command } from "../cmd"
 import proto from "../protocol"
+import { validateIP, validatePort } from "../utils"
 
 const serveCommand: Command = {
 	name: "serve",
@@ -12,7 +12,7 @@ const serveCommand: Command = {
 		{ required: false, name: "host", type: String, default: "0.0.0.0", validator: validateIP },
 		{ required: false, name: "port", type: Number, default: 8000, validator: validatePort },
 	],
-	execute: async (host, port) => serve(host as string, port as number),
+	execute: async (host: string, port: number) => serve(host, port),
 }
 
 const STATUS_RESPONSE_SUCCESS = new Uint8Array([0, 1])

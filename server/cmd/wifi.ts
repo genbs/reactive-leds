@@ -1,8 +1,8 @@
 import { logger } from "@leds/shared"
 import { exec } from "child_process"
-import { Command } from "cmd"
-import proto from "protocol"
-import { validateIP, validatePort } from "utils"
+import { Command } from "../cmd"
+import proto from "../protocol"
+import { validateIP, validatePort } from "../utils"
 
 export const scanCommand: Command = {
 	name: "scan",
@@ -36,6 +36,21 @@ export const pingCommand: Command = {
 		const pingResult = await proto.ping(ip as string, port as number)
 
 		logger.log(pingResult ? "Device is online" : "Device is offline")
+	},
+}
+
+export const resetWifiCommand: Command = {
+	name: "reset-wifi",
+	description: "Reset the Wi-Fi credentials of the device",
+	args: [
+		{ name: "ip", required: true, validator: validateIP },
+		{ name: "port", type: Number, required: false, default: 4210, validator: validatePort },
+	],
+
+	execute: async (ip: string, port: number) => {
+		const result = await proto.resetWifi(ip, port)
+
+		logger.log(result ? "Wi-Fi credentials reset successfully" : "Failed to reset Wi-Fi credentials")
 	},
 }
 

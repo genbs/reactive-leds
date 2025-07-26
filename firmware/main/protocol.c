@@ -1,6 +1,8 @@
 #include "protocol.h"
 
+#include "esp_wifi.h"
 #include "config.h"
+#include "storage.h"
 #include "udp_con.h"
 #include "leds.h"
 #include "esp_log.h"
@@ -17,6 +19,7 @@ enum ProtocolMessageType
     GET_CONFIG = 1,
     SET_CONFIG = 2,
     SET_LEDS = 3,
+    RESET_WIFI = 4
 };
 
 static bool is_protocol_packet_valid(const udp_packet* packet);
@@ -25,6 +28,7 @@ static void protocol_ping(const udp_packet* request);
 static void protocol_get_config(const udp_packet* request);
 static void protocol_set_config(const udp_packet* request);
 static void protocol_set_leds(const udp_packet* request);
+static void protocol_reset_wifi(const udp_packet* request);
 
 bool protocol_begin() {
     if (udp_con_begin(config.port)) {
@@ -61,6 +65,7 @@ static void protocol_process_packet(udp_packet* packet)
         case GET_CONFIG: protocol_get_config(packet); break;
         case SET_CONFIG: protocol_set_config(packet); break;
         case SET_LEDS:   protocol_set_leds(packet); break;
+        case RESET_WIFI: protocol_reset_wifi(packet); break;
         default:         ESP_LOGW(PROTOCOL_TAG, "Unknown message type: %d", packet->data[1]); break;
     }
 }
@@ -151,6 +156,8 @@ static void protocol_set_leds(const udp_packet* request)
         return;
     }
 
+    ESP_LOGV(PROTOCOL_TAG, "SET_LEDS");
+
     for (int i = 2; i + 4 < len; i += 5) {
         uint8_t pixel_index = data[i];
         if (pixel_index >= config.num_leds) {
@@ -161,4 +168,26 @@ static void protocol_set_leds(const udp_packet* request)
     }
 
     leds_show();
+}
+
+static void protocol_reset_wifi(const udp_packet* request)
+{
+    ESP_LOGV(PROTOCOL_TAG, "RESET_WIFI");
+
+    udp_packet response;
+    response.source_addr = request->source_addr;
+    response.data[0] = request->data[0];
+    response.data[1] = RESET_WIFI;
+    response.data[2] = 1; 
+    response.len = 3;
+    udp_con_send(&response);
+
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    ESP_LOGI(PROTOCOL_TAG, "Performing WiFi reset...");
+    esp_wifi_restore();
+    storage_delete("wifi", NULL); 
+
+    ESP_LOGI(PROTOCOL_TAG, "WiFi credentials reset, restarting...");
+    esp_restart();
 }

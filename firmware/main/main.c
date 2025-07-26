@@ -164,7 +164,6 @@ void app_main(void)
 
     // start wifi in station mode and disable sleep
     wifi_init_sta();
-    wifi_disable_sleep();
 
     wifi_credentials_t credentials = {0};
     if (!connect_to_known_networks(&credentials)) {
@@ -178,6 +177,8 @@ void app_main(void)
     } else {
         // stop BLE
         ble_down();
+
+        wifi_disable_sleep();
     }
     
     // Start application

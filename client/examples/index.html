@@ -11,12 +11,76 @@
 		</style>
 	</head>
 	<body>
-		<div>Connected: <span id="connected">No</span></div>
+		<div>
+			WIKI
+			<ul>
+				<li>1. Build and deploy the firmware</li>
+				<li>2. Send WIFI credential to the device (bt-credential)</li>
+				<li>3. Comunicate with the device (config, leds)</li>
+				<li>4. Get list of device (scan, bt-scan)</li>
+			</ul>
+		</div>
+		<div>
+			<ul>
+				<li>1. Assicurati che il server ed i dispositivi siano connessi alla stessa rete</li>
+				<li>2. Crea una lista di dispositivi (4.)</li>
+			</ul>
+		</div>
+		<div style="margin-top: 60px">
+			<div>Connected: <span id="connected">No</span></div>
+
+			<div>
+				<input type="range" id="red" min="0" step="1" max="255" value="0" id="red" />
+				<input type="range" id="green" min="0" step="1" max="255" value="0" id="green" />
+				<input type="range" id="blue" min="0" step="1" max="255" value="0" id="blue" />
+				<input type="range" id="brightness" min="0" step="1" max="255" value="0" id="brightness" />
+			</div>
+		</div>
 
 		<script src="leds.js"></script>
 		<script>
+			//new Worker("worker.js")
 			;(async () => {
+				//return
 				const connectedSpan = document.getElementById("connected")
+
+				const deviceIPs = ["192.168.1.2", "192.168.1.6"]
+				const devices = new Map()
+				let rid = 0
+
+				let color = [
+					Number(localStorage.getItem("red")) || 0,
+					Number(localStorage.getItem("green")) || 0,
+					Number(localStorage.getItem("blue")) || 0,
+					Number(localStorage.getItem("brightness")) || 0,
+				]
+
+				// bind the inputs
+				{
+					;["red", "green", "blue", "brightness"].forEach(id => {
+						const input = document.getElementById(id)
+						input.value = localStorage.getItem(id) || 0
+
+						input.addEventListener("input", async () => {
+							if (!leds.isConnected()) return
+							try {
+								color = [
+									Number(document.getElementById("red").value),
+									Number(document.getElementById("green").value),
+									Number(document.getElementById("blue").value),
+									Number(document.getElementById("brightness").value),
+								]
+
+								localStorage.setItem("red", color[0])
+								localStorage.setItem("green", color[1])
+								localStorage.setItem("blue", color[2])
+								localStorage.setItem("brightness", color[3])
+							} catch (error) {
+								console.error("Error setting color:", error)
+							}
+						})
+					})
+				}
 
 				try {
 					const result = await leds.begin("ws://localhost:8000", false)
@@ -26,6 +90,72 @@
 
 					function main() {
 						connectedSpan.textContent = leds.isConnected() ? "Yes" : "No"
+
+						deviceIPs.forEach(ip => {
+							connectDevice(ip)
+						})
+
+						clearTimeout(rid)
+						if (leds.isConnected()) {
+							animate()
+						}
+					}
+
+					function animate() {
+						const args = []
+						const now = performance.now()
+						const time = now / 1000
+
+						devices.keys().forEach((ip, index) => {
+							const config = devices.get(ip)
+							const len = config.num_leds
+							const data = new Uint8Array(len * 5)
+
+							for (let i = 0; i < len; i++) {
+								data[i * 5] = i
+								data[i * 5 + 1] = color[0]
+								data[i * 5 + 2] = color[1]
+								data[i * 5 + 3] = color[2]
+								data[i * 5 + 4] = color[3]
+								c = Math.floor(Math.sin(time * 10 + i / 10) ** 0.2 * 127 + 128)
+								data[i * 5 + 1] = 0
+								data[i * 5 + 2] = 0
+								data[i * 5 + 3] = 0
+								data[i * 5 + 4] = c * 0.05
+							}
+							args[index] = {
+								ip: ip,
+								port: config.port,
+								data: data,
+							}
+						})
+
+						args.forEach(arg => {
+							leds.setLEDs(arg.ip, arg.port, arg.data)
+						})
+
+						rid = setTimeout(animate, 1000 / 60)
+					}
+
+					async function connectDevice(ip, retries = 100) {
+						if (devices.has(ip)) {
+							console.log("Already connected to device:", ip)
+							return
+						}
+
+						console.log("Connecting to device:", ip, retries)
+						const config = await leds.getConfig(ip)
+						if (config) {
+							devices.set(ip, config)
+							console.log("Device connected:", ip, config)
+						} else {
+							console.error("Failed to connect to device:", ip)
+							if (retries > 0) {
+								setTimeout(() => {
+									connectDevice(ip, retries - 1)
+								}, 33)
+							}
+						}
 					}
 				} catch (error) {
 					console.error("Error connecting to LED server:", error)

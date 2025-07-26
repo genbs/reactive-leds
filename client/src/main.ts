@@ -11,7 +11,6 @@ import {
 	addressToBuffer,
 	bufferToConfig,
 	Config,
-	configToBuffer,
 	DeviceAddress,
 	DeviceIP,
 	LOG_LEVEL,
@@ -20,7 +19,7 @@ import {
 } from "@leds/shared"
 import { FALSE, TRUE, WorkerRequestType } from "./comm"
 import { mapPixels } from "./mapping"
-import { connect, isConnected, onConnectionChange, send, sendSync } from "./proxy"
+import { isConnected, onConnectionChange, send, sendSync, wsconnect } from "./proxy"
 
 // Internal map of address to buffer
 const addressBufferMap = new Map<DeviceIP, DeviceAddress>()
@@ -52,43 +51,52 @@ function createPacket(ip: DeviceIP, port: number, type: PacketType, data?: Uint8
  * (Sync) With this function you can connect to the server, it's necessary to call this function before any other function.
  * With the debug parameter you can enable the debug mode, the library will print more information in the console.
  */
-function begin(serverURL: string, debug = false): Promise<boolean> {
+export function begin(serverURL: string, debug = false): Promise<boolean> {
 	logger.level = debug ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR
 
-	return connect(serverURL, debug)
+	return wsconnect(serverURL, debug)
 }
 
 // (Sync) Send a ping message to the server and wait for the response.
-function ping(ip: DeviceIP, port = 4210): Promise<boolean> {
+export function ping(ip: DeviceIP, port = 4210): Promise<boolean> {
 	const packet = createPacket(ip, port, PacketType.PING)
 
 	return sendSync(packet).then(response => response[0] === TRUE)
 }
 
 // (Sync) Get the configuration of the device.
-function getConfig(ip: DeviceIP, port = 4210): Promise<Config | null> {
+export function getConfig(ip: DeviceIP, port = 4210): Promise<Config | null> {
 	const packet = createPacket(ip, port, PacketType.GET_CONFIG)
 
 	return sendSync(packet).then(response => {
 		if (response.length === 1 && response[0] === FALSE) return null
-
 		return bufferToConfig(response)
 	})
 }
 
-/**
- * (Sync) Set Configuration of device, required a full Configuration
- */
-function setConfig(ip: DeviceIP, port = 4210, newConfig: Config): Promise<Boolean> {
-	const configBuffer = configToBuffer(newConfig)
-	const packet = createPacket(ip, port, PacketType.SET_CONFIG, configBuffer)
-
-	return sendSync(packet).then(response => response.length === 1 && response[0] === TRUE)
+// (Async) Set the RGB LEDs of the device.
+export function setLEDs(ip: DeviceIP, port = 4210, leds: Uint8Array) {
+	return send(createPacket(ip, port, PacketType.SET_LEDS, leds))
 }
 
-// (Async) Set the RGB LEDs of the device.
-function setLEDs(ip: DeviceIP, port = 4210, leds: Uint8Array) {
-	return send(createPacket(ip, port, PacketType.SET_LEDS, leds))
+type Device = {
+	config: Config
+	send: (leds: Uint8Array) => void
+}
+
+export async function connect(ip: DeviceIP, port = 4210): Promise<Device | null> {
+	const result = await ping(ip, port)
+	if (result) {
+		const config = await getConfig(ip, port)
+		if (!config) return null
+
+		return {
+			config,
+			send: (leds: Uint8Array) => setLEDs(ip, port, leds),
+		}
+	}
+
+	return null
 }
 
 const leds = {
@@ -96,9 +104,10 @@ const leds = {
 	onConnectionChange,
 	isConnected,
 
+	connect,
+
 	ping,
 	getConfig,
-	setConfig,
 	setLEDs,
 	mapPixels,
 }

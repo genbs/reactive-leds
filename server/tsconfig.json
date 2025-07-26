@@ -16,10 +16,11 @@
 		"declaration": true,
 		"types": ["jest", "node"],
 		"allowSyntheticDefaultImports": true,
-		"allowJs": true,
 		"lib": ["DOM", "ESNext"],
 		"resolveJsonModule": true,
 		"paths": {}
 	},
-	"exclude": ["node_modules"]
+	"include": ["src"],
+	"exclude": ["node_modules"],
+	"references": [{ "path": "../shared" }]
 }

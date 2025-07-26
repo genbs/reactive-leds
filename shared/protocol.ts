@@ -30,12 +30,18 @@ export enum PacketType {
 	 */
 
 	SET_CONFIG = 2,
+
 	/**
 	 * set the RGB LEDs of the device
 	 * request: DeviceAddress, MessageID, pixel_index, r, g, b, b/w, pixel_index, r, g, b, b/w...
 	 * response: None, this is an async request, no response needed
 	 */
 	SET_LEDS = 3,
+
+	/**
+	 * Clear all wi-Fi credentials stored in the device
+	 */
+	RESET_WIFI = 4,
 }
 
 export type Packet = Uint8Array // [PacketID, PacketType, ...number[]]
@@ -72,6 +78,7 @@ export const PacketTypeMap = {
 	[PacketType.GET_CONFIG]: "GET_CONFIG",
 	[PacketType.SET_CONFIG]: "SET_CONFIG",
 	[PacketType.SET_LEDS]: "SET_LEDS",
+	[PacketType.RESET_WIFI]: "RESET_WIFI",
 }
 
 // convert a buffer to a config object

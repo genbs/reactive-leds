@@ -121,18 +121,31 @@ esp_err_t storage_delete(const char* namespace, const char* key)
     nvs_handle_t my_handle;
     esp_err_t err;
 
-    char truncated_key[NVS_KEY_NAME_MAX_SIZE];
-    get_truncated_key(truncated_key, key);
-
     err = nvs_open(namespace, NVS_READWRITE, &my_handle);
     if (err != ESP_OK) {
         ESP_LOGE(STORAGE_TAG, "Failed to open NVS namespace '%s': %s", namespace, esp_err_to_name(err));
         return err;
     }
 
-    err = nvs_erase_key(my_handle, truncated_key);
+    if (key != NULL) {
+        ESP_LOGI(STORAGE_TAG, "Erasing key '%s' from namespace '%s'...", key, namespace);
+
+        char truncated_key[NVS_KEY_NAME_MAX_SIZE];
+        get_truncated_key(truncated_key, key);
+        
+        err = nvs_erase_key(my_handle, truncated_key);
+    } else {
+        ESP_LOGI(STORAGE_TAG, "Erasing all keys from namespace '%s'...", namespace);
+        err = nvs_erase_all(my_handle);
+    }
+
     if (err == ESP_OK) {
         err = nvs_commit(my_handle);
+        if (err != ESP_OK) {
+             ESP_LOGE(STORAGE_TAG, "NVS commit failed: %s", esp_err_to_name(err));
+        }
+    } else {
+        ESP_LOGE(STORAGE_TAG, "Erase operation failed: %s", esp_err_to_name(err));
     }
     
     nvs_close(my_handle);

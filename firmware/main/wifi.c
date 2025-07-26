@@ -172,17 +172,3 @@ wifi_ap_record_t* wifi_scan(int *num_networks) {
     
     return ap_records;
 }
-
-char* mask_wifi_password(const char *password) {
-    static char masked_password[WIFI_PASS_MAX_LEN + 1]; 
-    size_t pass_len = strlen(password);
-
-    if (pass_len <= 4) {
-        snprintf(masked_password, sizeof(masked_password), "********");
-    } else {
-        snprintf(masked_password, sizeof(masked_password), "%.3s...%c", 
-                 password, password[pass_len - 1]);
-    }
-    
-    return masked_password;
-}
