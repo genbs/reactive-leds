@@ -7,3 +7,5 @@ dist
 .env
 *.log*
 .idea
+.cache
+.vscode

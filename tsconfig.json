@@ -14,5 +14,5 @@
 		"types": ["jest"]
 	},
 	"exclude": ["node_modules", "**/node_modules", "**/dist"],
-	"references": [{ "path": "./shared" }, { "path": "./client" }, { "path": "./server" }]
+	"references": [{ "path": "./shared" }, { "path": "./client" }, { "path": "./cli" }]
 }

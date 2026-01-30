@@ -1,9 +1,0 @@
-{
-	"idf.pythonInstallPath": "/usr/bin/python3",
-	"idf.port": "/dev/tty.usbmodem1101",
-	"idf.openOcdConfigs": ["board/esp32s3-builtin.cfg"],
-	"idf.customExtraVars": {
-		"IDF_TARGET": "esp32s3"
-	},
-	"idf.flashType": "UART"
-}

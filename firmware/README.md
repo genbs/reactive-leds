@@ -14,9 +14,9 @@
    Run idf.py menuconfig and enable the following option:
 
 Component config -> Bluetooth -> Bluedroid Options -> [*] CONFIG_BT_BLE_42_FEATURES_SUPPORTED
-CONFIG_LWIP_UDP_RECVMBOX_SIZE=64
+CONFIG_LWIP_UDP_RECVMBOX_SIZE=6
 CONFIG_LWIP_TCPIP_TASK_PRIO=1
-CONFIG_UDP_RECVMBOX_SIZE=64
+CONFIG_UDP_RECVMBOX_SIZE=6
 
 Setup the "Device configuration"
 
@@ -40,40 +40,27 @@ idf.py build
 idf.py -p /dev/tty.usbmodem1101 flash
 ```
 
-### VSCode configuration
+### Send udp message using netcat
 
-.vscode/c_cpp_properties.json
-
-```json
-{
-	"configurations": [
-		{
-			"name": "Mac",
-			"includePath": ["${workspaceFolder}/**", "~/esp/esp-idf/**"],
-			"defines": [],
-			"macFrameworkPath": ["/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"],
-			"compilerPath": "${config:idf.toolsPath}/tools/xtensa-esp-elf/esp-13.2.0_20240530/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc",
-			"cStandard": "c17",
-			"cppStandard": "c++17",
-			"intelliSenseMode": "macos-clang-arm64"
-		}
-	],
-	"version": 4
-}
+```bash
+// send [1,4] to
+echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210
 ```
 
-.vscode/settings.json
+Print result in hex
 
-```json
-{
-	"idf.pythonInstallPath": "/usr/bin/python3",
-	"idf.port": "/dev/tty.usbmodem1101",
-	"idf.openOcdConfigs": ["board/esp32s3-builtin.cfg"],
-	"idf.customExtraVars": {
-		"IDF_TARGET": "esp32s3"
-	},
-	"idf.flashType": "UART"
-}
+```bash
+# ping
+echo -n -e '\x01\x01' | nc -u -w1 192.168.x.x 4210 | hexdump -C
+
+# set led 1 to red
+echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210 | hexdump -C
+```
+
+or
+
+```bash
+echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210 | xxd -p
 ```
 
 ## TODO
