@@ -1,3 +1,11 @@
 node_modules
 build
 dist
+.todo
+.vscode
+.DS_Store
+.env
+*.log*
+.idea
+.cache
+.vscode

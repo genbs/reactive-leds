@@ -1,0 +1,29 @@
+menu "Device configuration"
+
+    config LED_PIN
+        int "GPIO for LED Strip"
+        default 18
+        help
+            The GPIO pin number connected to the data line of the LED strip.
+
+    config NUM_LEDS
+        int "Number of LEDs"
+        default 16
+        help
+            The total number of LEDs in the strip.
+
+    config BRIGHTNESS
+        int "Default Brightness (0-255)"
+        range 0 255
+        default 255
+        help
+            The default brightness level for the LEDs.
+
+
+    config PORT
+        int "UDP Listener Port"
+        default 4210
+        help
+            The UDP port the ESP32 will listen on for commands.
+
+endmenu

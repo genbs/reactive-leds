@@ -1,51 +1,34 @@
-# gydra-led
+# DIY Tube LED
 
-### Send udp message using netcat
+## Introduzione
 
-```bash
-// send [1,4] to
-echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210
-```
+Questo progetto si propone di condividere la mia personale esperienza nella costruzione di un un tubo LED stampato in 3D e controllabile tramite WiFi.
 
-Print result in hex
+Il firmware ed i modelli 3D sono progettati per funzionare con i materiali che ho utilizzato.
 
-```bash
-# ping
-echo -n -e '\x01\x01' | nc -u -w1 192.168.x.x 4210 | hexdump -C
+## Motivazione
 
-# blink
-echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210 | hexdump -C
+## Risultato
 
-# set led 1 to red
-echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210 | hexdump -C
-```
+## Materiale utilizzato
 
-or
+Ho scelto delle strisce FCOB di 24v e 896 LEDs per metro. I circuiti integrati (IC) per metro sono 16, quindi si possono controllare 16 LEDs sulla striscia.
 
-```bash
-echo -n -e '\x01\x04' | nc -u -w1 192.168.x.x 4210 | xxd -p
-```
+- [Striscia LED](https://it.aliexpress.com/item/1005007316659176.html)
+- [Modulo DC-DC](https://it.aliexpress.com/item/1005008231627584.html)
+- [ESP32-S3](https://it.aliexpress.com/item/1005005045724400.html)
+- [Alimentatore 24v](https://www.amazon.it/dp/B0C8CM7GS7)
+- [Cavo alimentazione](https://it.aliexpress.com/item/1005007046323657.html)
+- [JST](https://it.aliexpress.com/item/1005005362711029.html) ([oppure](https://it.aliexpress.com/item/1005004615616698.html))
 
-### Show host on network
+## Stampa 3D
 
-```bash
-dns-sd -B _http._tcp local # mdns
-nmap -sn 192.168.1.0/24 # arp
+Il case è stato progettato per inserire l'esp32 e il modulo dc-dc sopra elencati. Così come il profilo della striscia LED (12mm).
 
-```
+Per il profilo ho scelto di stampare 5 pezzi in PLA da 20cm ciascuno, per l'opalino ho utilizzato un PETG trasparente, ognuno della lunghezza di 25cm.
 
-### Arduino Conf
+## Montaggio
 
-per l'esp32s3 selezionare
+## Utilizzo
 
-- PSRAM: OPI PSRAM
-- Partition Scheme: 8MB
-
-### Problems
-
-```
-assert failed: tcp_alloc /IDF/components/lwip/lwip/src/core/tcp.c:1851 (Required to lock TCPIP core functionality!)
-```
-
-resolved with install 3.0.7 version of ESP32 core:
-https://forum.arduino.cc/t/asyncwebserver-is-no-longer-working-crashing-with-esp32-s3-wroom/1334021/5
+Modem, avvio server, client
