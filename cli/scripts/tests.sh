@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# usage: ./tests.sh <device_ip> [red] [green] [blue]
+
 pixels() {
   local count=${1:-16}
   local r=${2:-255}
@@ -11,13 +14,12 @@ pixels() {
     output+="$i,$r,$g,$b,$w,"
   done
 
-  # Rimuove l'ultima virgola
   output=${output%,}
   echo "$output"
 }
 
 if [ -z "$1" ]; then
-  echo "Error: missing device id"
+  echo "Error: missing device ip"
   exit 1
 fi
 
@@ -26,5 +28,6 @@ g=${3:-0}
 b=${4:-0}
 
 payload=$(pixels 16 "$r" "$g" "$b" 0)
-ip="192.168.1.$1"
-./run.sh leds "$ip" 4210 "$payload"
+ip=$1
+current_dir=$(dirname "$0")
+"$current_dir/run.sh" leds "$ip" 4210 "$payload"

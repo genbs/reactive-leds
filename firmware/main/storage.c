@@ -17,6 +17,24 @@ static void get_truncated_key(char* dest, const char* src) {
     dest[NVS_KEY_NAME_MAX_SIZE - 1] = '\0';
 }
 
+static bool is_key_long(const char* key) {
+    return strlen(key) > (NVS_KEY_NAME_MAX_SIZE - 1);
+}
+
+static uint32_t fnv1a_hash32(const char* data) {
+    uint32_t hash = 2166136261u;
+    for (const unsigned char* p = (const unsigned char*)data; *p != '\0'; ++p) {
+        hash ^= (uint32_t)(*p);
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+static void get_hashed_key(char* dest, const char* src) {
+    uint32_t hash = fnv1a_hash32(src);
+    snprintf(dest, NVS_KEY_NAME_MAX_SIZE, "h_%08x", (unsigned)hash);
+}
+
 /**
  * Initialize the NVS storage.
  */
@@ -43,6 +61,12 @@ esp_err_t storage_set(const char* namespace, const char* key, const char* value)
 
     char truncated_key[NVS_KEY_NAME_MAX_SIZE];
     get_truncated_key(truncated_key, key);
+    char hashed_key[NVS_KEY_NAME_MAX_SIZE];
+    const char* final_key = truncated_key;
+    if (is_key_long(key)) {
+        get_hashed_key(hashed_key, key);
+        final_key = hashed_key;
+    }
 
     err = nvs_open(namespace, NVS_READWRITE, &my_handle);
     if (err != ESP_OK) {
@@ -50,7 +74,7 @@ esp_err_t storage_set(const char* namespace, const char* key, const char* value)
         return err;
     }
 
-    err = nvs_set_str(my_handle, truncated_key, value);
+    err = nvs_set_str(my_handle, final_key, value);
     if (err != ESP_OK) {
         ESP_LOGE(STORAGE_TAG, "Failed to set key '%s': %s", key, esp_err_to_name(err));
     } else {
@@ -75,6 +99,11 @@ esp_err_t storage_get(const char* namespace, const char* key, char* value, size_
 
     char truncated_key[NVS_KEY_NAME_MAX_SIZE];
     get_truncated_key(truncated_key, key);
+    char hashed_key[NVS_KEY_NAME_MAX_SIZE];
+    bool long_key = is_key_long(key);
+    if (long_key) {
+        get_hashed_key(hashed_key, key);
+    }
 
     err = nvs_open(namespace, NVS_READONLY, &my_handle);
     if (err != ESP_OK) {
@@ -82,7 +111,14 @@ esp_err_t storage_get(const char* namespace, const char* key, char* value, size_
         return err;
     }
 
-    err = nvs_get_str(my_handle, truncated_key, value, length);
+    if (long_key) {
+        err = nvs_get_str(my_handle, hashed_key, value, length);
+        if (err == ESP_ERR_NVS_NOT_FOUND) {
+            err = nvs_get_str(my_handle, truncated_key, value, length);
+        }
+    } else {
+        err = nvs_get_str(my_handle, truncated_key, value, length);
+    }
 
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGW(STORAGE_TAG, "Failed to get key '%s': %s", key, esp_err_to_name(err));
@@ -100,6 +136,11 @@ bool storage_has_key(const char* namespace, const char* key)
     nvs_handle_t my_handle;
     char truncated_key[NVS_KEY_NAME_MAX_SIZE];
     get_truncated_key(truncated_key, key);
+    char hashed_key[NVS_KEY_NAME_MAX_SIZE];
+    bool long_key = is_key_long(key);
+    if (long_key) {
+        get_hashed_key(hashed_key, key);
+    }
 
     esp_err_t err = nvs_open(namespace, NVS_READONLY, &my_handle);
     if (err != ESP_OK) {
@@ -107,7 +148,14 @@ bool storage_has_key(const char* namespace, const char* key)
     }
 
     size_t required_size = 0;
-    err = nvs_get_str(my_handle, truncated_key, NULL, &required_size);
+    if (long_key) {
+        err = nvs_get_str(my_handle, hashed_key, NULL, &required_size);
+        if (err == ESP_ERR_NVS_NOT_FOUND) {
+            err = nvs_get_str(my_handle, truncated_key, NULL, &required_size);
+        }
+    } else {
+        err = nvs_get_str(my_handle, truncated_key, NULL, &required_size);
+    }
     nvs_close(my_handle);
 
     return (err == ESP_OK);
@@ -132,8 +180,36 @@ esp_err_t storage_delete(const char* namespace, const char* key)
 
         char truncated_key[NVS_KEY_NAME_MAX_SIZE];
         get_truncated_key(truncated_key, key);
-        
+        char hashed_key[NVS_KEY_NAME_MAX_SIZE];
+        bool long_key = is_key_long(key);
+        bool deleted = false;
+
+        if (long_key) {
+            get_hashed_key(hashed_key, key);
+            err = nvs_erase_key(my_handle, hashed_key);
+            if (err == ESP_OK) {
+                deleted = true;
+            } else if (err != ESP_ERR_NVS_NOT_FOUND) {
+                ESP_LOGE(STORAGE_TAG, "Erase operation failed: %s", esp_err_to_name(err));
+                nvs_close(my_handle);
+                return err;
+            }
+        }
+
         err = nvs_erase_key(my_handle, truncated_key);
+        if (err == ESP_OK) {
+            deleted = true;
+        } else if (err != ESP_ERR_NVS_NOT_FOUND) {
+            ESP_LOGE(STORAGE_TAG, "Erase operation failed: %s", esp_err_to_name(err));
+            nvs_close(my_handle);
+            return err;
+        }
+
+        if (!deleted) {
+            err = ESP_ERR_NVS_NOT_FOUND;
+        } else {
+            err = ESP_OK;
+        }
     } else {
         ESP_LOGI(STORAGE_TAG, "Erasing all keys from namespace '%s'...", namespace);
         err = nvs_erase_all(my_handle);
@@ -144,7 +220,7 @@ esp_err_t storage_delete(const char* namespace, const char* key)
         if (err != ESP_OK) {
              ESP_LOGE(STORAGE_TAG, "NVS commit failed: %s", esp_err_to_name(err));
         }
-    } else {
+    } else if (err != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGE(STORAGE_TAG, "Erase operation failed: %s", esp_err_to_name(err));
     }
     
@@ -181,15 +257,9 @@ void storage_log(const char* partition_name, const char* namespace)
         
         if (info.type == NVS_TYPE_STR) {
             size_t len;
-            
-            // Get the length of the string value
+            // Log only length to avoid leaking sensitive values
             if (nvs_get_str(my_handle, info.key, NULL, &len) == ESP_OK) {
-                char* value = malloc(len);
-                if (value) {
-                    nvs_get_str(my_handle, info.key, value, &len);
-                    ESP_LOGI(STORAGE_TAG, "Key: '%s', Value: '%s'", info.key, value);
-                    free(value);
-                }
+                ESP_LOGI(STORAGE_TAG, "Key: '%s', Type: STR, Len: %u", info.key, (unsigned)len);
             }
         } else {
             ESP_LOGI(STORAGE_TAG, "Key: '%s', Type: 0x%02X", info.key, info.type);

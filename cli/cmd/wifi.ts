@@ -9,6 +9,7 @@ export const scanCommand: Command = {
 	description: "Scan for available devices over Wi-Fi",
 	args: [{ name: "port", type: Number, required: false, default: 4210, validator: validatePort }],
 	execute: async port => {
+		logger.log("Scanning for devices...")
 		const devices = await scan(port as number)
 
 		const message = `Available devices:\n\t- ${devices
@@ -75,6 +76,8 @@ function scan(port: number): Promise<ScanResult[]> {
 							return null
 						}
 
+						logger.debug("Found ARP entry:", parts)
+
 						const ip = parts[1].replace(/[()]/g, "")
 						const mac = parts[3]
 							.split(":")
@@ -83,7 +86,11 @@ function scan(port: number): Promise<ScanResult[]> {
 
 						let pinged = false
 						for (let i = 3 /* retries */; i > 0; i--) {
-							if ((pinged = await proto.ping(ip, port))) break
+							try {
+								if ((pinged = await proto.ping(ip, port))) break
+							} catch {
+								// ignore
+							}
 						}
 
 						return {

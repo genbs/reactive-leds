@@ -40,6 +40,12 @@ idf.py build
 idf.py -p /dev/tty.usbmodem1101 flash
 ```
 
+4. Monitor the device
+
+```bash
+idf.py -p /dev/tty.usbmodem1101 monitor
+```
+
 ### Send udp message using netcat
 
 ```bash

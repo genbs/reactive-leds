@@ -30,10 +30,24 @@ bool udp_con_begin(uint16_t port) {
 
     // non blocking mode
     int flags = fcntl(sock, F_GETFL, 0);
-    fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+    if (flags < 0) {
+        ESP_LOGE(UDP_TAG, "fcntl(F_GETFL) failed: errno %d", errno);
+        close(sock);
+        sock = -1;
+        return false;
+    }
+
+    if (fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
+        ESP_LOGE(UDP_TAG, "fcntl(F_SETFL) failed: errno %d", errno);
+        close(sock);
+        sock = -1;
+        return false;
+    }
 
     if (bind(sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
         ESP_LOGE(UDP_TAG, "Socket unable to bind: errno %d", errno);
+        close(sock);
+        sock = -1;
         return false;
     }
 

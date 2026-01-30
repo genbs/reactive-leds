@@ -16,7 +16,7 @@ export const rainbowCommand: Command = {
     ],
     execute: async (seconds: number, ip: string, port: number, num_leds: number) => {
         // send rainbow command for specified seconds
-
+        const FPS = 200
         const now = performance.now()
         const w = 0
         const ledsPackage = new Uint8Array(num_leds * 5)
@@ -31,7 +31,7 @@ export const rainbowCommand: Command = {
                 }
 
                 proto.setLEDs(ip, port, ledsPackage)
-                await new Promise(resolve => setTimeout(resolve, 1000 / 60)) // 60 FPS
+                await new Promise(resolve => setTimeout(resolve, 1000 / FPS))
             }
         }
 

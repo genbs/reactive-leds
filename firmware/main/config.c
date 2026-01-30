@@ -27,16 +27,19 @@ void config_begin(void) {
     size_t len = sizeof(buf);
     
     if (storage_has_key("config", "pin")) {
+        len = sizeof(buf);
         storage_get("config", "pin", buf, &len);
         config.pin = (uint8_t)atoi(buf);
     }
     
     if (storage_has_key("config", "num_leds")) {
+        len = sizeof(buf);
         storage_get("config", "num_leds", buf, &len);
         config.num_leds = (uint8_t)atoi(buf);
     }
 
     if (storage_has_key("config", "brightness")) {
+        len = sizeof(buf);
         storage_get("config", "brightness", buf, &len);
         config.brightness = (uint8_t)atoi(buf);
     }

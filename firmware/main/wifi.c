@@ -14,6 +14,18 @@ static int s_retry_num = 0;
 static bool s_connected = false;
 static char s_ip_address_str[16] = "0.0.0.0"; 
 static char s_mac_address_str[18] = "00:00:00:00:00:00";
+static bool s_wifi_started = false;
+static bool s_handlers_registered = false;
+static esp_event_handler_instance_t s_instance_any_id;
+static esp_event_handler_instance_t s_instance_got_ip;
+
+static void wifi_start_once(void)
+{
+    if (!s_wifi_started) {
+        ESP_ERROR_CHECK(esp_wifi_start());
+        s_wifi_started = true;
+    }
+}
 
 
 static void event_handler(void* arg, esp_event_base_t event_base,
@@ -103,10 +115,11 @@ void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
 {   
     ESP_LOGV(WIFI_TAG, "Connecting to WiFi network: %s-%s", WIFI_SSID, mask_wifi_password(WIFI_PASS));
 
-    esp_event_handler_instance_t instance_any_id;
-    esp_event_handler_instance_t instance_got_ip;
-    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &instance_any_id);
-    esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &instance_got_ip);
+    if (!s_handlers_registered) {
+        esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &s_instance_any_id);
+        esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &s_instance_got_ip);
+        s_handlers_registered = true;
+    }
 
     wifi_config_t wifi_config = {0}; 
     strcpy((char *)wifi_config.sta.ssid, (char *)WIFI_SSID);
@@ -117,7 +130,7 @@ void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
     wifi_config.sta.pmf_cfg.required = false;
     
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    wifi_start_once();
 
     uint8_t mac[6];
     esp_wifi_get_mac(ESP_IF_WIFI_STA, mac);
@@ -142,13 +155,19 @@ void wifi_stop() {
     ESP_LOGI(WIFI_TAG, "Stopping WiFi");
     ESP_ERROR_CHECK(esp_wifi_stop());
     ESP_ERROR_CHECK(esp_wifi_deinit());
+    s_wifi_started = false;
+    if (s_handlers_registered) {
+        esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, s_instance_any_id);
+        esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, s_instance_got_ip);
+        s_handlers_registered = false;
+    }
 }
 
 // Scan all available networks
 // returns an array of wifi_ap_record_t and set num_networks to the number of networks found
 wifi_ap_record_t* wifi_scan(int *num_networks) {
     ESP_LOGI(WIFI_TAG, "Starting WiFi scan");
-    ESP_ERROR_CHECK(esp_wifi_start());
+    wifi_start_once();
 
     // Start scan
     wifi_scan_config_t scan_config = {

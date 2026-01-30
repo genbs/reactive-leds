@@ -42,6 +42,18 @@ static esp_ble_adv_params_t adv_params = {
     .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
 
+static uint32_t s_last_activity_ms = 0;
+
+uint32_t ble_last_activity_ms()
+{
+    return s_last_activity_ms;
+}
+
+static void ble_mark_activity()
+{
+    s_last_activity_ms = esp_log_timestamp();
+}
+
 // when the client sends the credentials, store them and restart the device
 // TODO: Could be a problem if the client sends too many credentials - maybe invalid - and occupies unnecessary memory
 void store_credentials(uint8_t *value, size_t len)
@@ -83,6 +95,7 @@ void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp
     switch (event) {
     case ESP_GATTS_CONNECT_EVT:
         ESP_LOGV(BLE_TAG, "Connected, conn_id %d", param->connect.conn_id);
+        ble_mark_activity();
         break;
     case ESP_GATTS_REG_EVT: 
         ESP_LOGV(BLE_TAG, "Registered, status %d, app_id %d", param->reg.status, param->reg.app_id);
@@ -120,6 +133,7 @@ void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp
                 (unsigned int)param->write.conn_id,
                 (unsigned int)param->write.trans_id,
                 (unsigned int)param->write.handle);
+        ble_mark_activity();
 
         if (param->write.need_rsp) {
             esp_gatt_rsp_t rsp = {0}; 
@@ -188,6 +202,7 @@ void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
 void ble_begin()
 {
     ESP_LOGI(BLE_TAG, "BLE initialization");
+    ble_mark_activity();
 
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
     

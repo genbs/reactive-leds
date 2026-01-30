@@ -97,14 +97,14 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
  */
 void ble_configuration_loop() {
     ble_begin();
-    
-    uint32_t start_time = esp_log_timestamp();
-    while (esp_log_timestamp() - start_time < BLE_TIMEOUT_MS) { 
-        delay(CHECK_CONNECTED_TIMEOUT);
-    }
 
-    ESP_LOGW(TAG, "BLE timeout, rebooting");
-    esp_restart();
+    while (true) {
+        delay(CHECK_CONNECTED_TIMEOUT);
+        if (esp_log_timestamp() - ble_last_activity_ms() > BLE_TIMEOUT_MS) {
+            ESP_LOGW(TAG, "BLE timeout, rebooting");
+            esp_restart();
+        }
+    }
 }
 
 /**
@@ -165,7 +165,7 @@ void app_main(void)
     // start wifi in station mode and disable sleep
     wifi_init_sta();
 
-    wifi_credentials_t credentials = {0};
+    static wifi_credentials_t credentials = {0};
     if (!connect_to_known_networks(&credentials)) {
         ESP_LOGI(TAG, "No known networks found, starting BLE");
 

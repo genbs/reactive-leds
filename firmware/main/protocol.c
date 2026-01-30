@@ -105,6 +105,10 @@ static void protocol_get_config(const udp_packet* request)
     response.data[6] = config.port & 0xFF;
 
     size_t hostname_len = strlen(config.hostname);
+    size_t max_host_len = (sizeof(response.data) > 7) ? (sizeof(response.data) - 7) : 0;
+    if (hostname_len > max_host_len) {
+        hostname_len = max_host_len;
+    }
     memcpy(&response.data[7], config.hostname, hostname_len);
     response.len = 7 + hostname_len;
 
@@ -158,6 +162,7 @@ static void protocol_set_leds(const udp_packet* request)
 
     ESP_LOGV(PROTOCOL_TAG, "SET_LEDS");
 
+    bool updated = false;
     for (int i = 2; i + 4 < len; i += 5) {
         uint8_t pixel_index = data[i];
         if (pixel_index >= config.num_leds) {
@@ -165,9 +170,12 @@ static void protocol_set_leds(const udp_packet* request)
             continue;
         }
         leds_update(pixel_index, data[i+1] /* R */, data[i+2] /* G */, data[i+3] /* B */, data[i+4] /* W */);
+        updated = true;
     }
 
-    leds_show();
+    if (updated) {
+        leds_show();
+    }
 }
 
 static void protocol_reset_wifi(const udp_packet* request)

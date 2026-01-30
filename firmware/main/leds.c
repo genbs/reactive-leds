@@ -39,6 +39,7 @@ bool leds_begin()
         return false;
     }
     memset(s_led_buffer, 0, buffer_size);
+
     
     // Configure RMT (credits: https://github.com/espressif/esp-idf/blob/master/examples/peripherals/rmt/led_strip/main/led_strip_example_main.c)
     ESP_LOGV(LEDS_TAG, "Create RMT TX channel");
@@ -76,7 +77,7 @@ void leds_update(uint8_t pixel_index, uint8_t r, uint8_t g, uint8_t b, uint8_t w
     if (!s_led_buffer || pixel_index >= config.num_leds) {
         return;
     }
-    
+
     // TODO: the order of colors might be different depending on the type of LED
     size_t index = pixel_index * 4;
     s_led_buffer[index] = w;

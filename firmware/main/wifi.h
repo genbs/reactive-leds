@@ -5,7 +5,7 @@
 #include "esp_wifi.h"
 
 #define WIFI_SSID_MAX_LEN 32
-#define WIFI_PASS_MAX_LEN 32
+#define WIFI_PASS_MAX_LEN 64
 
 void wifi_init_sta();
 void wifi_connect(const char *ssid, const char *password);
