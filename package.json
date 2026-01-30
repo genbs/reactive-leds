@@ -1,0 +1,25 @@
+{
+    "private": true,
+    "scripts": {},
+    "workspaces": [
+        "client",
+        "server",
+        "shared"
+    ],
+    "devDependencies": {
+        "@jest/globals": "^29.7.0",
+        "@types/jest": "^29.5.12",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.1.5",
+        "tsconfig-paths": "^4.2.0",
+        "tslib": "^2.8.1",
+        "typescript": "^5.4.5"
+    },
+    "jest": {
+        "preset": "ts-jest",
+        "testMatch": [
+            "**/__tests__/**/*.ts",
+            "**/?(*.)+(spec|test).ts"
+        ]
+    }
+}

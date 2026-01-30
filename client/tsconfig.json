@@ -1,26 +1,21 @@
 {
+	"extends": "../tsconfig.json",
 	"compilerOptions": {
-		"baseUrl": ".",
+		"composite": true,
+		"rootDir": "./src",
 		"outDir": "./dist",
 		"module": "ESNext",
 		"jsx": "react-jsx",
 		"target": "ESNext",
 		"moduleResolution": "node",
-		"esModuleInterop": true,
 		"isolatedModules": false,
 		"useDefineForClassFields": false,
 		"declaration": true,
 		"types": ["node", "jest"],
 		"allowSyntheticDefaultImports": true,
-		"allowJs": true,
-		"lib": ["DOM", "ESNext"],
-		"resolveJsonModule": true,
-		"paths": {
-			"@shared": ["../shared/index"],
-			"@lib": ["./src/lib/index"],
-			"@mapping/*": ["./src/mapping/*"]
-		}
+		"lib": ["DOM", "ESNext"]
 	},
-	"include": ["src/**/*"],
-	"exclude": ["node_modules", "build", "dist"]
+	"include": ["src"],
+	"exclude": ["node_modules", "build", "dist"],
+	"references": [{ "path": "../shared" }]
 }
