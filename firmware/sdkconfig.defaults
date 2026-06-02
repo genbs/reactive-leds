@@ -1,0 +1,53 @@
+# Project-specific overrides for reactive-leds firmware.
+# ESP-IDF generates the full sdkconfig from this file + IDF defaults at build time.
+# Keep this file minimal — only entries that differ from IDF defaults belong here.
+
+# --- Target hardware ---
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
+# --- Partition table (see partitions.csv) ---
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+
+# --- Bluetooth ---
+# BLE 4.2 features required for the provisioning GATT server.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_BLE_42_FEATURES_SUPPORTED=y
+
+# --- lwIP / UDP ---
+# Small UDP receive mailbox (6 slots). The kernel drops new arrivals once full
+# (drop-tail), bounding queue-induced staleness to ~60 ms with 10 ms polling.
+# A larger mailbox would let stale frames accumulate (up to 640 ms with 64
+# slots) before being processed FIFO. Lower TCP/IP task priority so the
+# protocol task (priority 5) can preempt it under load.
+# Note: CONFIG_UDP_RECVMBOX_SIZE is auto-derived by ESP-IDF from this and does
+# not need to be set explicitly.
+CONFIG_LWIP_UDP_RECVMBOX_SIZE=6
+LWIP_MAX_UDP_PCBS=32
+CONFIG_LWIP_TCPIP_TASK_PRIO=1
+CONFIG_LWIP_LOCAL_HOSTNAME="esp32-X"
+
+# --- FreeRTOS ---
+# 1000 Hz tick (default 100 Hz) gives vTaskDelay 1 ms granularity, improving
+# responsiveness of the protocol polling loop.
+CONFIG_FREERTOS_HZ=1000
+
+# --- Device configuration (overridable via menuconfig "Device configuration") ---
+CONFIG_LED_PIN=18
+CONFIG_NUM_LEDS=16
+CONFIG_PORT=4210
+
+# --- Production (performance-first) ---
+CONFIG_LOG_DEFAULT_LEVEL_WARN=y
+CONFIG_LOG_DEFAULT_LEVEL=2
+CONFIG_LOG_BOOTLOADER_LEVEL_WARN=y
+CONFIG_LOG_BOOTLOADER_LEVEL=2
+CONFIG_BOOTLOADER_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE=y
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_RMT_ISR_IRAM_SAFE=y

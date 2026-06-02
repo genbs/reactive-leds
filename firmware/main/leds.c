@@ -22,16 +22,15 @@ esp_err_t rmt_new_led_strip_encoder(rmt_encoder_handle_t *ret_encoder);
 static uint8_t* s_led_buffer = NULL;
 static rmt_channel_handle_t s_led_chan = NULL;
 static rmt_encoder_handle_t s_led_encoder = NULL;
-static rmt_transmit_config_t s_tx_config = {
-    .loop_count = 0, //  no transfer loop
-};
 
 
 bool leds_begin()
 {
     ESP_LOGI(LEDS_TAG, "Initializing RMT for LED strip");
 
-    // Buffer initialization
+    // Single allocation that lives for the entire process lifetime. leds_end()
+    // frees it, but is intentionally never called in the normal flow — the
+    // device runs until reboot/power-off. Not a leak.
     size_t buffer_size = config.num_leds * 4;
     s_led_buffer = malloc(buffer_size);
     if (!s_led_buffer) {
@@ -95,12 +94,18 @@ void leds_clear()
 
 void leds_show()
 {
+    static const rmt_transmit_config_t s_tx_config = {
+        .loop_count = 0, // no transfer loop
+    };
+
     if (!s_led_chan || !s_led_encoder || !s_led_buffer) {
         return;
     }
 
     ESP_ERROR_CHECK(rmt_transmit(s_led_chan, s_led_encoder, s_led_buffer, config.num_leds * 4, &s_tx_config));
-    ESP_ERROR_CHECK(rmt_tx_wait_all_done(s_led_chan, portMAX_DELAY));
+    // 100ms is ~10x the worst-case transfer time (299 LEDs ≈ 9ms). A timeout here
+    // means RMT is stuck; ESP_ERROR_CHECK panics → reboot via panic handler.
+    ESP_ERROR_CHECK(rmt_tx_wait_all_done(s_led_chan, pdMS_TO_TICKS(100)));
 }
 
 

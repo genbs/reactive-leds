@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "esp_wifi.h"
 
-#define WIFI_SSID_MAX_LEN 32
+#define WIFI_SSID_MAX_LEN 33
 #define WIFI_PASS_MAX_LEN 64
 
 void wifi_init_sta();
@@ -16,6 +16,14 @@ void wifi_disable_sleep();
 bool wifi_connected();
 char *wifi_ip();
 char *wifi_mac();
+
+/**
+ * Scan visible Wi-Fi access points.
+ *
+ * Returns a heap-allocated array of records and writes the count into
+ * *num_networks. The caller is responsible for free()-ing the returned array.
+ * Returns NULL only if the underlying malloc failed.
+ */
 wifi_ap_record_t* wifi_scan(int *num_networks);
 
 #endif // WIFI_H

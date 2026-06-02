@@ -3,7 +3,7 @@
 #include "esp_log.h"
 #include <string.h>
 #include <lwip/netdb.h>
-#include <fcntl.h> 
+#include <fcntl.h>
 
 #define UDP_TAG "UDP_SERVICE"
 
@@ -22,13 +22,16 @@ bool udp_con_begin(uint16_t port) {
     dest_addr.sin_family = AF_INET;
     dest_addr.sin_port = htons(port);
 
-    sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); 
+    sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock < 0) {
         ESP_LOGE(UDP_TAG, "Unable to create socket: errno %d", errno);
         return false;
     }
 
-    // non blocking mode
+    // Non-blocking mode: paired with vTaskDelay polling in app_protocol_loop.
+    // A previous switch from blocking to non-blocking resolved observed issues
+    // (root cause not isolated — could have been the polling change or
+    // concurrent ESP-IDF config tuning). Benchmark before revisiting.
     int flags = fcntl(sock, F_GETFL, 0);
     if (flags < 0) {
         ESP_LOGE(UDP_TAG, "fcntl(F_GETFL) failed: errno %d", errno);

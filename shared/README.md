@@ -2,7 +2,9 @@
 
 Language: [English](./README.md) | [Italiano](./README-it.md)
 
-Shared TypeScript types and protocol helpers used by the client and CLI.
+The binary protocol specification for communicating with reactive-leds devices, plus the TypeScript types and serialization helpers that implement it (shared by [client](../client/README.md) and [CLI](../cli/README.md)). If you want to control LEDs from another language, start here.
+
+> Internal workspace package — inlined into `@reactive-leds/client` and `@reactive-leds/cli` at build time, not published to npm.
 
 ## Protocol
 
@@ -26,6 +28,17 @@ Every packet starts with two bytes:
 | `RESET_WIFI` | 4 | request only | Clear stored WiFi credentials |
 | `GET_VERSION` | 5 | request/response | Read firmware version string (from `PROJECT_VER` / `git describe`) |
 | `GET_STATUS`  | 6 | request/response | Read device status (uptime, free heap, WiFi RSSI) |
+
+### Example (PING)
+
+A concrete walkthrough: PING device 192.168.1.10 on port 4210.
+
+```
+→  01 00               # request:  PacketID=1, PING
+←  01 00 01            # response: PacketID=1, PING, status=OK (1)
+```
+
+The same pattern applies to every request/response type: send `[id, type, ...data]`, receive `[id, type, ...response]`. Fire-and-forget types (`SET_LEDS`, `RESET_WIFI`) skip the response.
 
 ### SET_LEDS format
 
@@ -109,9 +122,9 @@ If you want to write a client in another language (Python, Rust, Go, Pure Data, 
 
 The protocol itself is not licensed — the byte layout above is sufficient to write a fully compatible client from scratch.
 
-## Notes
+## Versioning
 
-Avoid breaking changes without updating all packages that depend on this module.
+The protocol extends additively: new behaviors are added as new `PacketType` values. Old firmware ignores unknown types, so a newer client degrades cleanly instead of breaking. This is how `GET_VERSION` and `GET_STATUS` were added without touching any existing types.
 
 ## Links
 

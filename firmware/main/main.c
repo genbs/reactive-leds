@@ -15,13 +15,21 @@
 
 #define TAG "MAIN"
 
-#define CHECK_CONNECTED_TIMEOUT 100 // delay to check if wifi/ble is connected
-#define WIFI_CONNECT_TIMEOUT 20000 // Timeout to enstablish wifi connection
-#define BLE_TIMEOUT_MS 60000 // Reboot if no BLE connection is established
+#define CHECK_CONNECTED_TIMEOUT 100 // polling interval for wifi/ble state checks
+
+// Timeout per WiFi association attempt. 20s is generous (most associations
+// complete in 2–5s), but covers slow routers and weak RSSI. At boot it caps
+// the time spent trying each saved network before moving on to the next or
+// falling back to BLE provisioning.
+#define WIFI_CONNECT_TIMEOUT 20000
+
+// Reboot if no BLE activity for this long during provisioning. Includes user
+// time for scan + selection + typing SSID + typing password.
+#define BLE_TIMEOUT_MS 180000
 
 // current wifi credentials
 typedef struct {
-    char ssid[32];
+    char ssid[WIFI_SSID_MAX_LEN];
     char pass[WIFI_PASS_MAX_LEN];
 } wifi_credentials_t;
 
@@ -30,9 +38,7 @@ void delay(uint32_t ms)
     vTaskDelay(pdMS_TO_TICKS(ms));
 }
 
-/**
- * Scan all wifi networks, check if any of them is known and try to connect to it.
- */
+/** Scan all wifi networks, check if any of them is known and try to connect to it. */
 bool connect_to_known_networks(wifi_credentials_t *credentials) {
     int num_networks;
 
@@ -59,9 +65,9 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
             ESP_LOGV(TAG, "Trying to connect to %s", scanned_ssid);
                         
             // store the password and ssid in the credentials struct
-            size_t pass_len = sizeof(credentials->pass) - 1;
+            size_t pass_len = sizeof(credentials->pass);
             storage_get("wifi", scanned_ssid, credentials->pass, &pass_len);
-            credentials->pass[pass_len] = '\0';
+            credentials->pass[sizeof(credentials->pass) - 1] = '\0';
             strncpy(credentials->ssid, scanned_ssid, sizeof(credentials->ssid) - 1);
 
             // try to connect to the network
@@ -80,8 +86,6 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
 
             ESP_LOGW(TAG, "Failed to connect to %s", credentials->ssid);
 
-            // TODO: remove the network from the known networks, maybe the password is wrong
-            // storage_delete("wifi", scanned_ssid);
         } else {
             ESP_LOGI(TAG, "Network %s is unknown", scanned_ssid);
         }
@@ -114,13 +118,16 @@ void app_protocol_loop(void *param) {
     while (1) {
         protocol_loop();
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(6));
     }
 }
 
 /**
  * While connected to wifi, keep the connection alive.
- * If the connection is lost, try to reconnect.
+ * If the connection is lost, retry forever — never reboot from this task.
+ * A frozen frame during a live performance is preferable to a forced restart.
+ * If the WiFi stack genuinely corrupts, ESP_ERROR_CHECK inside wifi_connect()
+ * will panic-reboot as a last-resort safety net.
  */
 void wifi_reconnect_task(void *param) {
     wifi_credentials_t *credentials = (wifi_credentials_t *)param;
@@ -128,21 +135,18 @@ void wifi_reconnect_task(void *param) {
     while (1) {
         if (wifi_connected()) {
             delay(CHECK_CONNECTED_TIMEOUT);
-        } else {
-            ESP_LOGI(TAG, "Reconnecting to WiFi");
-            wifi_connect(credentials->ssid, credentials->pass);
+            continue;
+        }
 
-            uint32_t start_time = esp_log_timestamp();
-            while (!wifi_connected()) {
-                delay(CHECK_CONNECTED_TIMEOUT);
+        ESP_LOGI(TAG, "Reconnecting to WiFi");
+        wifi_connect(credentials->ssid, credentials->pass);
 
-                if (esp_log_timestamp() - start_time > WIFI_CONNECT_TIMEOUT) {
-                    ESP_LOGW(TAG, "WiFi connection timeout, rebooting");
-                    
-                    // TODO: off the leds?
-                    esp_restart();
-                }
-            }
+        // Wait up to WIFI_CONNECT_TIMEOUT for the event handler to converge,
+        // then fall through to the outer loop and try again. The event handler
+        // exhausts its own MAX_RETRY internally, so we must re-trigger periodically.
+        uint32_t start = esp_log_timestamp();
+        while (!wifi_connected() && esp_log_timestamp() - start < WIFI_CONNECT_TIMEOUT) {
+            delay(CHECK_CONNECTED_TIMEOUT);
         }
     }
 }

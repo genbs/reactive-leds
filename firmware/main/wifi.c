@@ -7,10 +7,8 @@
 #include "esp_log.h"
 
 #define WIFI_TAG "WIFI_SERVICE"
-#define MAX_RETRY 10  
-#define MAX_AP_SCAN 10
+#define MAX_RETRY 10
 
-static int s_retry_num = 0;
 static bool s_connected = false;
 static char s_ip_address_str[16] = "0.0.0.0"; 
 static char s_mac_address_str[18] = "00:00:00:00:00:00";
@@ -31,6 +29,9 @@ static void wifi_start_once(void)
 static void event_handler(void* arg, esp_event_base_t event_base,
     int32_t event_id, void* event_data)
 {
+    // Connection retry counter, scoped to this handler (only consumer).
+    static int s_retry_num = 0;
+
     if (event_base == WIFI_EVENT) {
         switch (event_id) {
             case WIFI_EVENT_STA_START:
@@ -38,7 +39,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 esp_wifi_connect();
                 break;
 
-            case WIFI_EVENT_STA_DISCONNECTED: 
+            case WIFI_EVENT_STA_DISCONNECTED: {
                 wifi_event_sta_disconnected_t *disconn = (wifi_event_sta_disconnected_t *) event_data;
                 ESP_LOGW(WIFI_TAG, "WIFI_EVENT_STA_DISCONNECTED => reason=%d", disconn->reason);
 
@@ -55,6 +56,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                     snprintf(s_ip_address_str, sizeof(s_ip_address_str), "0.0.0.0");
                 }
                 break;
+            }
 
             default:
                 ESP_LOGV(WIFI_TAG, "Unhandled WIFI_EVENT (%d)", (int)event_id);
@@ -122,8 +124,8 @@ void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
     }
 
     wifi_config_t wifi_config = {0}; 
-    strcpy((char *)wifi_config.sta.ssid, (char *)WIFI_SSID);
-    strcpy((char *)wifi_config.sta.password, (char *)WIFI_PASS);
+    strncpy((char *)wifi_config.sta.ssid, (char *)WIFI_SSID, sizeof(wifi_config.sta.ssid) - 1);
+    strncpy((char *)wifi_config.sta.password, (char *)WIFI_PASS, sizeof(wifi_config.sta.password) - 1);
     wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
     wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     wifi_config.sta.pmf_cfg.capable = true;
@@ -176,15 +178,19 @@ wifi_ap_record_t* wifi_scan(int *num_networks) {
         .channel = 0,
         .show_hidden = true
     };
-    ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));  
+    ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
 
-    uint16_t ap_num = MAX_AP_SCAN;
+    // Return every visible AP — capping risks excluding the user's saved network
+    // when it isn't among the strongest (common in crowded RF environments).
+    uint16_t ap_num = 0;
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_num));
     wifi_ap_record_t *ap_records = (wifi_ap_record_t *)malloc(ap_num * sizeof(wifi_ap_record_t));
+    if (!ap_records) {
+        ESP_LOGE(WIFI_TAG, "Failed to allocate memory for scan results");
+        *num_networks = 0;
+        return NULL;
+    }
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, ap_records));
-
-    // ESP_ERROR_CHECK(esp_wifi_stop());
-    // ESP_ERROR_CHECK(esp_wifi_deinit());
 
     *num_networks = ap_num;
     ESP_LOGI(WIFI_TAG, "WiFi scan complete, found %d networks", ap_num);
