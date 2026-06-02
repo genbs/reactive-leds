@@ -113,7 +113,7 @@ Dopo una scrittura valida il device salva le credenziali in NVS e si riavvia ent
 Implementazioni di riferimento:
 
 - Device (server): [`firmware/main/ble.c`](../firmware/main/ble.c)
-- CLI (client): [`cli/cmd/bluetooth.ts`](../cli/cmd/bluetooth.ts) — usa `@abandonware/noble`
+- CLI (client): [`cli/cmd/bluetooth.ts`](../cli/cmd/bluetooth.ts) — usa `@stoprocent/noble`
 
 ## Implementazioni di riferimento
 

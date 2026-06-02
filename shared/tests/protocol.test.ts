@@ -1,4 +1,4 @@
-import { addressToBuffer, bufferToConfig, bufferToStatus, configToBuffer, decodeBuffer, encodeBuffer, PacketType } from ".."
+import { addressToBuffer, bufferToConfig, bufferToStatus, configToBuffer, decodeBuffer, encodeBuffer, PacketType, statusToBuffer } from ".."
 
 describe("Config", () => {
 	test("configToBuffer", () => {
@@ -103,6 +103,15 @@ describe("Status", () => {
 		])
 		const status = bufferToStatus(buffer)
 		expect(status.uptime).toBe(0xffffffff)
+	})
+
+	test("statusToBuffer round-trips through bufferToStatus (incl. negative RSSI)", () => {
+		// RSSI is always negative in practice — the int8 sign handling is the risky bit.
+		const status = { uptime: 987654, heap: 1_500_000, rssi: -73 }
+		const buffer = statusToBuffer(status)
+		expect(buffer.length).toBe(9)
+		expect(buffer[8]).toBe(-73 & 0xff) // 0xB7
+		expect(bufferToStatus(buffer)).toEqual(status)
 	})
 })
 

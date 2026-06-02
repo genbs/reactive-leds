@@ -126,6 +126,21 @@ export function bufferToStatus(buffer: Uint8Array): Status {
 	return { uptime, heap, rssi }
 }
 
+/** Convert a Status object to its 9-byte wire payload: [uptime(4 BE), heap(4 BE), rssi(1, int8)] */
+export function statusToBuffer(status: Status): Uint8Array {
+	const buffer = new Uint8Array(9)
+	buffer[0] = (status.uptime >>> 24) & 0xff
+	buffer[1] = (status.uptime >>> 16) & 0xff
+	buffer[2] = (status.uptime >>> 8) & 0xff
+	buffer[3] = status.uptime & 0xff
+	buffer[4] = (status.heap >>> 24) & 0xff
+	buffer[5] = (status.heap >>> 16) & 0xff
+	buffer[6] = (status.heap >>> 8) & 0xff
+	buffer[7] = status.heap & 0xff
+	buffer[8] = status.rssi & 0xff // int8 written as a raw byte
+	return buffer
+}
+
 /** Convert address (ip + port) to buffer */
 export function addressToBuffer(ip: DeviceIP, port: number, dest?: DeviceAddress): DeviceAddress {
 	const buffer = dest || new Uint8Array(6) // 4 bytes for IP + 2 bytes for port
