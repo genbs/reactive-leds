@@ -1,23 +1,28 @@
 import {
 	bufferToConfig,
+	bufferToStatus,
 	Config,
 	configToBuffer,
+	decodeBuffer,
 	EMPTY_PACKET_ID,
-	logger,
 	Packet,
 	PacketID,
 	PacketStatus,
 	PacketType,
 	PacketTypeMap,
-} from "@leds/shared"
+	Status,
+} from "@reactive-leds/shared"
 import dgram from "dgram"
+import { DEBUG } from "./utils"
 
 class Protocol {
 	static PING_TIMEOUT = 1000
-	static GET_CONFIG_TIMEOUT = 1000
-	static SET_CONFIG_TIMEOUT = 1000
+	static GET_CONFIG_TIMEOUT = 3000
+	static SET_CONFIG_TIMEOUT = 3000
+	static GET_VERSION_TIMEOUT = 1000
+	static GET_STATUS_TIMEOUT = 2000
 
-	private socket: dgram.Socket
+	private socket?: dgram.Socket
 	private requestID: PacketID = 1
 	private pendingRequests = new Map<
 		number,
@@ -29,18 +34,16 @@ class Protocol {
 		}
 	>()
 
-	private configBuffer: Uint8Array | null = null
-
-	/**
-	 * Create UDP socket to communicate with devices.
-	 */
-	constructor() {
-		this.socket = dgram.createSocket({
-			type: "udp4",
-			reuseAddr: true,
-		})
-
-		this.socket.on("message", (msg: Packet) => this.handleMessage(msg))
+	private ensureSocket() {
+		if (!this.socket) {
+			this.socket = dgram.createSocket({
+				type: "udp4",
+				reuseAddr: true,
+			})
+			this.socket.on("error", (err) => console.error("[Socket Error]:", err))
+			this.socket.on("message", (msg: Packet) => this.handleMessage(msg))
+			this.socket.bind()
+		}
 	}
 
 	private handleMessage(msg: Packet) {
@@ -52,7 +55,7 @@ class Protocol {
 			clearTimeout(pending.timeout)
 			this.pendingRequests.delete(requestID)
 
-			logger.debug(
+			if (DEBUG) console.log(
 				`[Request:${requestID}] Received ${PacketTypeMap[requestType]} in ${performance.now() - pending.startTime}ms`,
 				msg
 			)
@@ -75,11 +78,11 @@ class Protocol {
 	/**
 	 * Get device configuration.
 	 * First byte is message id, second byte is message type.
-	 * Response is [requestID, PacketType.GET_CONFIG, port, id, num_leds, hostname], each byte is a number, except hostname.
+	 * Response is [reqId, GET_CONFIG, pin, num_leds, port_h, port_l, hostname...]
 	 *
 	 * @param ip device ip
 	 * @param port device port
-	 * @returns (Promise) null if no response, otherwise {port, id, num_leds, hostname}
+	 * @returns (Promise) null if no response, otherwise {pin, num_leds, port, hostname}
 	 */
 	async getConfig(ip: string, port: number): Promise<Config | null> {
 		const response = await this.sendSync(ip, port, PacketType.GET_CONFIG, null, Protocol.GET_CONFIG_TIMEOUT)
@@ -97,14 +100,13 @@ class Protocol {
 	 * @returns [MessageID, MessageType, Status (boolean)]
 	 */
 	async setConfig(ip: string, port: number, config: Config): Promise<boolean> {
-		const packetLength = 1 + 1 + 1 + 2 + config.hostname.length
-		if (!this.configBuffer || this.configBuffer.length < packetLength) this.configBuffer = configToBuffer(config)
+		const configBuffer = configToBuffer(config)
 
 		const response = await this.sendSync(
 			ip,
 			port,
 			PacketType.SET_CONFIG,
-			this.configBuffer,
+			configBuffer,
 			Protocol.SET_CONFIG_TIMEOUT
 		)
 
@@ -113,13 +115,14 @@ class Protocol {
 
 	/**
 	 * Turn on the leds based on the index and the specified color.
+	 * Resolves when the kernel has handed the packet to the network stack,
+	 * so callers can `await` to ensure the packet leaves before process exit.
 	 *
 	 * @param ip device ip
 	 * @param port device port
 	 * @param data [led_index, r, g, b, brightness / whiteness, led_index, r, g, b, brightness / whiteness, ...]
-	 * @returns
 	 */
-	setLEDs(ip: string, port: number, data: Uint8Array) {
+	setLEDs(ip: string, port: number, data: Uint8Array): Promise<void> {
 		return this.send(ip, port, PacketType.SET_LEDS, data)
 	}
 
@@ -137,21 +140,58 @@ class Protocol {
 	}
 
 	/**
+	 * Get the firmware version string from the device.
+	 *
+	 * @param ip device ip
+	 * @param port device port
+	 * @returns version string, or null if no response (offline or firmware too old to support GET_VERSION)
+	 */
+	async getVersion(ip: string, port: number): Promise<string | null> {
+		const response = await this.sendSync(ip, port, PacketType.GET_VERSION, null, Protocol.GET_VERSION_TIMEOUT)
+		if (!response || response.length < 2) return null
+		return decodeBuffer(response.slice(2))
+	}
+
+	/**
+	 * Get device status: uptime, free heap, WiFi RSSI.
+	 *
+	 * @param ip device ip
+	 * @param port device port
+	 * @returns (Promise) null if no response, otherwise {uptime, heap, rssi}
+	 */
+	async getStatus(ip: string, port: number): Promise<Status | null> {
+		const response = await this.sendSync(ip, port, PacketType.GET_STATUS, null, Protocol.GET_STATUS_TIMEOUT)
+		if (!response || response.length < 11) return null
+
+		return bufferToStatus(response.slice(2))
+	}
+
+	/**
 	 * send UDP message to device, no response expected.
 	 *
 	 * @param ip device ip
 	 * @param port device port
 	 * @param data any
 	 */
-	private send(ip: string, port: number, type: PacketType, data: Uint8Array) {
+	private send(ip: string, port: number, type: PacketType, data: Uint8Array): Promise<void> {
+		this.ensureSocket()
+
 		const message = new Uint8Array(1 + 1 + data.length)
 		message[0] = EMPTY_PACKET_ID
 		message[1] = type
 		message.set(data, 2)
 
-		logger.debug(`[Request (not sync)] Sending ${PacketTypeMap[type]} to ${ip}:${port}`, data)
+		if (DEBUG) console.log(`[Request (not sync)] Sending ${PacketTypeMap[type]} to ${ip}:${port}`, data)
 
-		this.socket.send(message, 0, message.length, port, ip, err => err && logger.error(err))
+		// Promisify dgram.send so callers can await. Without the callback returning
+		// control to the event loop, a short-lived CLI command would call
+		// process.exit() before the kernel actually transmits the packet.
+		return new Promise(resolve => {
+			this.socket!.send(message, 0, message.length, port, ip, err => {
+				if (err && DEBUG) console.error(err)
+				resolve()
+			})
+		})
 	}
 
 	/**
@@ -172,7 +212,14 @@ class Protocol {
 		data: Uint8Array | null = null,
 		timeoutDuration: number
 	): Promise<Packet | null> {
-		// from 1 to 255 with modulo (0 is reserved for empty message)
+		this.ensureSocket()
+
+		// Cycle requestID through 1..255 (0 is reserved for fire-and-forget SET_LEDS).
+		// 255 in-flight slots is plenty for typical CLI use (sync requests are rare —
+		// PING / GET_CONFIG / SET_CONFIG / RESET_WIFI, with 1s timeouts). If the CLI is
+		// proxying many concurrent sync requests through `ws`, a high enough rate could
+		// theoretically collide on IDs before the previous timeout elapses; in practice
+		// this requires >255 sync requests/second, which no realistic client produces.
 		this.requestID = (this.requestID % 255) + 1
 		const requestID = this.requestID
 
@@ -181,13 +228,13 @@ class Protocol {
 		message[1] = type
 		if (data) message.set(data, 2)
 
-		logger.debug(`[Request:${requestID}] Sending ${PacketTypeMap[type]} to ${ip}:${port}`, data)
+		if (DEBUG) console.log(`[Request:${requestID}] Sending ${PacketTypeMap[type]} to ${ip}:${port}`, data)
 
-		return new Promise(resolve => {
+		return new Promise((resolve) => {
 			const startTime = performance.now()
 			const timeout = setTimeout(() => {
 				this.pendingRequests.delete(requestID)
-				logger.debug(
+				if (DEBUG) console.log(
 					`[Request:${requestID}] Timeout for ${PacketTypeMap[type]} after ${performance.now() - startTime}ms`
 				)
 				resolve(null)
@@ -195,11 +242,11 @@ class Protocol {
 
 			this.pendingRequests.set(requestID, { resolve, type, timeout, startTime })
 
-			this.socket.send(message, 0, message.length, port, ip, err => {
+			this.socket!.send(message, 0, message.length, port, ip, err => {
 				if (err) {
 					clearTimeout(timeout)
 					this.pendingRequests.delete(requestID)
-					logger.error(err)
+					if (DEBUG) console.error(`[Request:${requestID}] Error sending ${PacketTypeMap[type]}:`, err)
 					resolve(null)
 				}
 			})
@@ -210,4 +257,5 @@ class Protocol {
 const proto = new Protocol()
 
 export { Protocol }
+
 export default proto

@@ -1,7 +1,8 @@
-import { availableConfigKeys, logger } from "@leds/shared"
+import { availableConfigKeys } from "@reactive-leds/shared"
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { validateIP, validatePort } from "../utils"
+import { validateIPOrHostname, validatePort } from "../utils"
+import { clearScanCache, resolveTargets } from "./wifi"
 
 export const configCommand: Command = {
 	name: "config",
@@ -12,36 +13,38 @@ export const configCommand: Command = {
 	examples: ["config 192.168.1.1 4210", "config 192.168.1.1 4210 hostname my-device"],
 
 	args: [
-		{ required: true, name: "ip", type: String, validator: validateIP },
-		{ required: false, name: "udp_port", type: Number, validator: validatePort, default: 4210 },
+		{ required: true, name: "ip", type: String, validator: validateIPOrHostname },
+		{ required: false, name: "port", type: Number, validator: validatePort, default: 4210 },
 		{ required: false, name: "key", type: String, validator: validateConfigKey },
 		{ required: false, name: "value", type: String, validator: (value, args) => validateConfigValue(args[2], value) },
 	],
 
-	execute: async (ip, port, key?, value?) => {
-		const config = await proto.getConfig(ip as string, port as number)
-		if (!config) {
-			logger.log(`Failed to get config for ${ip}:${port}`)
+	execute: async (ip: string, port: number, key?: string, value?: string) => {
+		// resolveTargets resolves a hostname (accepted by the validator) to a real IP.
+		const targets = await resolveTargets(ip, port)
+		const target = targets[0]
+		if (!target || !target.config) {
+			console.log(`Failed to get config for ${ip}:${port}`)
 			return false
 		}
-
+		const config = target.config
 		if (typeof key !== "undefined" && typeof value !== "undefined") {
-			const result = await proto.setConfig(ip as string, port as number, { ...config, [key as string]: value })
-			if (result) {
-				logger.log("Config updated successfully")
-			} else {
-				logger.log("Failed to update config")
+			const result = await proto.setConfig(target.ip, target.port, { ...config, [key]: value })
+			if (!result) {
+				console.log("Failed to update config")
 				return false
 			}
+			// The cached scan now holds a stale config for this device (and the
+			// device is rebooting on a possibly different port). Clear the cache so
+			// the next multi-target command does a fresh scan.
+			clearScanCache()
+			// SET_CONFIG auto-reboots the device; refetching would fail. We trust
+			// the firmware response and report success without re-reading.
+			console.log(`Config updated: ${key} = ${value}. Device is rebooting (~5s offline).`)
+			return
 		}
 
-		logger.log(`Config: 
-			\r\t- pin: ${config.pin}
-			\r\t- Num LEDs: ${config.num_leds}
-			\r\t- Brightness: ${config.brightness}
-			\r\t- Port: ${config.port}
-			\r\t- Hostname: ${config.hostname}
-		`)
+		console.log(`Config:\n\t- pin: ${config.pin}\n\t- Num LEDs: ${config.num_leds}\n\t- Port: ${config.port}\n\t- Hostname: ${config.hostname}`)
 	},
 }
 
@@ -51,29 +54,32 @@ export const ledsCommand: Command = {
 		"Set the LEDs on the device at <ip>:<port>.\nThe <led_package> argument must be a comma-separated list of values in the format <led_index>,<r>,<g>,<b>,<brightness/whiteness>.",
 	examples: ["leds 192.168.1.100 4210 0,255,0,128,0,1,0,255,128,0"],
 	args: [
-		{ required: true, name: "ip", type: String, validator: validateIP },
-		{ required: false, name: "udp_port", type: Number, validator: validatePort, default: 4210 },
+		{ required: true, name: "ip", type: String, validator: validateIPOrHostname },
+		{ required: false, name: "port", type: Number, validator: validatePort, default: 4210 },
 		{
 			required: true,
 			name: "leds_package",
-			type: String /* by now array is not supported */,
+			type: String, // array not supported yet
 			validator: validateLedsPackage,
 		},
 	],
 	execute: async (ip: string, port: number, ledsPackage: string) => {
-		const ledData = (ledsPackage as string).split(",").map(Number) // validated
-		const retryCount = 5
-		for (let i = 0; i < retryCount; i++) {
-			const data = new Uint8Array(ledData)
-			proto.setLEDs(ip as string, port, data)
-			await new Promise(resolve => setTimeout(resolve, 100))
+		// Resolve so a hostname (accepted by validateIPOrHostname) becomes a real IP.
+		const targets = await resolveTargets(ip, port)
+		if (targets.length === 0) {
+			console.log(`Device ${ip} not found`)
+			return false
 		}
+		const target = targets[0]
 
-		logger.log("LEDs request sent")
+		const data = new Uint8Array(ledsPackage.split(",").map(Number)) // validated
+		// Await so the kernel transmits before process exit.
+		await proto.setLEDs(target.ip, target.port, data)
+		console.log("LEDs request sent")
 	},
 }
 
-//////////////////////
+////////////////////// Validators
 
 function validateConfigKey(key: (typeof availableConfigKeys)[number]): boolean {
 	return !!(key && availableConfigKeys.includes(key))
@@ -83,21 +89,16 @@ function validateConfigValue(key: string, value: string): boolean | string {
 	switch (key) {
 		case "hostname":
 			if (value.length > 32) return `Invalid value for key "${key}". Length must be less than 32 characters.`
-			break
-		case "pin":
-			if (isNaN(Number(value))) return `Invalid value for key "${key}". Value must be a number.`
-			break
-		case "num_leds":
-			if (isNaN(Number(value))) return `Invalid value for key "${key}". Value must be a number.`
-			break
+			return true
 		case "port":
 			if (!validatePort(value)) return `Invalid value for key "${key}". Value must be a number.`
-			break
-		case "brightness":
-			if (isNaN(Number(value))) return `Invalid value for key "${key}". Value must be a number.`
-			if (Number(value) < 0 || Number(value) > 255)
-				return `Invalid value for key "${key}". Value must be between 0 and 255.`
-			break
+			return true
+		case "pin":
+		case "num_leds": {
+			const n = Number(value)
+			if (isNaN(n)) return `Invalid value for key "${key}". Value must be a number.`
+			return true
+		}
 	}
 
 	return true

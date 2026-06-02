@@ -1,4 +1,11 @@
-// Types
+/**
+ * Command definition and validation for the CLI.
+ *
+ * Each command is represented by a Command object with typed arguments
+ * and automatic validation via the `validate()` function.
+ */
+
+import { bold } from "./utils"
 
 export interface Command<Args extends readonly CommandArg[] = CommandArg[]> {
 	name: string
@@ -8,14 +15,6 @@ export interface Command<Args extends readonly CommandArg[] = CommandArg[]> {
 	execute: (...args: CommandArgsToTuple<Args>) => Promise<boolean | void> | boolean | void
 }
 
-type ArgValue<T> = T extends StringConstructor
-	? string
-	: T extends NumberConstructor
-	? number
-	: T extends BooleanConstructor
-	? boolean
-	: any // Fallback for other types
-
 interface CommandArg<T = any> {
 	required: boolean
 	name: string
@@ -24,27 +23,34 @@ interface CommandArg<T = any> {
 	default?: any
 }
 
-// This utility type converts the CommandArg array into a strongly-typed tuple for the execute function's parameters
+/** Utility type to map a constructor type to its corresponding value type */
+type ArgValue<T> = T extends StringConstructor
+	? string
+	: T extends NumberConstructor
+	? number
+	: T extends BooleanConstructor
+	? boolean
+	: any // Fallback for other types
+
+/** This utility type converts the CommandArg array into a strongly-typed tuple for the execute function's parameters */
 type CommandArgsToTuple<Args extends readonly CommandArg[]> = {
 	[K in keyof Args]: Args[K] extends CommandArg<infer T>
-		? Args[K]["required"] extends true
-			? ArgValue<T> // Required args are always present
-			: // For optional args, check if a default value exists
-			"default" extends keyof Args[K]
-			? ArgValue<T> // If default exists, it will never be undefined
-			: ArgValue<T> | undefined // If no default, it can be undefined
-		: never
+	? Args[K]["required"] extends true
+	? ArgValue<T> // Required args are always present
+	: // For optional args, check if a default value exists
+	"default" extends keyof Args[K]
+	? ArgValue<T> // If default exists, it will never be undefined
+	: ArgValue<T> | undefined // If no default, it can be undefined
+	: never
 }
 
-/**
- * Returns the number of required arguments for a command.
- */
-export function requiredArguments(cdm: Command): number {
+/** Returns the number of required arguments for a command. */
+export function requiredArguments(cmd: Command): number {
 	let count = 0
 
-	if (cdm.args)
-		for (let i = 0, len = cdm.args.length; i < len; i++) {
-			const arg = cdm.args[i]
+	if (cmd.args)
+		for (let i = 0; i < cmd.args.length; i++) {
+			const arg = cmd.args[i]
 			if (arg.required) count++
 			else return count
 		}
@@ -52,7 +58,7 @@ export function requiredArguments(cdm: Command): number {
 	return count
 }
 
-// Print help
+////////////////////// Help printing
 
 function typeToString(type?: StringConstructor | NumberConstructor | BooleanConstructor): string {
 	if (!type) return "string"
@@ -69,37 +75,37 @@ function typeToString(type?: StringConstructor | NumberConstructor | BooleanCons
 	}
 }
 
+/** Returns a short usage string for a command. */
 export function shortUsage(command: Command) {
-	const title = `\u001b[1m${command.name}\u001b[22m`
+	const title = bold(command.name)
 	const args = command.args
 		? ` ${command.args
-				.map(arg => `<${arg.name}${arg.default ? `(${arg.default})` : arg.required ? "" : "?"}>`)
-				.join(" ")}`
+			.map(arg => `<${arg.name}${arg.default !== undefined ? `(${arg.default})` : arg.required ? "" : "?"}>`)
+			.join(" ")}`
 		: ""
 	const description = command.description ? ` ${command.description}` : ""
 
 	return `${title}${args}${description}`
 }
 
+/** Returns a detailed usage string for a command. */
 export function usage(command: Command) {
-	const title = `\u001b[1m${command.name}\u001b[22m`
+	const title = bold(command.name)
 	const description = command.description || ""
 
 	const args = (command.args || []).map(
 		arg =>
-			`\u001b[1m${arg.name}\u001b[22m: ${typeToString(arg.type)}, ${arg.required ? "required" : "optional"}${
-				arg.default ? `, default "${arg.default}"` : ""
+			`${bold(arg.name)}: ${typeToString(arg.type)}, ${arg.required ? "required" : "optional"}${arg.default !== undefined ? `, default "${arg.default}"` : ""
 			}`
 	)
 
 	const examples = command.examples || []
 
-	return `${title}${description ? `: ${description}` : ""}${
-		args.length > 0 ? `\n\nArguments:\n\t${args.join("\n\t")}` : ""
-	}${examples.length > 0 ? `\nExamples:\n\t${examples.join("\n\t")}` : ""}`
+	return `${title}${description ? `: ${description}` : ""}${args.length > 0 ? `\n\nArguments:\n\t${args.join("\n\t")}` : ""
+		}${examples.length > 0 ? `\nExamples:\n\t${examples.join("\n\t")}` : ""}`
 }
 
-// Validation
+////////////////////// Validation
 
 type ValidationResult = {
 	errors: Array<string>
@@ -107,6 +113,11 @@ type ValidationResult = {
 	args: Record<string, string | number | boolean>
 }
 
+/**
+ * Validates the arguments for a command according to its arg definitions,
+ * running type coercion and custom validators. Returns the validated values
+ * keyed by argument name and a list of errors (empty on success).
+ */
 export function validate(command: Command, args: string[]): ValidationResult {
 	const result: ValidationResult = {
 		errors: [],
@@ -118,15 +129,19 @@ export function validate(command: Command, args: string[]): ValidationResult {
 
 	for (let i = 0; i < command.args.length; i++) {
 		const arg = command.args[i]
-		const value: number | string | boolean = args[i] || arg.default
+		const value: number | string | boolean = args[i] ?? arg.default
 
-		if (arg.required && (value === undefined || value === null)) {
-			result.errors.push(`Missing required argument: ${arg.name}`)
+		if ((value === undefined || value === null)) {
+			if (arg.required) {
+				result.errors.push(`Missing required argument: ${arg.name}`)
+				continue
+			}
+
+			result.args[arg.name] = value
 			continue
 		}
 
 		const type = arg.type || String
-		// validate by type
 		switch (true) {
 			case type === String:
 				result.args[arg.name] = value
@@ -140,7 +155,7 @@ export function validate(command: Command, args: string[]): ValidationResult {
 				}
 				break
 			case type === Boolean:
-				const t = args[i].toLowerCase()
+				const t = (value as string).toLowerCase()
 				if (t === "true" || t === "1") {
 					result.args[arg.name] = true
 				} else if (t === "false" || t === "0") {

@@ -1,25 +1,42 @@
 {
     "private": true,
-    "name": "@leds/server",
+    "name": "@reactive-leds/cli",
     "version": "1.0.0",
-    "description": "",
-    "scripts": {
-        "start": "ts-node -r tsconfig-paths/register ./main.ts",
-        "test": "jest"
+    "description": "Command-line tools for provisioning, discovering, and controlling reactive-leds ESP32-S3 devices over UDP and BLE. Includes a WebSocket proxy for browser-based LED control.",
+    "keywords": [
+        "led",
+        "esp32",
+        "ws2812",
+        "live-coding",
+        "visuals",
+        "diy"
+    ],
+    "author": "Gennaro Bosone",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/genbs/reactive-leds.git",
+        "directory": "cli"
     },
-    "main": "./dist/main.js",
-    "license": "ISC",
+    "homepage": "https://github.com/genbs/reactive-leds/tree/master/cli#readme",
+    "bin": {
+        "rleds": "./bin/rleds.js"
+    },
+    "scripts": {
+        "build": "esbuild main.ts --bundle --platform=node --outfile=bin/rleds.js --external:@stoprocent/noble --banner:js='#!/usr/bin/env node'",
+        "test": "jest",
+        "prepare": "npm run build"
+    },
+    "license": "GPL-3.0",
     "devDependencies": {
-        "@jest/globals": "^29.7.0",
         "@types/jest": "^29.5.14",
+        "esbuild": "^0.25.0",
         "jest": "^29.7.0",
         "ts-jest": "^29.4.0",
-        "tsconfig-paths": "^4.2.0",
         "typescript": "^5.4.5"
     },
     "dependencies": {
-        "@abandonware/noble": "^1.9.2-26",
-        "dgram": "^1.0.1"
+        "@stoprocent/noble": "^2.5.3",
+        "ws": "^8.0.0"
     },
     "jest": {
         "preset": "ts-jest",
