@@ -14,7 +14,7 @@ import {
 	WorkerRequestTypeMap,
 } from "./comm"
 function createWorker() {
-	return new Worker(new URL("./daemon.worker.js", location.href).href, { type: "module" })
+	return new Worker(new URL("./daemon.worker.js", import.meta.url).href, { type: "module" })
 }
 
 // Pending sync requests waiting for a response from the worker

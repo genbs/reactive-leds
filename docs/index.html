@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>reactive-leds</title>
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0d0d0d;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    h1 { font-size: 1.75rem; font-weight: 700; color: #fff; }
+    h1 span { color: #f97316; }
+
+    .tagline { color: #888; font-size: 0.95rem; margin-top: 0.25rem; }
+
+    section {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #ccc;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    p { font-size: 0.9rem; color: #888; line-height: 1.5; }
+
+    esp-web-install-button::part(button) {
+      background: #f97316;
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1.4rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .code-block {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-family: monospace;
+      font-size: 0.875rem;
+      color: #a3e635;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid #333;
+      color: #888;
+      border-radius: 6px;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .copy-btn:hover { border-color: #555; color: #ccc; }
+
+    .form-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    input[type="text"], input[type="number"] {
+      background: #111;
+      border: 1px solid #333;
+      color: #e0e0e0;
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      flex: 1;
+      min-width: 120px;
+    }
+    input:focus { outline: none; border-color: #f97316; }
+
+    .sliders { display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .slider-label {
+      width: 1.5rem;
+      font-weight: 700;
+      font-size: 0.875rem;
+    }
+    .slider-label.r { color: #f87171; }
+    .slider-label.g { color: #86efac; }
+    .slider-label.b { color: #93c5fd; }
+
+    input[type="range"] {
+      flex: 1;
+      accent-color: #f97316;
+    }
+
+    .slider-val {
+      width: 2.5rem;
+      text-align: right;
+      font-size: 0.875rem;
+      color: #888;
+      font-variant-numeric: tabular-nums;
+    }
+
+    button.primary {
+      background: #f97316;
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1.4rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-weight: 600;
+      align-self: flex-start;
+    }
+    button.primary:hover { background: #ea6c0a; }
+    button.primary:disabled { background: #444; cursor: not-allowed; }
+
+    #status {
+      font-size: 0.85rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+    }
+    #status.ok { border-color: #166534; color: #86efac; }
+    #status.err { border-color: #7f1d1d; color: #fca5a5; }
+
+    .unavailable {
+      font-size: 0.875rem;
+      color: #555;
+      font-style: italic;
+    }
+
+    a { color: #f97316; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>reactive<span>-leds</span></h1>
+      <p class="tagline">Real-time LED control for ESP32-S3 over UDP &amp; WebSocket</p>
+    </header>
+
+    <!-- Flash firmware -->
+    <section>
+      <h2>1 — Flash firmware</h2>
+      <p>Connect your ESP32-S3 via USB, then click the button below. Requires Chrome or Edge.</p>
+      <esp-web-install-button manifest="manifest.json">
+        <span slot="unsupported">
+          Your browser doesn't support Web Serial.
+          Use <a href="https://www.google.com/chrome/">Chrome</a> or Edge.
+        </span>
+      </esp-web-install-button>
+    </section>
+
+    <!-- Install CLI -->
+    <section>
+      <h2>2 — Install CLI</h2>
+      <p>Control the device from your terminal. Requires Node.js 18+.</p>
+      <div class="code-block">
+        <code id="cli-cmd">npm install -g @reactive-leds/cli</code>
+        <button class="copy-btn" onclick="copy('cli-cmd', this)">copy</button>
+      </div>
+      <p>Then run <code>rleds --help</code> to get started.</p>
+    </section>
+
+    <!-- Interactive demo -->
+    <section>
+      <h2>3 — Browser demo</h2>
+      <p>
+        Start the local proxy with <code>rleds proxy</code>, then connect here to control LEDs in real time.
+        The proxy bridges WebSocket (browser) to UDP (device).
+      </p>
+      <div id="demo-unavailable" class="unavailable" style="display:none">
+        Client library not yet available on npm.
+        <a href="https://github.com/genbs/reactive-leds/releases">Check releases</a>.
+      </div>
+      <div id="demo-ui">
+        <div class="form-row">
+          <input type="text" id="ip" placeholder="Device IP (e.g. 192.168.1.42)" value="">
+          <input type="number" id="proxy-port" placeholder="Proxy port" value="4210" min="1" max="65535" style="max-width:120px">
+        </div>
+        <div class="form-row">
+          <button class="primary" id="connect-btn" onclick="connectDevice()">Connect</button>
+          <span id="status">&mdash;</span>
+        </div>
+        <div class="sliders" id="sliders" style="display:none">
+          <div class="slider-row">
+            <span class="slider-label r">R</span>
+            <input type="range" min="0" max="255" value="255" id="r" oninput="updateColor()">
+            <span class="slider-val" id="rv">255</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label g">G</span>
+            <input type="range" min="0" max="255" value="0" id="g" oninput="updateColor()">
+            <span class="slider-val" id="gv">0</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label b">B</span>
+            <input type="range" min="0" max="255" value="0" id="b" oninput="updateColor()">
+            <span class="slider-val" id="bv">0</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p style="font-size:0.8rem; color:#444; text-align:center">
+        <a href="https://github.com/genbs/reactive-leds">GitHub</a> &nbsp;·&nbsp;
+        MIT / GPL-3.0
+      </p>
+    </footer>
+  </div>
+
+  <script type="module">
+    const CDN = "https://cdn.jsdelivr.net/npm/@reactive-leds/client@latest/build/reactive-leds.js"
+
+    let rl = null
+    let device = null
+
+    async function loadClient() {
+      try {
+        const mod = await import(CDN)
+        return mod.default ?? mod
+      } catch {
+        return null
+      }
+    }
+
+    async function init() {
+      rl = await loadClient()
+      if (!rl) {
+        document.getElementById("demo-unavailable").style.display = ""
+        document.getElementById("demo-ui").style.display = "none"
+      }
+    }
+
+    function setStatus(msg, cls = "") {
+      const el = document.getElementById("status")
+      el.textContent = msg
+      el.className = cls
+    }
+
+    window.connectDevice = async function () {
+      if (!rl) return
+
+      const ip = document.getElementById("ip").value.trim()
+      const port = parseInt(document.getElementById("proxy-port").value, 10) || 4210
+      const proxyURL = `ws://localhost:${port}`
+
+      if (!ip) { setStatus("Enter a device IP", "err"); return }
+
+      const btn = document.getElementById("connect-btn")
+      btn.disabled = true
+      setStatus("Connecting…")
+
+      try {
+        const ok = await rl.begin(proxyURL)
+        if (!ok) { setStatus("Proxy unreachable — run: rleds proxy", "err"); btn.disabled = false; return }
+
+        device = await rl.connect(ip)
+        if (!device) { setStatus("Device unreachable at " + ip, "err"); btn.disabled = false; return }
+
+        setStatus("Connected — " + device.config.leds + " LEDs", "ok")
+        document.getElementById("sliders").style.display = ""
+        updateColor()
+      } catch (e) {
+        setStatus(e.message || "Error", "err")
+        btn.disabled = false
+      }
+    }
+
+    window.updateColor = function () {
+      const r = +document.getElementById("r").value
+      const g = +document.getElementById("g").value
+      const b = +document.getElementById("b").value
+      document.getElementById("rv").textContent = r
+      document.getElementById("gv").textContent = g
+      document.getElementById("bv").textContent = b
+
+      if (!device || !rl) return
+
+      const leds = new Uint8Array(device.config.leds * 3)
+      for (let i = 0; i < device.config.leds; i++) {
+        leds[i * 3] = r; leds[i * 3 + 1] = g; leds[i * 3 + 2] = b
+      }
+      device.send(leds)
+    }
+
+    window.copy = function (id, btn) {
+      navigator.clipboard.writeText(document.getElementById(id).textContent)
+      btn.textContent = "copied"
+      setTimeout(() => btn.textContent = "copy", 1500)
+    }
+
+    init()
+  </script>
+</body>
+</html>

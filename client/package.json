@@ -18,8 +18,12 @@
         "directory": "client"
     },
     "homepage": "https://github.com/genbs/reactive-leds/tree/master/client#readme",
+    "main": "build/reactive-leds.js",
+    "module": "build/reactive-leds.js",
+    "files": ["build/"],
     "scripts": {
         "build": "esbuild src/main.ts --bundle --format=esm --outfile=build/reactive-leds.js && esbuild src/daemon.worker.ts --bundle --format=esm --outfile=build/daemon.worker.js",
+        "prepare": "npm run build",
         "test": "jest"
     },
     "license": "MIT",

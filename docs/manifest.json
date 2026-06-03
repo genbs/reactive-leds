@@ -1,0 +1,12 @@
+{
+  "name": "reactive-leds",
+  "version": "latest",
+  "builds": [{
+    "chipFamily": "ESP32-S3",
+    "parts": [
+      { "path": "https://github.com/genbs/reactive-leds/releases/latest/download/bootloader.bin", "offset": 0 },
+      { "path": "https://github.com/genbs/reactive-leds/releases/latest/download/partition-table.bin", "offset": 32768 },
+      { "path": "https://github.com/genbs/reactive-leds/releases/latest/download/firmware.bin", "offset": 65536 }
+    ]
+  }]
+}
