@@ -53,6 +53,25 @@ L'`hostname` è configurabile sotto la voce "Component config → LWIP". Di defa
 
 Di default ESP-IDF la deriva da `git describe --tags --long --dirty`, quindi basta taggare il repo (es. `git tag vX.Y.Z`). Per override manuale, aggiungi `set(PROJECT_VER "X.Y.Z")` nel `CMakeLists.txt` prima di `idf_component_register`.
 
+### Una build, molti dispositivi
+
+Serve compilare una sola volta. I default in `sdkconfig.defaults` (`pin=18`, `num_leds=16`, `port=4210`) sono un punto di partenza — dopo il flash puoi cambiarli tutti a runtime con `rleds config <ip> <chiave> <valore>` senza ricompilare. Il device si riavvia e carica la nuova config da NVS.
+
+Questo significa che puoi flashare lo stesso binario su tutti i tuoi device e configurarne ognuno singolarmente dalla CLI.
+
+La cosa più importante da impostare su ogni device è l'**hostname** — identifica il device in modo univoco sulla rete ed è quello che `rleds scan` mostra. Impostalo subito dopo il primo flash:
+
+```bash
+rleds config <ip> hostname esp32-1
+```
+
+Dopo puoi usare l'hostname al posto dell'IP in qualsiasi comando:
+
+```bash
+rleds ping esp32-1
+rleds config esp32-1 num_leds 32
+```
+
 ### Build e flash
 
 Dopo aver configurato, builda e flasha il firmware con:

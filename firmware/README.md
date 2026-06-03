@@ -53,6 +53,25 @@ The `hostname` is configurable under "Component config → LWIP". Default is `es
 
 By default ESP-IDF derives it from `git describe --tags --long --dirty`, so just tag the repo (e.g. `git tag vX.Y.Z`). For a manual override, add `set(PROJECT_VER "X.Y.Z")` in `CMakeLists.txt` before `idf_component_register`.
 
+### One build, many devices
+
+You only need to build once. The defaults in `sdkconfig.defaults` (`pin=18`, `num_leds=16`, `port=4210`) are a starting point — after flashing you can change any of them at runtime via `rleds config <ip> <key> <value>` without recompiling. The device reboots and picks up the new config from NVS.
+
+This means you can flash the same binary on all your devices and configure each one individually from the CLI.
+
+The most important thing to set per device is the **hostname** — it uniquely identifies the device on the network and is what `rleds scan` shows. Set it right after the first flash:
+
+```bash
+rleds config <ip> hostname esp32-1
+```
+
+After that you can use the hostname instead of the IP in any command:
+
+```bash
+rleds ping esp32-1
+rleds config esp32-1 num_leds 32
+```
+
 ### Build and flash
 
 After configuring, build and flash the firmware:
@@ -108,12 +127,12 @@ s_led_buffer[index + 3] = b;
 
 Common orders:
 
-| IC / strip             | Bytes per LED | Order      |
-| ---------------------- | ------------- | ---------- |
-| FCOB (this project)    | 4             | W, R, G, B |
-| SK6812 RGBW            | 4             | R, G, B, W |
-| WS2812 / WS2812B       | 3             | G, R, B    |
-| WS2811                 | 3             | R, G, B    |
+| IC / strip          | Bytes per LED | Order      |
+| ------------------- | ------------- | ---------- |
+| FCOB (this project) | 4             | W, R, G, B |
+| SK6812 RGBW         | 4             | R, G, B, W |
+| WS2812 / WS2812B    | 3             | G, R, B    |
+| WS2811              | 3             | R, G, B    |
 
 If you switch to a 3-byte type (no white channel), also change:
 
@@ -145,13 +164,13 @@ The 330 Ω resistor is in series on the data line, as close to the strip as prac
 
 The custom `partitions.csv` defines five partitions sized for the ESP32-S3 N16R8 (16 MB flash):
 
-| Partition  | Size   | Purpose                                     |
-| ---------- | ------ | ------------------------------------------- |
-| `nvs`      | 24 KB  | WiFi credentials, device configuration      |
-| `phy_init` | 4 KB   | RF calibration data                         |
-| `factory`  | 1.5 MB | Main image (flashed via USB)                |
-| `ota_0`    | 1.5 MB | OTA slot A (reserved, not yet implemented)  |
-| `ota_1`    | 1.5 MB | OTA slot B (reserved, not yet implemented)  |
+| Partition  | Size   | Purpose                                    |
+| ---------- | ------ | ------------------------------------------ |
+| `nvs`      | 24 KB  | WiFi credentials, device configuration     |
+| `phy_init` | 4 KB   | RF calibration data                        |
+| `factory`  | 1.5 MB | Main image (flashed via USB)               |
+| `ota_0`    | 1.5 MB | OTA slot A (reserved, not yet implemented) |
+| `ota_1`    | 1.5 MB | OTA slot B (reserved, not yet implemented) |
 
 **OTA is not implemented.** Updates currently require USB flash. The OTA slots are reserved in the partition table so a future OTA implementation can land without repartitioning — repartitioning would erase NVS, forcing every device through BLE provisioning again. PRs to implement OTA are welcome.
 
