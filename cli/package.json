@@ -1,5 +1,4 @@
 {
-    "private": true,
     "name": "@reactive-leds/cli",
     "version": "1.0.0",
     "description": "Command-line tools for provisioning, discovering, and controlling reactive-leds ESP32-S3 devices over UDP and BLE. Includes a WebSocket proxy for browser-based LED control.",
@@ -29,6 +28,7 @@
     "license": "GPL-3.0",
     "devDependencies": {
         "@types/jest": "^29.5.14",
+        "@types/ws": "^8.0.0",
         "esbuild": "^0.25.0",
         "jest": "^29.7.0",
         "ts-jest": "^29.4.0",

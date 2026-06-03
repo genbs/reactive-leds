@@ -2,7 +2,7 @@
 
 Language: [English](./README.md) | [Italiano](./README-it.md)
 
-Client JavaScript per il controllo realtime dei LED via WiFi. È pensato per integrarsi con strumenti browser-based per visual interattive — live coding, installazioni, performance — ma funziona da qualsiasi runtime JS che supporti WebSocket.
+Client JavaScript per il controllo real-time dei LED via WiFi. È pensato per integrarsi con strumenti browser-based per visual interattive — live coding, installazioni, performance — ma funziona da qualsiasi runtime JS che supporti WebSocket.
 
 ## Build
 
@@ -21,7 +21,7 @@ import leds from "./build/reactive-leds.js"
 await leds.begin("ws://localhost:8000")
 ```
 
-> Ti servono gli IP dei device? Lancia `rleds proxy` dal terminale — stampa lo scan della LAN all'avvio, copia gli IP nel tuo codice.
+> Lanciando dalla [cli](../cli/README-it.md) `rleds proxy` dal terminale verranno stampati i risultati dello scan della LAN all'avvio, puoi copiare gli IP nel tuo codice.
 
 Passa `true` come secondo argomento per abilitare i log di debug (`[Proxy]`, `[Worker]`, `[WS]`).
 
@@ -31,7 +31,7 @@ Invia colori a un device — fire-and-forget, nessuna risposta attesa:
 
 ```ts
 // [pixel_index, r, g, b, w] per ogni LED — 5 byte per LED
-const data = new Uint8Array([0, 255, 0, 0, 0])   // LED 0 → rosso
+const data = new Uint8Array([0, 255, 0, 0, 0]) // LED 0 → rosso
 leds.setLEDs("192.168.X.Y", 4210, data)
 ```
 
@@ -44,8 +44,8 @@ Per i dettagli sul formato consulta il [protocollo](../shared/README-it.md#forma
 ```ts
 const device = await leds.connect("192.168.X.Y")
 if (device) {
-    console.log(device.config.num_leds) // numero di LED configurati
-    device.send(data)                   // equivalente a setLEDs
+	console.log(device.config.num_leds) // numero di LED configurati
+	device.send(data) // equivalente a setLEDs
 }
 ```
 
@@ -59,8 +59,8 @@ const status = await leds.getStatus("192.168.X.Y")
 ### Altre chiamate
 
 ```ts
-await leds.ping("192.168.X.Y")          // true se il device risponde
-await leds.getConfig("192.168.X.Y")     // { pin, num_leds, port, hostname }
+await leds.ping("192.168.X.Y") // true se il device risponde
+await leds.getConfig("192.168.X.Y") // { pin, num_leds, port, hostname }
 ```
 
 ### mapPixels — da canvas a LED

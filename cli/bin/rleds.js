@@ -3709,7 +3709,6 @@ var require_websocket_server = __commonJS({
 var require_package = __commonJS({
   "package.json"(exports2, module2) {
     module2.exports = {
-      private: true,
       name: "@reactive-leds/cli",
       version: "1.0.0",
       description: "Command-line tools for provisioning, discovering, and controlling reactive-leds ESP32-S3 devices over UDP and BLE. Includes a WebSocket proxy for browser-based LED control.",
@@ -3739,6 +3738,7 @@ var require_package = __commonJS({
       license: "GPL-3.0",
       devDependencies: {
         "@types/jest": "^29.5.14",
+        "@types/ws": "^8.0.0",
         esbuild: "^0.25.0",
         jest: "^29.7.0",
         "ts-jest": "^29.4.0",
@@ -3945,33 +3945,19 @@ function bufferToConfig(buffer) {
     hostname: decodeBuffer(buffer.slice(4)).substring(0, 32)
   };
 }
-function configToBuffer(config, dest) {
-  const pin = config.pin;
-  const num_leds = config.num_leds;
-  const port = config.port;
+function configToBuffer(config) {
   const hostname = config.hostname.substring(0, 32);
-  const packetLength = 1 + 1 + 2 + hostname.length;
-  let packet;
-  if (typeof dest !== "undefined") {
-    if (dest.length < packetLength) throw new Error("Destination buffer is too small");
-    packet = dest;
-  } else {
-    packet = new Uint8Array(packetLength);
-  }
-  packet[0] = pin;
-  packet[1] = num_leds;
-  packet[2] = port >> 8 & 255;
-  packet[3] = port & 255;
-  if (packet.length < 4) {
-    throw new Error(`Packet buffer too small: ${packet.length} bytes`);
-  }
+  const packet = new Uint8Array(4 + hostname.length);
+  packet[0] = config.pin;
+  packet[1] = config.num_leds;
+  packet[2] = config.port >> 8 & 255;
+  packet[3] = config.port & 255;
   encodeBuffer(hostname, packet, 4);
   return packet;
 }
 function bufferToStatus(buffer) {
-  if (buffer.length < 9) {
+  if (buffer.length < 9)
     throw new Error(`Status buffer too short: ${buffer.length} bytes, need at least 9`);
-  }
   const uptime = (buffer[0] << 24 | buffer[1] << 16 | buffer[2] << 8 | buffer[3]) >>> 0;
   const heap = (buffer[4] << 24 | buffer[5] << 16 | buffer[6] << 8 | buffer[7]) >>> 0;
   const rssi = buffer[8] << 24 >> 24;
@@ -4006,7 +3992,7 @@ function encodeBuffer(str, dest, position) {
 }
 function decodeBuffer(buffer) {
   const nullIndex = buffer.indexOf(0);
-  if (nullIndex !== -1) buffer = buffer.subarray(0, nullIndex);
+  if (nullIndex !== -1) return decoder.decode(buffer.subarray(0, nullIndex));
   return decoder.decode(buffer);
 }
 
@@ -4241,7 +4227,7 @@ var Protocol = class _Protocol {
       configBuffer,
       _Protocol.SET_CONFIG_TIMEOUT
     );
-    return response !== null && response.length >= 2 && response[2] === 1 /* OK */;
+    return response !== null && response.length >= 3 && response[2] === 1 /* OK */;
   }
   /**
    * Turn on the leds based on the index and the specified color.
@@ -4264,7 +4250,7 @@ var Protocol = class _Protocol {
    */
   resetWifi(ip, port) {
     return this.sendSync(ip, port, 4 /* RESET_WIFI */, null, _Protocol.SET_CONFIG_TIMEOUT).then(
-      (response) => response !== null && response.length >= 2 && response[2] === 1 /* OK */
+      (response) => response !== null && response.length >= 3 && response[2] === 1 /* OK */
     );
   }
   /**
@@ -4760,9 +4746,10 @@ async function handleProxyMessage(payload) {
     }
     case 4 /* RESET_WIFI */:
       return status(await protocol_default.resetWifi(ip, port));
-    default:
+    default: {
       console.warn(`Unhandled packet type: ${packetType}`);
       return status(false);
+    }
   }
 }
 function proxy(host = "0.0.0.0", port = 8e3, devicePort = 4210) {
@@ -4779,15 +4766,12 @@ function proxy(host = "0.0.0.0", port = 8e3, devicePort = 4210) {
       });
     });
     let scanTimer;
-    async function render() {
-      const header = `  Proxy: ws://${host}:${port}`;
-      process.stdout.write(`\x1B[H${header}  \u25CF scanning...\x1B[J`);
-      const start = Date.now();
+    async function render(initial = false) {
+      if (initial) process.stdout.write(`\x1B[H  Proxy: ws://${host}:${port}  \u25CF scanning...\x1B[J`);
       const devices = await scan(devicePort, { useCache: false, verbose: false });
-      const elapsed = Math.round((Date.now() - start) / 100) / 10;
       const count = devices.length;
       const lines = [
-        `${header}  \u25CF active  last scan: ${elapsed}s  devices: ${count}`,
+        `  Proxy: ws://${host}:${port}  devices: ${count}   `,
         ""
       ];
       if (count === 0) {
@@ -4806,7 +4790,7 @@ function proxy(host = "0.0.0.0", port = 8e3, devicePort = 4210) {
     process.on("SIGINT", shutdown);
     process.on("SIGTERM", shutdown);
     wss.on("listening", async () => {
-      await render();
+      render(true);
       scanTimer = setInterval(render, SCAN_INTERVAL);
     });
   });

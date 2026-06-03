@@ -102,19 +102,14 @@ export function proxy(host = "0.0.0.0", port = 8000, devicePort = 4210) {
 		})
 
 		let scanTimer: ReturnType<typeof setInterval>
+		async function render(initial = false) {
+			if (initial) process.stdout.write(`\x1b[H  Proxy: ws://${host}:${port}  ● scanning...\x1b[J`)
 
-		async function render() {
-			const header = `  Proxy: ws://${host}:${port}`
-
-			process.stdout.write(`\x1b[H${header}  ● scanning...\x1b[J`)
-
-			const start = Date.now()
 			const devices = await scan(devicePort, { useCache: false, verbose: false })
-			const elapsed = Math.round((Date.now() - start) / 100) / 10
 			const count = devices.length
 
 			const lines = [
-				`${header}  ● active  last scan: ${elapsed}s  devices: ${count}`,
+				`  Proxy: ws://${host}:${port}  devices: ${count}   `,
 				"",
 			]
 
@@ -138,7 +133,7 @@ export function proxy(host = "0.0.0.0", port = 8000, devicePort = 4210) {
 		process.on("SIGTERM", shutdown)
 
 		wss.on("listening", async () => {
-			await render()
+			await render(true)
 			scanTimer = setInterval(render, SCAN_INTERVAL)
 		})
 	})

@@ -1,8 +1,23 @@
 {
-    "private": true,
     "name": "@reactive-leds/client",
     "version": "1.0.0",
-    "description": "",
+    "description": "Browser JavaScript client for realtime LED control over WebSocket. Bridges the reactive-leds UDP protocol to browser applications via a local proxy.",
+    "keywords": [
+        "led",
+        "esp32",
+        "ws2812",
+        "websocket",
+        "live-coding",
+        "visuals",
+        "browser"
+    ],
+    "author": "Gennaro Bosone",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/genbs/reactive-leds.git",
+        "directory": "client"
+    },
+    "homepage": "https://github.com/genbs/reactive-leds/tree/master/client#readme",
     "scripts": {
         "build": "esbuild src/main.ts --bundle --format=esm --outfile=build/reactive-leds.js && esbuild src/daemon.worker.ts --bundle --format=esm --outfile=build/daemon.worker.js",
         "test": "jest"

@@ -68,7 +68,7 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
             size_t pass_len = sizeof(credentials->pass);
             storage_get("wifi", scanned_ssid, credentials->pass, &pass_len);
             credentials->pass[sizeof(credentials->pass) - 1] = '\0';
-            strncpy(credentials->ssid, scanned_ssid, sizeof(credentials->ssid) - 1);
+            snprintf(credentials->ssid, sizeof(credentials->ssid), "%s", scanned_ssid);
 
             // try to connect to the network
             wifi_connect(credentials->ssid, credentials->pass);
