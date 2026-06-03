@@ -77,7 +77,7 @@ void leds_update(uint8_t pixel_index, uint8_t r, uint8_t g, uint8_t b, uint8_t w
         return;
     }
 
-    // TODO: the order of colors might be different depending on the type of LED
+    // Color order for FCOB WRGB strips. Adapt these 4 lines for other ICs — see firmware/README.md.
     size_t index = pixel_index * 4;
     s_led_buffer[index] = w;
     s_led_buffer[index + 1] = r; 

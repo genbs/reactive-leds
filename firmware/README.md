@@ -202,6 +202,8 @@ echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210
 
 **Clear all WiFi credentials from a running device.** Send `RESET_WIFI` via UDP (`rleds reset-wifi <ip>`). The device clears NVS, reboots, and starts in BLE provisioning mode.
 
+**`SET_CONFIG` is best-effort, not atomic.** Each field (pin, num_leds, port, hostname) is written to NVS separately. If a storage error occurs mid-sequence, the device may boot with a partially updated config. Workaround: send `SET_CONFIG` again, or `RESET_WIFI` and re-provision from scratch.
+
 ## Links
 
 - [Back to main README](../README.md)
