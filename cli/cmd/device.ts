@@ -1,7 +1,7 @@
 import { availableConfigKeys } from "@reactive-leds/shared"
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { validateIPOrHostname, validatePort } from "../utils"
+import { fail, ok, validateIPOrHostname, validatePort } from "../utils"
 import { clearScanCache, resolveTargets } from "./wifi"
 
 export const configCommand: Command = {
@@ -24,14 +24,14 @@ export const configCommand: Command = {
 		const targets = await resolveTargets(ip, port)
 		const target = targets[0]
 		if (!target || !target.config) {
-			console.log(`Failed to get config for ${ip}:${port}`)
+			console.log(fail(`Failed to get config for ${ip}:${port}`))
 			return false
 		}
 		const config = target.config
 		if (typeof key !== "undefined" && typeof value !== "undefined") {
 			const result = await proto.setConfig(target.ip, target.port, { ...config, [key]: value })
 			if (!result) {
-				console.log("Failed to update config")
+				console.log(fail("Failed to update config"))
 				return false
 			}
 			// The cached scan now holds a stale config for this device (and the
@@ -67,7 +67,7 @@ export const ledsCommand: Command = {
 		// Resolve so a hostname (accepted by validateIPOrHostname) becomes a real IP.
 		const targets = await resolveTargets(ip, port)
 		if (targets.length === 0) {
-			console.log(`Device ${ip} not found`)
+			console.log(fail(`Device ${ip} not found`))
 			return false
 		}
 		const target = targets[0]
@@ -75,7 +75,7 @@ export const ledsCommand: Command = {
 		const data = new Uint8Array(ledsPackage.split(",").map(Number)) // validated
 		// Await so the kernel transmits before process exit.
 		await proto.setLEDs(target.ip, target.port, data)
-		console.log("LEDs request sent")
+		console.log(ok("LEDs request sent"))
 	},
 }
 

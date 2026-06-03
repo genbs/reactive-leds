@@ -1,6 +1,6 @@
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { DEBUG, validateByte, validateIPOrHostname, validatePort } from "../utils"
+import { DEBUG, ok, validateByte, validateIPOrHostname, validatePort } from "../utils"
 import { resolveTargets } from "./wifi"
 
 const randomByte = () => Math.floor(Math.random() * 256)
@@ -47,7 +47,7 @@ export const colorCommand: Command = {
 		// the process exits (setLEDs is fire-and-forget but non-blocking).
 		for (const { target, data } of packets) {
 			await proto.setLEDs(target.ip, target.port, data)
-			console.log(`${target.ip}: done`)
+			console.log(`${target.ip}: ${ok("done")}`)
 		}
 	},
 }

@@ -1,6 +1,6 @@
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { validateIPOrHostname, validatePort } from "../utils"
+import { ok, validateIPOrHostname, validatePort } from "../utils"
 import { resolveTargets } from "./wifi"
 
 export const offCommand: Command = {
@@ -28,7 +28,7 @@ export const offCommand: Command = {
 
 		for (const { target, data } of packets) {
 			await proto.setLEDs(target.ip, target.port, data)
-			console.log(`${target.ip}: off`)
+			console.log(`${target.ip}: ${ok("off")}`)
 		}
 	},
 }

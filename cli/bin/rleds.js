@@ -4017,7 +4017,7 @@ var btScanCommand = {
   execute: async (timeout = SCAN_TIMEOUT) => {
     const devices = await scanDevices(timeout);
     if (devices.length === 0) {
-      console.log("No devices found");
+      console.log(fail("No devices found"));
     } else {
       printDevices(devices);
     }
@@ -4033,7 +4033,7 @@ var btCredentialCommand = {
   execute: async (indexOrHost, ssid) => {
     const devices = await scanDevices();
     if (devices.length === 0) {
-      console.log("No devices found");
+      console.log(fail("No devices found"));
       return false;
     }
     if (!indexOrHost) {
@@ -4104,7 +4104,7 @@ async function sendBluetoothCredentials(peripheral, ssid, password) {
     await wifiCharacteristic.writeAsync(data, false);
     await peripheral.disconnectAsync();
   } catch (err) {
-    console.error(`Failed to send Bluetooth credentials`);
+    console.log(fail("Failed to send Bluetooth credentials"));
     return false;
   }
   return true;
@@ -4364,7 +4364,7 @@ var scanCommand = {
       new Promise((resolve) => setTimeout(() => resolve([]), timeout))
     ]);
     if (devices.length === 0) {
-      console.log("No devices found");
+      console.log(fail("No devices found"));
       return;
     }
     console.log(`Available devices:
@@ -4528,7 +4528,7 @@ var clearCacheCommand = {
   args: [],
   execute: async () => {
     clearScanCache();
-    console.log("Scan cache cleared");
+    console.log(ok("Scan cache cleared"));
   }
 };
 
@@ -4570,7 +4570,7 @@ var colorCommand = {
     if (DEBUG) console.log("Prepared packets:", packets);
     for (const { target, data } of packets) {
       await protocol_default.setLEDs(target.ip, target.port, data);
-      console.log(`${target.ip}: done`);
+      console.log(`${target.ip}: ${ok("done")}`);
     }
   }
 };
@@ -4590,14 +4590,14 @@ var configCommand = {
     const targets = await resolveTargets(ip, port);
     const target = targets[0];
     if (!target || !target.config) {
-      console.log(`Failed to get config for ${ip}:${port}`);
+      console.log(fail(`Failed to get config for ${ip}:${port}`));
       return false;
     }
     const config = target.config;
     if (typeof key !== "undefined" && typeof value !== "undefined") {
       const result = await protocol_default.setConfig(target.ip, target.port, { ...config, [key]: value });
       if (!result) {
-        console.log("Failed to update config");
+        console.log(fail("Failed to update config"));
         return false;
       }
       clearScanCache();
@@ -4629,13 +4629,13 @@ var ledsCommand = {
   execute: async (ip, port, ledsPackage) => {
     const targets = await resolveTargets(ip, port);
     if (targets.length === 0) {
-      console.log(`Device ${ip} not found`);
+      console.log(fail(`Device ${ip} not found`));
       return false;
     }
     const target = targets[0];
     const data = new Uint8Array(ledsPackage.split(",").map(Number));
     await protocol_default.setLEDs(target.ip, target.port, data);
-    console.log("LEDs request sent");
+    console.log(ok("LEDs request sent"));
   }
 };
 function validateConfigKey(key) {
@@ -4690,7 +4690,7 @@ var offCommand = {
     });
     for (const { target, data } of packets) {
       await protocol_default.setLEDs(target.ip, target.port, data);
-      console.log(`${target.ip}: off`);
+      console.log(`${target.ip}: ${ok("off")}`);
     }
   }
 };
@@ -4841,7 +4841,7 @@ var rainbowCommand = {
         await new Promise((resolve) => setTimeout(resolve, 1e3 / (FPS * speed)));
       }
     }
-    console.log("Rainbow effect completed");
+    console.log(ok("Rainbow effect completed"));
   }
 };
 
@@ -4860,20 +4860,20 @@ var statusCommand = {
       console.log("No devices found.");
       return false;
     }
-    let ok2 = false;
+    let anyOk = false;
     for (const t of targets) {
       const status = await protocol_default.getStatus(t.ip, t.port);
       if (!status) {
-        console.log(`${t.ip}:${t.port}  offline`);
+        console.log(`${t.ip}:${t.port}  ${fail("offline")}`);
         continue;
       }
-      ok2 = true;
+      anyOk = true;
       const uptimeStr = formatUptime(status.uptime);
       const heapStr = formatHeap(status.heap);
       const rssiStr = status.rssi === 0 ? "N/A" : `${status.rssi} dBm`;
-      console.log(`${t.ip}:${t.port}  up ${uptimeStr}  heap ${heapStr}  rssi ${rssiStr}`);
+      console.log(`${t.ip}:${t.port}  ${green("up")} ${uptimeStr}  heap ${heapStr}  rssi ${rssiStr}`);
     }
-    return ok2;
+    return anyOk;
   }
 };
 function formatUptime(seconds) {

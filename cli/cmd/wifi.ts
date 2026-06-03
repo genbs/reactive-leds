@@ -24,7 +24,7 @@ export const scanCommand: Command = {
 		])
 
 		if (devices.length === 0) {
-			console.log("No devices found")
+			console.log(fail("No devices found"))
 			return
 		}
 

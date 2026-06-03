@@ -1,4 +1,5 @@
 import { Command } from "../cmd"
+import { ok } from "../utils"
 import { clearScanCache } from "./wifi"
 
 export const clearCacheCommand: Command = {
@@ -9,6 +10,6 @@ export const clearCacheCommand: Command = {
 	args: [],
 	execute: async () => {
 		clearScanCache()
-		console.log("Scan cache cleared")
+		console.log(ok("Scan cache cleared"))
 	},
 }

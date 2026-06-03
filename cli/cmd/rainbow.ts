@@ -1,6 +1,6 @@
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { validateIPOrHostname, validatePort } from "../utils"
+import { ok, validateIPOrHostname, validatePort } from "../utils"
 import { resolveTargets } from "./wifi"
 
 export const rainbowCommand: Command = {
@@ -45,6 +45,6 @@ export const rainbowCommand: Command = {
 			}
 		}
 
-		console.log("Rainbow effect completed")
+		console.log(ok("Rainbow effect completed"))
 	},
 }

@@ -18,7 +18,7 @@ export const btScanCommand: Command = {
 	execute: async (timeout: number = SCAN_TIMEOUT) => {
 		const devices = await scanDevices(timeout)
 		if (devices.length === 0) {
-			console.log("No devices found")
+			console.log(fail("No devices found"))
 		} else {
 			printDevices(devices)
 		}
@@ -35,7 +35,7 @@ export const btCredentialCommand: Command = {
 	execute: async (indexOrHost: string | undefined, ssid: string | undefined) => {
 		const devices = await scanDevices()
 		if (devices.length === 0) {
-			console.log("No devices found")
+			console.log(fail("No devices found"))
 			return false
 		}
 
@@ -130,7 +130,7 @@ async function sendBluetoothCredentials(peripheral: Peripheral, ssid: string, pa
 
 		await peripheral.disconnectAsync()
 	} catch (err) {
-		console.error(`Failed to send Bluetooth credentials`)
+		console.log(fail("Failed to send Bluetooth credentials"))
 		return false
 	}
 	return true

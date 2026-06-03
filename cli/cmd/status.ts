@@ -1,6 +1,6 @@
 import type { Command } from "../cmd"
 import proto from "../protocol"
-import { validateIPOrHostname, validatePort } from "../utils"
+import { fail, green, validateIPOrHostname, validatePort } from "../utils"
 import { resolveTargets } from "./wifi"
 
 export const statusCommand: Command = {
@@ -22,22 +22,22 @@ export const statusCommand: Command = {
 			return false
 		}
 
-		let ok = false
+		let anyOk = false
 		for (const t of targets) {
 			const status = await proto.getStatus(t.ip, t.port)
 			if (!status) {
-				console.log(`${t.ip}:${t.port}  offline`)
+				console.log(`${t.ip}:${t.port}  ${fail("offline")}`)
 				continue
 			}
 
-			ok = true
+			anyOk = true
 			const uptimeStr = formatUptime(status.uptime)
 			const heapStr = formatHeap(status.heap)
 			const rssiStr = status.rssi === 0 ? "N/A" : `${status.rssi} dBm`
-			console.log(`${t.ip}:${t.port}  up ${uptimeStr}  heap ${heapStr}  rssi ${rssiStr}`)
+			console.log(`${t.ip}:${t.port}  ${green("up")} ${uptimeStr}  heap ${heapStr}  rssi ${rssiStr}`)
 		}
 
-		return ok
+		return anyOk
 	},
 }
 
