@@ -1,10 +1,11 @@
 name: Firmware Build
 
 on:
-  push:
-    branches: [master]
   pull_request:
     branches: [master]
+    paths: [firmware/**]
+  push:
+    tags: ['v*']
   release:
     types: [published]
 
@@ -19,7 +20,7 @@ jobs:
       - name: Build firmware
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.5.1
+          esp_idf_version: v5.5.4
           target: esp32s3
           path: firmware
 
