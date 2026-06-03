@@ -90,6 +90,21 @@ LEDs are distributed in a 2D grid with a serpentine path (odd rows reversed), ma
 - Updates are sent over UDP and are designed for realtime use.
 - Under sustained overload the firmware drops new UDP arrivals at the kernel (drop-tail) to bound staleness; in normal use frames are displayed within ~10 ms of arrival.
 
+## Device provisioning
+
+Before a device is reachable on the network it needs WiFi credentials. Use the CLI:
+
+```bash
+rleds bt-scan          # find unpaired devices via Bluetooth
+rleds bt-credential    # send WiFi credentials over BLE
+```
+
+See [`cli/README.md`](../cli/README.md) for the full provisioning flow.
+
+## Going beyond the API
+
+The client exposes the most common operations. If you need lower-level access (e.g. `SET_CONFIG`, `RESET_WIFI`, `GET_VERSION`) you can use the proxy directly by sending raw binary packets — the format is documented in [`shared/README.md`](../shared/README.md).
+
 ## Links
 
 - [Back to main README](../README.md)
