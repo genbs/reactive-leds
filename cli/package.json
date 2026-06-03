@@ -20,6 +20,14 @@
     "bin": {
         "rleds": "./bin/rleds.js"
     },
+    "files": [
+        "bin/",
+        "README.md",
+        "README-it.md"
+    ],
+    "engines": {
+        "node": ">=18"
+    },
     "scripts": {
         "build": "esbuild main.ts --bundle --platform=node --outfile=bin/rleds.js --external:@stoprocent/noble --banner:js='#!/usr/bin/env node'",
         "test": "jest",

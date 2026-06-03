@@ -3730,6 +3730,14 @@ var require_package = __commonJS({
       bin: {
         rleds: "./bin/rleds.js"
       },
+      files: [
+        "bin/",
+        "README.md",
+        "README-it.md"
+      ],
+      engines: {
+        node: ">=18"
+      },
       scripts: {
         build: "esbuild main.ts --bundle --platform=node --outfile=bin/rleds.js --external:@stoprocent/noble --banner:js='#!/usr/bin/env node'",
         test: "jest",
@@ -4790,7 +4798,7 @@ function proxy(host = "0.0.0.0", port = 8e3, devicePort = 4210) {
     process.on("SIGINT", shutdown);
     process.on("SIGTERM", shutdown);
     wss.on("listening", async () => {
-      render(true);
+      await render(true);
       scanTimer = setInterval(render, SCAN_INTERVAL);
     });
   });

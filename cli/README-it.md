@@ -69,7 +69,7 @@ Il proxy scansiona la LAN ogni 10 secondi e aggiorna la lista dei device in temp
 
 ```
 $ rleds proxy
-Proxy: ws://0.0.0.0:8000  ● active  last scan: 8s  devices: 1
+Proxy: ws://0.0.0.0:8000  devices: 1
 
   esp32-X (192.168.X.X) [aa:bb:cc:dd:ee:ff]
 ```
