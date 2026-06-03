@@ -1,12 +1,13 @@
 // Comunication between client and worker
 
-// Message types that the client can send to the worker
+/** Message types that the client can send to the worker */
 export enum WorkerRequestType {
 	Connect = 0x00, // Connect to the server with websocket
 	ConnectionChange = 0x01, // Connection status changed
 	Send = 0x02, // Send a message to the server
 }
 
+/** Proxy comunication labels */
 export const WorkerRequestTypeMap = {
 	[WorkerRequestType.Connect]: "Connect",
 	[WorkerRequestType.ConnectionChange]: "ConnectionChange",

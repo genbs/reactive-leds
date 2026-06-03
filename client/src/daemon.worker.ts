@@ -1,37 +1,40 @@
-import { LOG_LEVEL, logger } from "@leds/shared"
+import { decodeBuffer } from "@reactive-leds/shared"
 import { CONNECTION_CHANGE_REQUEST_ID, FALSE, TRUE, WorkerRequestType, WorkerRequestTypeMap } from "./comm"
 import WS from "./ws"
 
-// single instance to communicate with the server
-let globalWS: WS | null = null
+let globalWS: WS | null = null // single instance to communicate with the server
 
-// The syncronous request id for 'connect' request
-let connectionChangeRequestId: number | null = null
+let connectionChangeRequestId: number | null = null // The syncronous request id for 'connect' request
 
-// handle messages from the client
-// Packet format: [requestId, type, ...message]
-// the requestId is used to send the response back to the client for syncronous requests
+let debug = false
+
+/** 
+ * Handle messages from the client
+ * Packet format: [requestId, type, ...message]
+ * the requestId is used to send the response back to the client for syncronous requests
+ */
 self.addEventListener("message", async (e: any) => {
 	const requestId = e.data[0]
 	const type = e.data[1]
 	const message = e.data.slice(2)
-	logger.debug(
+
+	debug && console.log(
 		`[Worker] recv from client [${requestId}] ${WorkerRequestTypeMap[type as WorkerRequestType]}`,
-		message,
-		logger.level
+		message
 	)
 
 	switch (type) {
 		// handle connection request [WorkerRequestType.Connect, serverUrl, debug]
 		case WorkerRequestType.Connect:
-			const debug = message[message.length - 1] === TRUE
-			const serverUrl = String.fromCharCode(...message.slice(0, message.length - 1))
-
-			logger.level = debug ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR
-			logger.debug(`[Worker] connect request to server="${serverUrl}" with debug=${debug}`)
+			// Symmetric with proxy.ts: serverURL is UTF-8 encoded via encodeBuffer.
+			// The last byte is the debug flag, so slice it off before decoding.
+			const serverUrl = decodeBuffer(message.slice(0, message.length - 1))
+			debug = message[message.length - 1] === 1
+			debug && console.log(`[Worker] connect request to server="${serverUrl}"`)
 
 			if (!globalWS) {
 				globalWS = new WS({
+					debug,
 					autoConnect: false,
 					shouldReconnect: true,
 					onConnectionChange: handleConnectionChange,
@@ -49,7 +52,7 @@ self.addEventListener("message", async (e: any) => {
 		// handle send message to server [WorkerRequestType.Send, ...message]
 		case WorkerRequestType.Send:
 			if (!globalWS) {
-				logger.error("[Worker] Send error, not connected, can't send message")
+				debug && console.log("[Worker] Send error, not connected, can't send message")
 				return
 			}
 
@@ -59,14 +62,14 @@ self.addEventListener("message", async (e: any) => {
 			globalWS.send(request)
 			break
 		default:
-			logger.debug("[Worker] Unknown request type")
+			debug && console.log("[Worker] Unknown request type")
 			break
 	}
 })
 
-// Intercept the connectionChangeCallback for the WS instance
+/** Intercept the connectionChangeCallback for the WS instance  */
 function handleConnectionChange(status: boolean) {
-	logger.debug("[Worker] websocket connection change", status)
+	debug && console.log("[Worker] websocket connection change", status)
 
 	const packet = new Uint8Array(3)
 	if (connectionChangeRequestId) {
@@ -83,11 +86,11 @@ function handleConnectionChange(status: boolean) {
 	self.postMessage(packet)
 }
 
-// When the server sends a message to the worker, relay it to the client
+/** When the server sends a message to the worker, relay it to the client */
 function handleMessage(packet: Uint8Array) {
 	const requestId = packet[0]
 	const message = packet.slice(1)
 
-	logger.debug(`[Worker] received from backend [${requestId}]`, message)
+	debug && console.log(`[Worker] received from backend [${requestId}]`, message)
 	self.postMessage(packet)
 }

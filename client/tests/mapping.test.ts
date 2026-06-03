@@ -332,10 +332,82 @@ describe("mapping module", () => {
 		)
 		const result = mapPixels(sourcePixels, sourceSize, grid, polygon, steps, w, output)
 
-		console.log("Result:", result)
-		console.log("Expected:", expected)
-
 		expect(result.length).toBe(expected.length)
 		expect(result).toEqual(expected)
+	})
+
+	test("serpentine: odd rows are reversed", () => {
+		/**
+		 * Source Pixels (4x2):
+		 * +-----+-------+---------+-------+
+		 * | RED | GREEN |  BLUE   | WHITE | row 0
+		 * +-----+-------+---------+-------+
+		 * |CYAN |MAGENTA| YELLOW  | BLACK | row 1
+		 * +-----+-------+---------+-------+
+		 */
+		const CYAN = [0, 255, 255]
+		const MAGENTA = [255, 0, 255]
+		const YELLOW = [255, 255, 0]
+		const CYAND = [...CYAN, 255]
+		const MAGENTAA = [...MAGENTA, 255]
+		const YELLOWA = [...YELLOW, 255]
+
+		const sourcePixels = new Uint8Array([
+			...REDA, ...GREENA, ...BLUEA, ...WHITEA, // row 0
+			...CYAND, ...MAGENTAA, ...YELLOWA, ...BLACKA, // row 1
+		])
+		const sourceSize: [number, number] = [4, 2]
+		const grid: [number, number] = [4, 2]
+		const polygon = [0, 0, 4, 0, 4, 2, 0, 2] as [number, number, number, number, number, number, number, number]
+		const steps = 8
+		const w = 0
+
+		/**
+		 * Expected LED layout (serpentine):
+		 *
+		 *  row 0 →  LED0:RED   LED1:GREEN  LED2:BLUE   LED3:WHITE
+		 *  row 1 ←  LED4:BLACK LED5:YELLOW LED6:MAGENTA LED7:CYAN
+		 */
+		const expected = new Uint8Array([
+			0, ...RED, w,
+			1, ...GREEN, w,
+			2, ...BLUE, w,
+			3, ...WHITE, w,
+			4, ...BLACK, w,  // row 1, col 3 (flipped from col 0)
+			5, ...YELLOW, w, // row 1, col 2 (flipped from col 1)
+			6, ...MAGENTA, w,// row 1, col 1 (flipped from col 2)
+			7, ...CYAN, w,   // row 1, col 0 (flipped from col 3)
+		])
+
+		const result = mapPixels(sourcePixels, sourceSize, grid, polygon, steps, w)
+		expect(result).toEqual(expected)
+	})
+
+	test("wa as function maps r,g,b to white channel", () => {
+		// Single red pixel (100, 0, 0) — wa returns the red value
+		const sourcePixels = new Uint8Array([100, 0, 0, 255])
+		const result = mapPixels(
+			sourcePixels,
+			[1, 1],
+			[1, 1],
+			[0, 0, 1, 0, 1, 1, 0, 1],
+			1,
+			(r, _g, _b) => r
+		)
+		expect(result[4]).toBe(100)
+	})
+
+	test("wa=true uses source alpha as white channel", () => {
+		// Single pixel with alpha=128
+		const sourcePixels = new Uint8Array([255, 0, 0, 128])
+		const result = mapPixels(
+			sourcePixels,
+			[1, 1],
+			[1, 1],
+			[0, 0, 1, 0, 1, 1, 0, 1],
+			1,
+			true
+		)
+		expect(result[4]).toBe(128)
 	})
 })

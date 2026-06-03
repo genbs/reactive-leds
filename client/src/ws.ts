@@ -1,12 +1,11 @@
-// Connects to a WebSocket server and handles messages and reconnections. Used by the deamon worker to communicate with the server.
+// Connects to a WebSocket server and handles messages and reconnections. Used by the daemon worker to communicate with the server.
 
-import { logger } from "@leds/shared"
-
-// Delay after closing the connection before trying to reconnect is 2 seconds * 30 retries = 60 seconds
+// Delay after closing the connection before trying to reconnect is 2 seconds * 5 retries = 10 seconds
 const WS_RECONNECTION_TIMEOUT = 2000
-const WS_RECONNECTION_MAX_RETRIES = 30
+const WS_RECONNECTION_MAX_RETRIES = 5
 
 export interface WSSettings {
+	debug?: boolean
 	url: string // WebSocket URL
 	autoConnect: boolean // Automatically connect on instantiation
 	shouldReconnect: boolean | (() => boolean) // Reconnect on close
@@ -16,8 +15,8 @@ export interface WSSettings {
 }
 
 const defaultSettings: Partial<WSSettings> = {
-	autoConnect: true,
-	shouldReconnect: true,
+	autoConnect: true, // Automatically connect on instantiation
+	shouldReconnect: true, // Automatically reconnect on close
 }
 
 export default class WS {
@@ -37,17 +36,18 @@ export default class WS {
 
 	/**
 	 * Connects to the WebSocket server.
+	 * If already connected, it will close the existing connection and create a new one.
 	 */
 	public connect() {
-		logger.info("[WS] Connecting to", this.settings.url)
+		this.settings.debug && console.log("[WS] Connecting to", this.settings.url)
 
 		if (this.socket) {
-			logger.warn("[WS] Warning: already connected, closing existing connection")
+			this.settings.debug && console.log("[WS] Warning: already connected, closing existing connection")
 			this.socket.close()
 		}
 
 		const onOpen = (e: Event) => {
-			logger.debug("[WS] Connection established", e)
+			this.settings.debug && console.log("[WS] Connection established", e)
 
 			this.connected = true
 			this.retries = 0
@@ -59,7 +59,7 @@ export default class WS {
 			if (e.data.length <= 0) return
 
 			const data = new Uint8Array(e.data)
-			logger.debug("[WS] Received", data)
+			this.settings.debug && console.log("[WS] Received", data)
 
 			this.settings.onMessage?.(data)
 		}
@@ -78,32 +78,27 @@ export default class WS {
 	}
 
 	public close() {
-		logger.info("[WS] Closing connection")
+		this.settings.debug && console.log("[WS] Closing connection")
 
 		this.connected = false
 		this.socket?.close()
 	}
 
-	public send(payload: string | ArrayBufferLike | Blob | ArrayBufferView) {
+	public send(payload: string | Blob | BufferSource) {
 		if (!this.socket) {
-			logger.error("[WS] Send error, not connected, can't send message")
+			this.settings.debug && console.log("[WS] Send error, not connected, can't send message")
 			return
 		}
 
-		logger.debug("[WS] Sending", payload)
+		this.settings.debug && console.log("[WS] Sending", payload)
 		this.socket.send(payload)
 	}
 
 	// Event listeners
 
-	/**
-	 * When the connection is closed, it will attempt to reconnect if the shouldReconnect setting is true.
-	 *
-	 * @param e
-	 * @returns
-	 */
+	/** When the connection is closed, it will attempt to reconnect if the shouldReconnect setting is true. */
 	private onSocketClose(e: CloseEvent | Event) {
-		logger.debug("[WS] Connection closed", e)
+		this.settings.debug && console.log("[WS] Connection closed", e)
 
 		this.socket = null
 		if (this.connected) {
@@ -118,11 +113,11 @@ export default class WS {
 
 		if (shouldReconnect) {
 			if (this.retries >= WS_RECONNECTION_MAX_RETRIES) {
-				logger.info("[WS] Max retries reached, not reconnecting")
+				this.settings.debug && console.log("[WS] Max retries reached, not reconnecting")
 				return
 			}
 
-			logger.info(`[WS] Reconnecting in ${WS_RECONNECTION_TIMEOUT / 1000}s...`)
+			this.settings.debug && console.log(`[WS] Reconnecting in ${WS_RECONNECTION_TIMEOUT / 1000}s...`)
 			this.retries++
 			setTimeout(() => this.connect(), WS_RECONNECTION_TIMEOUT)
 		}

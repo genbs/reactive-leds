@@ -2,6 +2,7 @@
  * Utility functions for mapping pixels to LEDs
  */
 
+/** Linear interpolation between two points — used for bilinear quad mapping */
 function step(t: number, xStart: number, yStart: number, xEnd: number, yEnd: number): [number, number] {
 	const x = (1 - t) * xStart + t * xEnd
 	const y = (1 - t) * yStart + t * yEnd
@@ -9,15 +10,22 @@ function step(t: number, xStart: number, yStart: number, xEnd: number, yEnd: num
 }
 
 /**
+ * Maps pixels from a source image to a LED strip arranged in a 2D serpentine grid.
  *
- * @param pixels source pixels data
- * @param pixelsSize source pixels image size [width, height]
- * @param grid destination grid size [cells, rows]
- * @param polygon mapping (x0, y0, x1, y1, x2, y2, x3, y3) on destination grid [TL, TR, BR, BL]
- * @param steps number of LEDs to map
- * @param wa if w is number is white/brightness mapping function or value, if boolean is alpha value
- * @param output [pixel_index,r,g,b,w, pixel_index,r,g,b,w ...] output buffer, if not provided a new one will be created
- * @returns
+ * The strip is treated as a grid of `ledCols x ledRows` LEDs, where the number of
+ * columns and rows is derived from the physical aspect ratio of the polygon.
+ * Odd rows are wired right-to-left (serpentine), matching the physical layout of LED panels.
+ *
+ * The polygon maps a region of the source grid to the LED layout using bilinear
+ * interpolation, so it works correctly even for skewed or rotated quadrilaterals.
+ *
+ * @param pixels source pixels (RGBA, 4 bytes per pixel)
+ * @param pixelsSize source image size [width, height] in pixels
+ * @param grid how the source image is divided [cols, rows] — defines cell size
+ * @param polygon region of the grid to map onto the LEDs [TL, TR, BR, BL] as (x0,y0, x1,y1, x2,y2, x3,y3) in grid coordinates
+ * @param steps number of LEDs
+ * @param wa white/brightness channel: fixed number, true = use source alpha, or a function(r,g,b) => w
+ * @param output output buffer [led_index, r, g, b, w, ...] — allocated automatically if not provided
  */
 export function mapPixels(
 	pixels: Uint8Array,
@@ -31,53 +39,65 @@ export function mapPixels(
 	const [imgWidth, imgHeight] = pixelsSize
 	const [cells, rows] = grid
 
-	// Assume polygon vertices are in order: Top-Left, Top-Right, Bottom-Right, Bottom-Left
+	// Vertices in order: Top-Left, Top-Right, Bottom-Right, Bottom-Left
 	const [x0, y0, x1, y1, x2, y2, x3, y3] = polygon
 
+	// Physical size of one grid cell in pixels
 	const cellWidth = imgWidth / cells
 	const cellHeight = imgHeight / rows
 
+	// Derive the 2D LED grid dimensions from the physical aspect ratio of the polygon.
+	// Using pixel coordinates (not grid coords) ensures correct proportions
+	// when cells are not square.
+	const physicalWidth = (x1 - x0) * cellWidth
+	const physicalHeight = (y3 - y0) * cellHeight
+	const aspectRatio = physicalHeight > 0 ? physicalWidth / physicalHeight : 1
+	const ledCols = Math.max(1, Math.round(Math.sqrt(steps * aspectRatio)))
+	// ceil ensures v never exceeds 1.0 even when steps is not divisible by ledCols
+	const ledRows = Math.ceil(steps / ledCols)
+
 	for (let i = 0; i < steps; i++) {
-		// Calculate parameter 't' for the center of the i-th segment
-		// This represents the fractional distance along the shape.
-		const t = (i + 0.5) / steps
+		let ledRow = Math.floor(i / ledCols)
+		let ledCol = i % ledCols
 
-		const [ptx, pty] = step(t, x0, y0, x1, y1)
-		const [pbx, pby] = step(t, x3, y3, x2, y2)
+		// Serpentine: reverse column direction on odd rows to match physical wiring
+		if (ledRow % 2 === 1) {
+			ledCol = ledCols - 1 - ledCol
+		}
 
-		const px = (ptx + pbx) * 0.5
-		const py = (pty + pby) * 0.5
+		// Fractional position of the LED center within the polygon (0.0 – 1.0)
+		const u = (ledCol + 0.5) / ledCols
+		const v = (ledRow + 0.5) / ledRows
 
-		// Convert grid coordinates (px, py) to source image pixel coordinates (sx, sy)
-		let sx = Math.floor(px * cellWidth)
-		let sy = Math.floor(py * cellHeight)
+		// Bilinear interpolation: find the point (gridX, gridY) inside the quadrilateral
+		// by interpolating along the top and bottom edges, then vertically between them
+		const [topX, topY] = step(u, x0, y0, x1, y1)
+		const [botX, botY] = step(u, x3, y3, x2, y2)
+		const [gridX, gridY] = step(v, topX, topY, botX, botY)
 
-		// Clamp coordinates to valid image bounds
+		// Convert grid coordinates to source image pixel coordinates, clamped to bounds
+		let sx = Math.floor(gridX * cellWidth)
+		let sy = Math.floor(gridY * cellHeight)
 		if (sx < 0) sx = 0
 		else if (sx >= imgWidth) sx = imgWidth - 1
 		if (sy < 0) sy = 0
-		else if (sy >= imgHeight) sy = imgHeight - 1 // Important for 1-pixel high images!
+		else if (sy >= imgHeight) sy = imgHeight - 1
 
-		// Calculate source pixel index (4 bytes per pixel: R, G, B, A)
-		const srcIndex = (sy * imgWidth + sx) << 2
-		// Calculate destination index in the output buffer (5 bytes per LED: index, R, G, B, W)
-		const dstIndex = i * 5
+		const srcIndex = (sy * imgWidth + sx) << 2 // 4 bytes per pixel (RGBA)
+		const dstIndex = i * 5                      // 5 bytes per LED (index, R, G, B, W)
 
-		// Assign LED data to the output buffer
-		output[dstIndex] = i // LED index
-		output[dstIndex + 1] = pixels[srcIndex] // Red
-		output[dstIndex + 2] = pixels[srcIndex + 1] // Green
-		output[dstIndex + 3] = pixels[srcIndex + 2] // Blue
-
-		// Calculate and assign the White/Brightness value based on the 'wa' parameter
+		output[dstIndex] = i
+		output[dstIndex + 1] = pixels[srcIndex]
+		output[dstIndex + 2] = pixels[srcIndex + 1]
+		output[dstIndex + 3] = pixels[srcIndex + 2]
 		output[dstIndex + 4] =
 			typeof wa === "number"
-				? wa // Use fixed number if 'wa' is a number
+				? wa
 				: typeof wa === "function"
-				? (wa as Function)(pixels[srcIndex], pixels[srcIndex + 1], pixels[srcIndex + 2]) // Use function if 'wa' is a function
-				: wa === true
-				? pixels[srcIndex + 3] // Use source Alpha if 'wa' is true
-				: 0 // Default to 0 otherwise
+					? (wa as Function)(pixels[srcIndex], pixels[srcIndex + 1], pixels[srcIndex + 2])
+					: wa === true
+						? pixels[srcIndex + 3] // source alpha
+						: 0
 	}
 
 	return output
