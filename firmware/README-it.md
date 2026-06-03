@@ -132,10 +132,11 @@ Alimentatore 24V
   └── (+) ──→ striscia LED (+) 24V
       (-)  ──→ striscia LED (-) GND (condiviso con ESP32 GND)
 
-ESP32 GPIO18 ──→ data line striscia LED
+ESP32 GPIO18 ──→ resistenza 330 Ω ──→ data line striscia LED
 ```
 
 Il modulo XL4015 abbassa la tensione da 24V a 5V per alimentare l'ESP32. La striscia LED funziona direttamente a 24V. I GND devono essere tutti collegati insieme.
+La resistenza da 330 Ω va messa in serie sulla linea dati, il più vicino possibile alla striscia, per ridurre il ringing e mantenere pulito il segnale LED.
 
 ## Layout della flash e OTA
 

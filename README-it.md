@@ -58,6 +58,7 @@ Questo e' un piccolo monorepo. Ogni area principale ha la propria cartella e il 
 - [Alimentatore 24V](https://www.amazon.it/dp/B0C8CM7GS7)
 - [Cavo di alimentazione](https://it.aliexpress.com/item/1005007046323657.html)
 - [JST](https://it.aliexpress.com/item/1005005362711029.html) ([alternativa](https://it.aliexpress.com/item/1005004615616698.html))
+- Resistenza da 330 Ω in serie sulla linea dati LED
 
 Questi sono i materiali che ho usato, ma il progetto è adattabile a strisce e componenti simili. Assicurati solo di configurare correttamente il firmware per la tua striscia (ordine dei colori, numero di segmenti, ecc).
 
@@ -74,3 +75,8 @@ Per il profilo ho stampato 5 pezzi in PLA, ciascuno lungo 20 cm. Per la barra di
 - **Ordine dei colori**: la sequenza di byte RGB/WRGB dipende dall'IC della striscia. Il firmware è configurato per la striscia indicata nei Materiali. Strisce diverse potrebbero richiedere un ordine diverso (vedi `firmware/main/leds.c`).
 - **WiFi sleep disabilitato**: la modalità risparmio energetico della radio WiFi è disabilitata esplicitamente per evitare picchi di latenza e perdita di pacchetti durante gli aggiornamenti real-time.
 - **Credenziali WiFi in chiaro via BLE**: durante il provisioning le credenziali vengono inviate senza cifratura. Per un progetto personale la semplicità ha priorità, ma tienilo a mente se usi reti sensibili.
+
+## Alimentazione e sicurezza
+
+La striscia LED funziona a 24V. Il dimensionamento dell'alimentatore dipende dalle specifiche della striscia e dal carico reale. Usa un alimentatore con margine adeguato e un cablaggio corretto.
+Metti la resistenza da 330 Ω in serie sulla linea dati tra ESP32 e striscia, il più vicino possibile alla striscia.

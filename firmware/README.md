@@ -132,10 +132,11 @@ Making the byte order and pixel size configurable (via Kconfig or runtime config
   └── (+) ──→ LED strip (+) 24V
       (-)  ──→ LED strip (-) GND (shared with ESP32 GND)
 
-ESP32 GPIO18 ──→ LED strip data line
+ESP32 GPIO18 ──→ 330 Ω resistor ──→ LED strip data line
 ```
 
 The XL4015 module steps down from 24V to 5V to power the ESP32. The LED strip runs directly at 24V. All GNDs must be connected together.
+The 330 Ω resistor is in series on the data line, as close to the strip as practical, to reduce ringing and keep the LED signal clean.
 
 ## Flash layout and OTA
 

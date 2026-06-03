@@ -58,6 +58,7 @@ This is a small monorepo. Each major area has its own folder and README.
 - [24V power supply](https://www.amazon.it/dp/B0C8CM7GS7)
 - [Power cable](https://it.aliexpress.com/item/1005007046323657.html)
 - [JST](https://it.aliexpress.com/item/1005005362711029.html) ([alternative](https://it.aliexpress.com/item/1005004615616698.html))
+- 330 Ω resistor in series on the LED data line
 
 These are the components I used, but the project can be adapted to similar strips and hardware. Make sure to configure the firmware correctly for your strip (color order, number of segments, etc).
 
@@ -78,3 +79,4 @@ For the profile I printed 5 pieces in PLA, each 20cm long. For the diffuser bar 
 ## Power and Safety
 
 The LED strip runs at 24V. PSU sizing depends on the strip specifications and real load. Use a power supply with adequate headroom and proper wiring.
+Put the 330 Ω series resistor on the data line between the ESP32 and the strip, as close to the strip as practical.
