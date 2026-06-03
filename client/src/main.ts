@@ -15,15 +15,16 @@ import { isConnected, onConnectionChange, send, sendSync, wsconnect } from "./pr
 export { isConnected, mapPixels, onConnectionChange }
 import { Device } from "./types"
 
-const addressBufferMap = new Map<DeviceIP, DeviceAddress>()
+const addressBufferMap = new Map<string, DeviceAddress>()
 
 // @internal Create a packet to send to the worker and then to the server.
 function createPacket(ip: DeviceIP, port: number, type: PacketType, data?: Uint8Array): Uint8Array {
-	let addressPacket = addressBufferMap.get(ip)
+	const key = `${ip}:${port}`
+	let addressPacket = addressBufferMap.get(key)
 
 	if (!addressPacket) {
 		addressPacket = addressToBuffer(ip, port)
-		addressBufferMap.set(ip, addressPacket)
+		addressBufferMap.set(key, addressPacket)
 	}
 
 	const addrLen = addressPacket.length

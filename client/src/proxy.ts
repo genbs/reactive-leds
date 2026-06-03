@@ -104,7 +104,7 @@ export function wsconnect(serverURL: string, _debug = false): Promise<boolean> {
 	buffer[1 + serverURL.length] = debug ? TRUE : FALSE
 
 	debug && console.log(`[Proxy] connect to ${serverURL}`, buffer)
-	return sendSync(buffer).then(response => (connected = response[0] === TRUE))
+	return sendSync(buffer).then(response => (connected = response[1] === TRUE))
 }
 
 /** Register a callback for connection state changes, returns an unsubscribe function */

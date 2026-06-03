@@ -1,11 +1,21 @@
 node_modules
 build
 dist
+
+# npm workspaces: only the root lockfile is authoritative
+cli/package-lock.json
+client/package-lock.json
+shared/package-lock.json
 .todo
 .vscode
 .DS_Store
 .env
 *.log*
+*.tsbuildinfo
 .idea
 .cache
-.vscode
+
+# ESP-IDF generates firmware/sdkconfig at build time from sdkconfig.defaults.
+# Only the defaults file is tracked; the generated sdkconfig is per-developer.
+firmware/sdkconfig
+firmware/sdkconfig.old
