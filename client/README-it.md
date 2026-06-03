@@ -1,5 +1,9 @@
 # Libreria Client
 
+[![Test](https://github.com/genbs/reactive-leds/actions/workflows/test-client.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/test-client.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![npm version](https://img.shields.io/npm/v/@reactive-leds/client)](https://www.npmjs.com/package/@reactive-leds/client)
+
 Language: [English](./README.md) | [Italiano](./README-it.md)
 
 Client JavaScript per il controllo real-time dei LED via WiFi. È pensato per integrarsi con strumenti browser-based per visual interattive — live coding, installazioni, performance — ma funziona da qualsiasi runtime JS che supporti WebSocket.

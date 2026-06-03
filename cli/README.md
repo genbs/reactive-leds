@@ -1,5 +1,9 @@
 # CLI
 
+[![Test](https://github.com/genbs/reactive-leds/actions/workflows/test-cli.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/test-cli.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![npm version](https://img.shields.io/npm/v/@reactive-leds/cli)](https://www.npmjs.com/package/@reactive-leds/cli)
+
 Language: [English](./README.md) | [Italiano](./README-it.md)
 
 `rleds` is the command-line tool for interacting with `reactive-leds` devices on the network.

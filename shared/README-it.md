@@ -1,5 +1,8 @@
 # Shared
 
+[![Test](https://github.com/genbs/reactive-leds/actions/workflows/test-shared.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/test-shared.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Language: [English](./README.md) | [Italiano](./README-it.md)
 
 Questo pacchetto contiene la specifica del protocollo binario per comunicare con i device `reactive-leds`, più i tipi TypeScript e gli helper di serializzazione che la implementano (condivisi da [client](../client/README-it.md) e [CLI](../cli/README-it.md)).

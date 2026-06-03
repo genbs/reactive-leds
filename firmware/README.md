@@ -1,5 +1,8 @@
 # Firmware
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Firmware Build](https://github.com/genbs/reactive-leds/actions/workflows/firmware-build.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/firmware-build.yml)
+
 Language: [English](./README.md) | [Italiano](./README-it.md)
 
 This is the heart of the project: the firmware running on the ESP32-S3, receiving commands via UDP and updating the LEDs in realtime with minimal latency.

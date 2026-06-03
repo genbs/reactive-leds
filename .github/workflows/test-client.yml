@@ -1,10 +1,9 @@
-name: Test
+name: Test client
 
 on:
   pull_request:
     branches: [master]
     paths:
-      - cli/**
       - client/**
       - shared/**
 
@@ -18,4 +17,4 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm install
-      - run: npm test --workspaces --if-present
+      - run: npm test --workspace=client
