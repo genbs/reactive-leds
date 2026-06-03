@@ -76,9 +76,10 @@ export async function handleProxyMessage(payload: Uint8Array): Promise<Uint8Arra
 		case PacketType.RESET_WIFI:
 			return status(await proto.resetWifi(ip, port))
 
-		default:
+		default: {
 			console.warn(`Unhandled packet type: ${packetType}`)
 			return status(false)
+		}
 	}
 }
 

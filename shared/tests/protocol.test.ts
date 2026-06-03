@@ -18,17 +18,6 @@ describe("Config", () => {
 		expect(result[3]).toBe(210) // port low byte (1234 & 0xff)
 		expect(decodeBuffer(result.slice(4))).toBe("test") // hostname
 
-		// test with destination buffer
-		const dest = new Uint8Array(20)
-		const resultWithDest = configToBuffer(config, dest)
-		expect(resultWithDest).toBe(dest)
-		expect(resultWithDest.length).toBe(20)
-		expect(resultWithDest[0]).toBe(1)
-		expect(resultWithDest[1]).toBe(10)
-		expect(resultWithDest[2]).toBe(4) // port high byte
-		expect(resultWithDest[3]).toBe(210) // port low byte
-		expect(decodeBuffer(resultWithDest.slice(4))).toBe("test") // hostname
-
 		// test with long hostname
 		const longHostname = "a".repeat(40)
 		const longConfig = {

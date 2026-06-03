@@ -110,7 +110,7 @@ class Protocol {
 			Protocol.SET_CONFIG_TIMEOUT
 		)
 
-		return response !== null && response.length >= 2 && response[2] === PacketStatus.OK
+		return response !== null && response.length >= 3 && response[2] === PacketStatus.OK
 	}
 
 	/**
@@ -135,7 +135,7 @@ class Protocol {
 	 */
 	resetWifi(ip: string, port: number): Promise<boolean> {
 		return this.sendSync(ip, port, PacketType.RESET_WIFI, null, Protocol.SET_CONFIG_TIMEOUT).then(
-			response => response !== null && response.length >= 2 && response[2] === PacketStatus.OK
+			response => response !== null && response.length >= 3 && response[2] === PacketStatus.OK
 		)
 	}
 

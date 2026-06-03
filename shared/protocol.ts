@@ -73,34 +73,14 @@ export function bufferToConfig(buffer: Uint8Array): Config {
 }
 
 /** Convert a config object to a buffer */
-export function configToBuffer(config: Config, dest?: Uint8Array): Uint8Array {
-	const pin = config.pin
-	const num_leds = config.num_leds
-	const port = config.port
+export function configToBuffer(config: Config): Uint8Array {
 	const hostname = config.hostname.substring(0, 32)
-
-	const packetLength = 1 + 1 + 2 + hostname.length // pin, num_leds, port_h, port_l, hostname
-
-	let packet
-	if (typeof dest !== "undefined") {
-		if (dest.length < packetLength) throw new Error("Destination buffer is too small")
-
-		packet = dest
-	} else {
-		packet = new Uint8Array(packetLength)
-	}
-
-	packet[0] = pin
-	packet[1] = num_leds
-	packet[2] = (port >> 8) & 0xff
-	packet[3] = port & 0xff
-
-	if (packet.length < 4) {
-		throw new Error(`Packet buffer too small: ${packet.length} bytes`)
-	}
-
+	const packet = new Uint8Array(4 + hostname.length)
+	packet[0] = config.pin
+	packet[1] = config.num_leds
+	packet[2] = (config.port >> 8) & 0xff
+	packet[3] = config.port & 0xff
 	encodeBuffer(hostname, packet, 4)
-
 	return packet
 }
 
@@ -113,9 +93,8 @@ export type Status = {
 
 /** Convert a status buffer to a Status object */
 export function bufferToStatus(buffer: Uint8Array): Status {
-	if (buffer.length < 9) {
+	if (buffer.length < 9)
 		throw new Error(`Status buffer too short: ${buffer.length} bytes, need at least 9`)
-	}
 
 	const uptime =
 		((buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3]) >>> 0
@@ -142,8 +121,8 @@ export function statusToBuffer(status: Status): Uint8Array {
 }
 
 /** Convert address (ip + port) to buffer */
-export function addressToBuffer(ip: DeviceIP, port: number, dest?: DeviceAddress): DeviceAddress {
-	const buffer = dest || new Uint8Array(6) // 4 bytes for IP + 2 bytes for port
+export function addressToBuffer(ip: DeviceIP, port: number): DeviceAddress {
+	const buffer = new Uint8Array(6) // 4 bytes for IP + 2 bytes for port
 
 	if (typeof ip === "string") {
 		const parts = ip.split(".")
@@ -199,7 +178,6 @@ export function encodeBuffer(str: string, dest?: Uint8Array, position?: number):
 /** Decode a Uint8Array buffer to a string, stopping at the first null byte */
 export function decodeBuffer(buffer: Uint8Array): string {
 	const nullIndex = buffer.indexOf(0)
-	if (nullIndex !== -1) buffer = buffer.subarray(0, nullIndex)
-
+	if (nullIndex !== -1) return decoder.decode(buffer.subarray(0, nullIndex))
 	return decoder.decode(buffer)
 }
