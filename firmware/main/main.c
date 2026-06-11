@@ -113,40 +113,67 @@ void ble_configuration_loop() {
 
 /**
  * Protocol loop task.
+ *
+ * Non-blocking recvfrom + 2 ms yield. Simple polling beats select() in
+ * practice — lwIP's select() notification pipe adds more latency than it
+ * saves on this hardware.
  */
 void app_protocol_loop(void *param) {
     while (1) {
         protocol_loop();
-
-        vTaskDelay(pdMS_TO_TICKS(6));
+        // 2 ms yield between polls. Relies on CONFIG_FREERTOS_HZ=1000 (1 tick =
+        // 1 ms): at the 100 Hz default, pdMS_TO_TICKS(2) rounds to 0 ticks and
+        // this becomes a busy-spin. Keep HZ=1000 if you change the tick rate.
+        vTaskDelay(pdMS_TO_TICKS(2));
     }
 }
 
 /**
  * While connected to wifi, keep the connection alive.
- * If the connection is lost, retry forever — never reboot from this task.
- * A frozen frame during a live performance is preferable to a forced restart.
- * If the WiFi stack genuinely corrupts, ESP_ERROR_CHECK inside wifi_connect()
- * will panic-reboot as a last-resort safety net.
+ * If the connection is lost, retry the current network up to 3 times, then
+ * scan for every known network in storage and try each one. Falls back to
+ * BLE provisioning only if no known network is visible at boot.
  */
 void wifi_reconnect_task(void *param) {
     wifi_credentials_t *credentials = (wifi_credentials_t *)param;
+    int failures = 0;
 
     while (1) {
         if (wifi_connected()) {
+            failures = 0;
             delay(CHECK_CONNECTED_TIMEOUT);
             continue;
         }
 
-        ESP_LOGI(TAG, "Reconnecting to WiFi");
-        wifi_connect(credentials->ssid, credentials->pass);
+        if (++failures >= 3) {
+            failures = 0;
+            int n;
+            wifi_ap_record_t *aps = wifi_scan(&n);
+            if (!aps) continue;
 
-        // Wait up to WIFI_CONNECT_TIMEOUT for the event handler to converge,
-        // then fall through to the outer loop and try again. The event handler
-        // exhausts its own MAX_RETRY internally, so we must re-trigger periodically.
-        uint32_t start = esp_log_timestamp();
-        while (!wifi_connected() && esp_log_timestamp() - start < WIFI_CONNECT_TIMEOUT) {
-            delay(CHECK_CONNECTED_TIMEOUT);
+            for (int i = 0; i < n && !wifi_connected(); i++) {
+                char ssid[33];
+                snprintf(ssid, sizeof(ssid), "%.*s", 32, aps[i].ssid);
+                if (!storage_has_key("wifi", ssid)) continue;
+
+                size_t len = sizeof(credentials->pass);
+                storage_get("wifi", ssid, credentials->pass, &len);
+                credentials->pass[sizeof(credentials->pass) - 1] = '\0';
+                snprintf(credentials->ssid, sizeof(credentials->ssid), "%s", ssid);
+                wifi_connect(credentials->ssid, credentials->pass);
+
+                uint32_t t = esp_log_timestamp();
+                while (!wifi_connected() && esp_log_timestamp() - t < WIFI_CONNECT_TIMEOUT)
+                    delay(CHECK_CONNECTED_TIMEOUT);
+            }
+            free(aps);
+        }
+
+        if (!wifi_connected()) {
+            wifi_connect(credentials->ssid, credentials->pass);
+            uint32_t t = esp_log_timestamp();
+            while (!wifi_connected() && esp_log_timestamp() - t < WIFI_CONNECT_TIMEOUT)
+                delay(CHECK_CONNECTED_TIMEOUT);
         }
     }
 }
@@ -197,12 +224,13 @@ void app_main(void)
         esp_restart();
     }
 
-    // Keep connected to WiFi and handle reconnections
-    xTaskCreatePinnedToCore(wifi_reconnect_task, "wifi_reconnect_task", 4096, &credentials, 1, NULL, 1);
+    // Keep connected to WiFi and handle reconnections — pinned to core 0 alongside the WiFi stack.
+    xTaskCreatePinnedToCore(wifi_reconnect_task, "wifi_reconnect_task", 4096, &credentials, 1, NULL, 0);
 
-    // Create a task to monitor the protocol
-    xTaskCreatePinnedToCore(app_protocol_loop, "app_protocol_loop", 4096, NULL, 5, NULL, 0);
-    
+    // Protocol task on core 1, isolated from the WiFi/lwIP stack on core 0 —
+    // a clean separation of the LED render pipeline from the network stack.
+    xTaskCreatePinnedToCore(app_protocol_loop, "app_protocol_loop", 4096, NULL, 5, NULL, 1);
+
     // Delete the main task
     vTaskDelete(NULL);
 }

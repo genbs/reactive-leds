@@ -126,10 +126,14 @@ void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
     wifi_config_t wifi_config = {0}; 
     strncpy((char *)wifi_config.sta.ssid, (char *)WIFI_SSID, sizeof(wifi_config.sta.ssid) - 1);
     strncpy((char *)wifi_config.sta.password, (char *)WIFI_PASS, sizeof(wifi_config.sta.password) - 1);
-    wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+    wifi_config.sta.scan_method = WIFI_FAST_SCAN;
     wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     wifi_config.sta.pmf_cfg.capable = true;
     wifi_config.sta.pmf_cfg.required = false;
+    // Disable 802.11k/v roaming on this stationary device: the periodic
+    // background channel scans they trigger briefly interrupt UDP reception.
+    wifi_config.sta.rm_enabled = 0;
+    wifi_config.sta.btm_enabled = 0;
     
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
     wifi_start_once();

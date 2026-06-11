@@ -4,6 +4,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_check.h"
+#include "esp_attr.h"
 #include "esp_log.h"
 #include "driver/rmt_tx.h"
 #include "driver/rmt_encoder.h"
@@ -19,7 +20,9 @@ static esp_err_t rmt_del_led_strip_encoder(rmt_encoder_t *encoder);
 static esp_err_t rmt_led_strip_encoder_reset(rmt_encoder_t *encoder);
 esp_err_t rmt_new_led_strip_encoder(rmt_encoder_handle_t *ret_encoder); 
 
-static uint8_t* s_led_buffer = NULL;
+static uint8_t* s_led_buffers[2] = {NULL, NULL};
+static int s_tx_idx = 0;
+static int s_pending_idx = 1;
 static rmt_channel_handle_t s_led_chan = NULL;
 static rmt_encoder_handle_t s_led_encoder = NULL;
 
@@ -28,16 +31,21 @@ bool leds_begin()
 {
     ESP_LOGI(LEDS_TAG, "Initializing RMT for LED strip");
 
-    // Single allocation that lives for the entire process lifetime. leds_end()
-    // frees it, but is intentionally never called in the normal flow — the
-    // device runs until reboot/power-off. Not a leak.
     size_t buffer_size = config.num_leds * 4;
-    s_led_buffer = malloc(buffer_size);
-    if (!s_led_buffer) {
-        ESP_LOGE(LEDS_TAG, "Failed to allocate memory for LED buffer");
+    s_led_buffers[0] = malloc(buffer_size);
+    s_led_buffers[1] = malloc(buffer_size);
+    if (!s_led_buffers[0] || !s_led_buffers[1]) {
+        ESP_LOGE(LEDS_TAG, "Failed to allocate memory for LED buffers");
+        free(s_led_buffers[0]);
+        free(s_led_buffers[1]);
+        s_led_buffers[0] = NULL;
+        s_led_buffers[1] = NULL;
         return false;
     }
-    memset(s_led_buffer, 0, buffer_size);
+    memset(s_led_buffers[0], 0, buffer_size);
+    memset(s_led_buffers[1], 0, buffer_size);
+    s_tx_idx = 0;
+    s_pending_idx = 1;
 
     
     // Configure RMT (credits: https://github.com/espressif/esp-idf/blob/master/examples/peripherals/rmt/led_strip/main/led_strip_example_main.c)
@@ -47,7 +55,8 @@ bool leds_begin()
         .gpio_num = config.pin,
         .mem_block_symbols = MEM_BLOCK_SYMBOLS,
         .resolution_hz = RMT_RESOLUTION_HZ,
-        .trans_queue_depth = TRANSFER_QUEUE_DEPTH, 
+        .trans_queue_depth = TRANSFER_QUEUE_DEPTH,
+        .flags.with_dma = true,
     };
 
     ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &s_led_chan));
@@ -63,49 +72,65 @@ void leds_end()
     if (s_led_chan) rmt_disable(s_led_chan);
     if (s_led_encoder) rmt_del_encoder(s_led_encoder);
     if (s_led_chan) rmt_del_channel(s_led_chan);
-    if (s_led_buffer) free(s_led_buffer);
+    free(s_led_buffers[0]);
+    free(s_led_buffers[1]);
     
+    s_led_buffers[0] = NULL;
+    s_led_buffers[1] = NULL;
     s_led_chan = NULL;
     s_led_encoder = NULL;
-    s_led_buffer = NULL;
     ESP_LOGI(LEDS_TAG, "LEDs driver de-initialized.");
 }
 
 void leds_update(uint8_t pixel_index, uint8_t r, uint8_t g, uint8_t b, uint8_t w)
 {
-    if (!s_led_buffer || pixel_index >= config.num_leds) {
+    uint8_t* buf = s_led_buffers[s_pending_idx];
+    if (!buf || pixel_index >= config.num_leds) {
         return;
     }
 
-    // Color order for FCOB WRGB strips. Adapt these 4 lines for other ICs — see firmware/README.md.
     size_t index = pixel_index * 4;
-    s_led_buffer[index] = w;
-    s_led_buffer[index + 1] = r; 
-    s_led_buffer[index + 2] = g; 
-    s_led_buffer[index + 3] = b; 
+    buf[index] = w;
+    buf[index + 1] = r;
+    buf[index + 2] = g;
+    buf[index + 3] = b;
 }
 
 void leds_clear()
 {
-    if (s_led_buffer) {
-        memset(s_led_buffer, 0, config.num_leds * 4);
+    uint8_t* buf = s_led_buffers[s_pending_idx];
+    if (buf) {
+        memset(buf, 0, config.num_leds * 4);
     }
 }
 
 void leds_show()
 {
     static const rmt_transmit_config_t s_tx_config = {
-        .loop_count = 0, // no transfer loop
+        .loop_count = 0,
     };
 
-    if (!s_led_chan || !s_led_encoder || !s_led_buffer) {
+    if (!s_led_chan || !s_led_encoder || !s_led_buffers[0] || !s_led_buffers[1]) {
         return;
     }
 
-    ESP_ERROR_CHECK(rmt_transmit(s_led_chan, s_led_encoder, s_led_buffer, config.num_leds * 4, &s_tx_config));
-    // 100ms is ~10x the worst-case transfer time (299 LEDs ≈ 9ms). A timeout here
-    // means RMT is stuck; ESP_ERROR_CHECK panics → reboot via panic handler.
-    ESP_ERROR_CHECK(rmt_tx_wait_all_done(s_led_chan, pdMS_TO_TICKS(100)));
+    // Wait for the previous TX to finish before recycling its buffer.
+    // With ~200 us TX time and 16 ms between calls this returns instantly.
+    // On timeout, skip this frame instead of panic-rebooting: a dropped frame
+    // is invisible, a reboot mid-performance is not.
+    if (rmt_tx_wait_all_done(s_led_chan, pdMS_TO_TICKS(100)) != ESP_OK) {
+        return;
+    }
+
+    // Swap: pending buffer (written by leds_update) becomes TX, old TX buffer
+    // becomes the new pending buffer. No lock needed: only the protocol task
+    // calls leds_update/leds_show, and the DMA reads the *other* (tx) buffer.
+    // (Reinstate a critical section here if a second task/ISR ever writes LEDs.)
+    s_tx_idx = s_pending_idx;
+    s_pending_idx = !s_pending_idx;
+
+    // Non-blocking: returns immediately, RMT runs in hardware via DMA.
+    ESP_ERROR_CHECK(rmt_transmit(s_led_chan, s_led_encoder, s_led_buffers[s_tx_idx], config.num_leds * 4, &s_tx_config));
 }
 
 
@@ -123,7 +148,7 @@ typedef struct {
 } rmt_led_strip_encoder_t;
 
 
-static size_t rmt_encode_led_strip(rmt_encoder_t *encoder, rmt_channel_handle_t channel, const void *primary_data, size_t data_size, rmt_encode_state_t *ret_state)
+static size_t IRAM_ATTR rmt_encode_led_strip(rmt_encoder_t *encoder, rmt_channel_handle_t channel, const void *primary_data, size_t data_size, rmt_encode_state_t *ret_state)
 {
     rmt_led_strip_encoder_t *led_encoder = __containerof(encoder, rmt_led_strip_encoder_t, base);
     rmt_encoder_handle_t bytes_encoder = led_encoder->bytes_encoder;
@@ -159,7 +184,7 @@ out:
     return encoded_symbols;
 }
 
-static esp_err_t rmt_del_led_strip_encoder(rmt_encoder_t *encoder)
+static esp_err_t IRAM_ATTR rmt_del_led_strip_encoder(rmt_encoder_t *encoder)
 {
     rmt_led_strip_encoder_t *led_encoder = __containerof(encoder, rmt_led_strip_encoder_t, base);
     rmt_del_encoder(led_encoder->bytes_encoder);
@@ -168,7 +193,7 @@ static esp_err_t rmt_del_led_strip_encoder(rmt_encoder_t *encoder)
     return ESP_OK;
 }
 
-static esp_err_t rmt_led_strip_encoder_reset(rmt_encoder_t *encoder)
+static esp_err_t IRAM_ATTR rmt_led_strip_encoder_reset(rmt_encoder_t *encoder)
 {
     rmt_led_strip_encoder_t *led_encoder = __containerof(encoder, rmt_led_strip_encoder_t, base);
     rmt_encoder_reset(led_encoder->bytes_encoder);

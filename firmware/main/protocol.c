@@ -45,14 +45,12 @@ bool protocol_begin() {
 /**
  * Protocol loop.
  * Reads one UDP packet per call (non-blocking) and processes it if valid.
- * Pacing is handled by the caller (app_protocol_loop with vTaskDelay).
+ * Pacing is handled by the caller (vTaskDelay + non-blocking recvfrom).
  * Sustained overload is absorbed by kernel-level drop-tail on the small
  * UDP receive mailbox.
  */
 void protocol_loop()
 {
-    // Function-scope static: whole-program lifetime (no stack pressure for
-    // ~1.6KB) but the scope honestly reflects that this loop is the only consumer.
     static udp_packet s_packet_buffer;
 
     if (udp_con_read(&s_packet_buffer)) {
@@ -206,7 +204,6 @@ static void protocol_set_leds(const udp_packet* request)
         leds_update(pixel_index, data[i+1] /* R */, data[i+2] /* G */, data[i+3] /* B */, data[i+4] /* W */);
         updated = true;
     }
-
     if (updated) {
         leds_show();
     }
