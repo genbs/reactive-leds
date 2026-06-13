@@ -29,7 +29,7 @@ const mock = proto as jest.Mocked<typeof proto>
 const REQ_ID = 42
 const PORT = 4210 // 0x10, 0x72
 
-/** Build a proxy request: [requestId, ip(4), port_h, port_l, type, ...data] */
+/** Build a proxy request: [requestId, address(4), port_h, port_l, type, ...data] */
 function req(type: PacketType, data: number[] = []): Uint8Array {
 	return new Uint8Array([REQ_ID, 192, 168, 1, 10, (PORT >> 8) & 0xff, PORT & 0xff, type, ...data])
 }

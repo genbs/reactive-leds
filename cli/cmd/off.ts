@@ -1,18 +1,18 @@
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { ok, validateIPOrHostname, validatePort } from "../utils"
+import { ok, validateAddressOrHostname, validatePort } from "../utils"
 import { resolveTargets } from "./wifi"
 
 export const offCommand: Command = {
 	name: "off",
-	description: "Turn off all LEDs. If <ip> is omitted, applies to every discovered device.",
+	description: "Turn off all LEDs. If <address> is omitted, applies to every discovered device.",
 	examples: ["off", "off 192.168.1.10"],
 	args: [
-		{ required: false, name: "ip", type: String, validator: validateIPOrHostname },
+		{ required: false, name: "address", type: String, validator: validateAddressOrHostname },
 		{ required: false, name: "port", type: Number, default: 4210, validator: validatePort },
 	],
-	execute: async (ip: string | undefined, port: number) => {
-		const targets = await resolveTargets(ip, port)
+	execute: async (address: string | undefined, port: number) => {
+		const targets = await resolveTargets(address, port)
 		if (targets.length === 0) return false
 
 		// num_leds comes from the cached config (filled in by scan/resolveTargets);
@@ -27,8 +27,8 @@ export const offCommand: Command = {
 		})
 
 		for (const { target, data } of packets) {
-			await proto.setLEDs(target.ip, target.port, data)
-			console.log(`${target.ip}: ${ok("off")}`)
+			await proto.setLEDs(target.address, target.port, data)
+			console.log(`${target.address}: ${ok("off")}`)
 		}
 	},
 }

@@ -1,7 +1,7 @@
 import noble, { Peripheral } from "@stoprocent/noble"
 import { encodeBuffer } from "@reactive-leds/shared"
 import { Command } from "../cmd"
-import { ask, DEBUG, fail, green, ok } from "../utils"
+import { ask, debug, fail, green, ok } from "../utils"
 
 // Keep in sync with firmware/main/ble.c (SERVICE_UUID_128, CHARACTERISTIC_UUID_128).
 // Contract documented in shared/README.md ("BLE provisioning").
@@ -101,7 +101,8 @@ function findDevice(devices: Peripheral[], host: string): Peripheral | undefined
 }
 
 async function sendBluetoothCredentials(peripheral: Peripheral, ssid: string, password: string) {
-	if (DEBUG) console.log(
+	debug(
+		"ble",
 		`Sending credentials (${ssid}:${password.replace(/./g, "*")}) to ${peripheral.advertisement.localName || peripheral.address || peripheral.uuid}`
 	)
 

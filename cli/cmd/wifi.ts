@@ -6,7 +6,7 @@ import { exec } from "child_process"
 
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { DEBUG, fail, green, ok, validateIPOrHostname, validatePort } from "../utils"
+import { debug, fail, green, ok, validateAddressOrHostname, validatePort } from "../utils"
 
 ////////////////////// Commands
 
@@ -34,18 +34,18 @@ export const scanCommand: Command = {
 
 export const pingCommand: Command = {
 	name: "ping",
-	description: "Ping a device over Wi-Fi. If <ip> is omitted, every device discovered on the network is pinged.",
+	description: "Ping a device over Wi-Fi. If <address> is omitted, every device discovered on the network is pinged.",
 	args: [
-		{ name: "ip", required: false, validator: validateIPOrHostname },
+		{ name: "address", required: false, validator: validateAddressOrHostname },
 		{ name: "port", type: Number, required: false, default: 4210, validator: validatePort },
 	],
-	execute: async (ip: string | undefined, port: number) => {
-		const targets = await resolveTargets(ip, port)
+	execute: async (address: string | undefined, port: number) => {
+		const targets = await resolveTargets(address, port)
 		if (targets.length === 0) return false
 
 		for (const target of targets) {
-			const result = await ping(target.ip, target.port)
-			const label = target.config?.hostname ? `${target.config.hostname} (${target.ip})` : target.ip
+			const result = await ping(target.address, target.port)
+			const label = target.config?.hostname ? `${target.config.hostname} (${target.address})` : target.address
 			console.log(`${label}: ${result ? ok("online") : fail("offline")}`)
 		}
 	},
@@ -53,18 +53,18 @@ export const pingCommand: Command = {
 
 export const resetWifiCommand: Command = {
 	name: "reset-wifi",
-	description: "Reset the Wi-Fi credentials on a device. If <ip> is omitted, every discovered device is reset.",
+	description: "Reset the Wi-Fi credentials on a device. If <address> is omitted, every discovered device is reset.",
 	args: [
-		{ name: "ip", required: false, validator: validateIPOrHostname },
+		{ name: "address", required: false, validator: validateAddressOrHostname },
 		{ name: "port", type: Number, required: false, default: 4210, validator: validatePort },
 	],
-	execute: async (ip: string | undefined, port: number) => {
-		const targets = await resolveTargets(ip, port)
+	execute: async (address: string | undefined, port: number) => {
+		const targets = await resolveTargets(address, port)
 		if (targets.length === 0) return false
 
 		for (const target of targets) {
-			const result = await proto.resetWifi(target.ip, target.port)
-			const label = target.config?.hostname ? `${target.config.hostname} (${target.ip})` : target.ip
+			const result = await proto.resetWifi(target.address, target.port)
+			const label = target.config?.hostname ? `${target.config.hostname} (${target.address})` : target.address
 			console.log(`${label}: ${result ? ok("reset successfully") : fail("failed")}`)
 		}
 	},
@@ -73,7 +73,7 @@ export const resetWifiCommand: Command = {
 ////////////////////// Public API for other commands
 
 export type ScanResult = {
-	ip: string
+	address: string
 	mac: string
 	port: number
 	/** Device configuration as returned by GET_CONFIG, or `null` if the device
@@ -84,7 +84,7 @@ export type ScanResult = {
 
 /** Subset of ScanResult that consumer commands actually need. */
 export type Target = {
-	ip: string
+	address: string
 	port: number
 	config: Config | null
 }
@@ -95,8 +95,9 @@ const CACHE_MAX_MINUTES = 5
 /** Pretty one-line representation of a device. Hostname (from config) is
  *  shown first when available — it's the physical label the user wrote on
  *  the case's tape and is much more memorable than the IP. */
-export function formatDevice(d: ScanResult): string {
-	const head = d.config?.hostname ? `${d.config.hostname} (${d.ip})` : d.ip
+export function formatDevice(d: ScanResult, showPort: boolean = true): string {
+	const addr = d.address + (showPort ? `:${d.port}` : "")
+	const head = d.config?.hostname ? `${d.config.hostname} (${addr})` : addr
 	return `${green(head)} ${d.mac}`
 }
 
@@ -105,7 +106,7 @@ export function clearScanCache(): void {
 	try {
 		if (fs.existsSync(CACHE_FILE)) fs.unlinkSync(CACHE_FILE)
 	} catch (err) {
-		if (DEBUG) console.log("[scan] failed to clear cache:", err)
+		debug("scan", "failed to clear cache:", err)
 	}
 }
 
@@ -161,12 +162,12 @@ export async function resolveTargets(
 			console.log("No devices found")
 			return []
 		}
-		return devices.map(d => ({ ip: d.ip, port, config: d.config }))
+		return devices.map(d => ({ address: d.address, port, config: d.config }))
 	}
 
 	if (isIPv4(identifier)) {
 		const config = await proto.getConfig(identifier, port).catch(() => null)
-		return [{ ip: identifier, port, config }]
+		return [{ address: identifier, port, config }]
 	}
 
 	// Treat as hostname: cache lookup, then fresh-scan fallback.
@@ -184,7 +185,7 @@ export async function resolveTargets(
 		return []
 	}
 
-	return [{ ip: found.ip, port, config: found.config }]
+	return [{ address: found.address, port, config: found.config }]
 }
 
 function isIPv4(value: string): boolean {
@@ -196,15 +197,13 @@ function isIPv4(value: string): boolean {
 /**
  * Ping a device, retrying up to `retries` times. Returns true on first success.
  */
-export async function ping(ip: string, port: number, retries = 3): Promise<boolean> {
-	for (let i = 0; i < retries; i++) {
-		try {
-			if (await proto.ping(ip, port)) return true
-		} catch (err) {
-			if (DEBUG) console.log(`[ping] ${ip} attempt ${i + 1} failed:`, err)
-		}
+export async function ping(address: string, port: number): Promise<boolean> {
+	try {
+		return await proto.ping(address, port)
+	} catch (err) {
+		debug("ping", `${address} failed:`, err)
+		return false
 	}
-	return false
 }
 
 ////////////////////// Internal
@@ -224,7 +223,7 @@ function readCache(maxMinutes: number): ScanResult[] | null {
 			const now = new Date()
 			fs.utimesSync(CACHE_FILE, now, now)
 		} catch (err) {
-			if (DEBUG) console.log("[scan] failed to bump cache mtime:", err)
+			debug("scan", "failed to bump cache mtime:", err)
 		}
 
 		return data
@@ -237,7 +236,7 @@ function writeCache(devices: ScanResult[]): void {
 	try {
 		fs.writeFileSync(CACHE_FILE, JSON.stringify(devices, null, 2))
 	} catch (err) {
-		if (DEBUG) console.log("[scan] failed to write cache:", err)
+		debug("scan", "failed to write cache:", err)
 	}
 }
 
@@ -252,9 +251,9 @@ function runArpScan(port: number): Promise<ScanResult[]> {
 					if (parts.length < 4) return null
 					if (parts[3] === "(incomplete)" || parts[3] === "ff:ff:ff:ff:ff:ff") return null
 
-					if (DEBUG) console.log("Found ARP entry:", line)
+					debug("scan", "Found ARP entry:", line)
 
-					const ip = parts[1].replace(/[()]/g, "")
+					const address = parts[1].replace(/[()]/g, "")
 					const mac = parts[3]
 						.split(":")
 						.map(part => parseInt(part, 16).toString(16).padStart(2, "0").toUpperCase())
@@ -262,13 +261,13 @@ function runArpScan(port: number): Promise<ScanResult[]> {
 
 					// use the retrying ping wrapper: a single UDP ping is unreliable on
 					// noisy Wi-Fi and would false-negative an online device.
-					if (!(await ping(ip, port))) return null
+					if (!(await ping(address, port))) return null
 
 					// Pull the config once during the scan so consumers don't have to
 					// re-fetch before every setLEDs. `null` is fine if it times out —
 					// downstream code falls back to num_leds=16.
-					const config = await proto.getConfig(ip, port).catch(() => null)
-					return { ip, mac, port, config }
+					const config = await proto.getConfig(address, port).catch(() => null)
+					return { address, mac, port, config }
 				})
 			)
 

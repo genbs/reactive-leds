@@ -3,13 +3,21 @@ import { Writable } from "stream"
 
 export const DEBUG = process.env.DEBUG === "1"
 
+/** Log to console with a `[HH:MM:SS.mmm tag]` prefix, only when DEBUG=1. */
+export function debug(tag: string, ...args: unknown[]) {
+	if (!DEBUG) return
+	const now = new Date()
+	const ts = now.toTimeString().slice(0, 8) + "." + String(now.getMilliseconds()).padStart(3, "0")
+	console.log(`[${ts} ${tag}]`, ...args)
+}
+
 export function validateByte(value: string): boolean {
 	const byte = Number(value)
 	return !isNaN(byte) && byte >= 0 && byte <= 255
 }
 
 /** Check if a string is a valid IPv4 address (four dot-separated octets 0-255). */
-export function validateIP(ip: string) {
+export function validateAddress(ip: string) {
 	if (!ip) return false
 
 	const parts = ip.split(".")
@@ -32,9 +40,9 @@ export function validatePort(port: string): boolean {
  * matching the firmware's 32-char limit and RFC 1123 alphanumeric+hyphen rules).
  * Commands that target a device use this so the user can type either form.
  */
-export function validateIPOrHostname(value: string): boolean | string {
+export function validateAddressOrHostname(value: string): boolean | string {
 	if (!value) return false
-	if (validateIP(value)) return true
+	if (validateAddress(value)) return true
 	// Hostname: 1–32 chars, must start with alphanumeric, then alphanumeric or hyphens.
 	if (/^[a-zA-Z0-9][a-zA-Z0-9-]{0,31}$/.test(value)) return true
 	return `"${value}" is not a valid IPv4 address or hostname`
@@ -51,13 +59,13 @@ const wrap = (open: string, close: string) =>
 
 const RESET = "\x1b[0m"
 
-export const green  = wrap("\x1b[32m", RESET)
-export const red    = wrap("\x1b[31m", RESET)
+export const green = wrap("\x1b[32m", RESET)
+export const red = wrap("\x1b[31m", RESET)
 export const yellow = wrap("\x1b[33m", RESET)
-export const bold   = wrap("\x1b[1m",  "\x1b[22m")
+export const bold = wrap("\x1b[1m", "\x1b[22m")
 
 // Semantic aliases — most call sites read better with these
-export const ok   = green
+export const ok = green
 export const fail = red
 export const warn = yellow
 

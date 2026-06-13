@@ -19,25 +19,25 @@ rleds <command>
 
 ## Global flags
 
-- `--version` / `-v` — print the CLI version and exit. (To query the firmware version of a device, use `rleds version <ip>`.)
+- `--version` / `-v` — print the CLI version and exit.
 - `--help` / `-h` — print the command list (same as running `rleds` with no arguments). For per-command help: `rleds help <command>`.
 
 ## Commands
 
 - `scan [port]` - discover devices on the LAN via ARP + UDP ping. Each result also includes the device hostname (from its config), so you can match the IP to the label you wrote on the case. Results are cached to disk (`/tmp/reactive-leds-scan.json` on macOS/Linux) to speed up subsequent commands (invalidated after 5 minutes).
 - `clear-cache` - delete the on-disk scan cache (`/tmp/reactive-leds-scan.json`). Useful when you have added/moved a device, changed WiFi networks, or just want to force a fresh discovery on the next command. `config` writes also clear the cache automatically (since they reboot the device).
-- `ping [ipOrHostname] [port]` - check if a device is online. If `ipOrHostname` is omitted, pings every discovered device.
-- `reset-wifi [ipOrHostname] [port]` - clear WiFi credentials. If `ipOrHostname` is omitted, applies to every discovered device.
-- `config <ipOrHostname> [port] [key] [value]` - read or update device configuration. Reading prints current keys and values. Writing reboots the device (~5 s offline before recovery). Requires an explicit `ipOrHostname`. Supported keys: `hostname` (string, max 32 chars), `pin` (number, LED GPIO), `num_leds` (number), `port` (number, UDP port).
-- `leds <ipOrHostname> [port] <leds_package>` - send LED updates. The package is a comma-separated list of values in groups of 5: `<led_index>,<r>,<g>,<b>,<w>` (w = white/brightness). Multiple LEDs can be chained: `0,255,0,0,0,1,0,128,128,0`. Each value between 0 and 255. Requires an explicit `ipOrHostname`.
+- `ping [addressOrHostname] [port]` - check if a device is online. If `addressOrHostname` is omitted, pings every discovered device.
+- `reset-wifi [addressOrHostname] [port]` - clear WiFi credentials. If `addressOrHostname` is omitted, applies to every discovered device.
+- `config <addressOrHostname> [port] [key] [value]` - read or update device configuration. Reading prints current keys and values. Writing reboots the device (~5 s offline before recovery). Requires an explicit `addressOrHostname`. Supported keys: `hostname` (string, max 32 chars), `pin` (number, LED GPIO), `num_leds` (number), `port` (number, UDP port).
+- `leds <addressOrHostname> [port] <leds_package>` - send LED updates. The package is a comma-separated list of values in groups of 5: `<led_index>,<r>,<g>,<b>,<w>` (w = white/brightness). Multiple LEDs can be chained: `0,255,0,0,0,1,0,128,128,0`. Each value between 0 and 255. Requires an explicit `addressOrHostname`.
 - `bt-scan` - scan devices over Bluetooth.
 - `bt-credential [indexOrHost] [ssid]` - send WiFi credentials over Bluetooth. If `indexOrHost` is omitted, runs in interactive mode: shows the list of found devices and asks which to select (by numeric index or name). If `ssid` is omitted, it is prompted (password is always prompted, hidden). If `indexOrHost` is a number, it is used as an index into the `bt-scan` list (1-based).
 - `proxy [host] [port] [device_port]` - start the WebSocket proxy between browser clients and the firmware. Scans the LAN every 10 seconds and shows discovered devices in realtime — IP, hostname, and MAC.
-- `rainbow [seconds] [speed] [ipOrHostname] [port]` - scroll a rainbow across the strip. If `ipOrHostname` is omitted, the effect is sent to every discovered device.
-- `color [r] [g] [b] [w] [ipOrHostname] [port]` - set all LEDs to a solid color. If `r g b` are omitted, a random color is used. If `ipOrHostname` is omitted, targets every discovered device.
-- `off [ipOrHostname] [port]` - turn off all LEDs. If `ipOrHostname` is omitted, applies to every discovered device. Convenience alias for `color 0 0 0 0`.
-- `status [ipOrHostname] [port]` - get device status (uptime, free heap, WiFi RSSI). If `ipOrHostname` is omitted, queries every discovered device.
-- `version [ipOrHostname] [port]` - read the firmware version (from `PROJECT_VER` / `git describe`). If `ipOrHostname` is omitted, queries every discovered device.
+- `rainbow [seconds] [speed] [addressOrHostname] [port]` - scroll a rainbow across the strip. If `addressOrHostname` is omitted, the effect is sent to every discovered device.
+- `color [r] [g] [b] [w] [addressOrHostname] [port]` - set all LEDs to a solid color. If `r g b` are omitted, a random color is used. If `addressOrHostname` is omitted, targets every discovered device.
+- `off [addressOrHostname] [port]` - turn off all LEDs. If `addressOrHostname` is omitted, applies to every discovered device. Convenience alias for `color 0 0 0 0`.
+- `status [addressOrHostname] [port]` - get device status (uptime, free heap, WiFi RSSI). If `addressOrHostname` is omitted, queries every discovered device.
+- `version [addressOrHostname] [port]` - read the firmware version (from `PROJECT_VER` / `git describe`). If `addressOrHostname` is omitted, queries every discovered device.
 
 ## Examples (minimal)
 
@@ -77,6 +77,16 @@ Proxy: ws://0.0.0.0:8000  devices: 1
 ## Notes
 
 - `scan` uses `arp -a` which works on macOS and Linux. On Windows the output format is different and the command does not work correctly.
+
+## Troubleshooting
+
+### macOS: every device shows `offline` but it responds to `nc`
+
+Symptom: `rleds ping <address>` reports `offline` (with `DEBUG=1`: `send EHOSTUNREACH` on every attempt, instantly), yet the device answers a manual probe like `echo -ne '\x01\x00' | nc -u -w1 <address> 4210`.
+
+Cause: macOS **Local Network privacy** (System Settings → Privacy & Security → Local Network). The check only applies to third-party binaries — Apple tools like `nc` are exempt, which is why they keep working. Node (and therefore `rleds`) is blocked, and the permission is attributed to the **terminal app** you launch it from (iTerm, Terminal, …), so `node` never appears in the list itself.
+
+Fix: enable the toggle for your terminal app in Privacy & Security → Local Network. If it is already on (the state can get corrupted after a macOS update), toggle it off and on, then fully restart the terminal (Cmd+Q).
 
 ## BLE Provisioning Flow
 
