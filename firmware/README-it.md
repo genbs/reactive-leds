@@ -9,13 +9,13 @@ Questo è il cuore del progetto: il firmware che gira sull'ESP32-S3, riceve i co
 
 Al primo avvio, il firmware entra in modalità provisioning BLE, dove aspetta le credenziali Wi-Fi da un client (es. la [CLI](../cli/README-it.md)). Dopo aver ricevuto le credenziali, si connette alla rete e resta in ascolto di [pacchetti UDP](#protocollo).
 
-Il firmware è tarato per FCOB 24V a 16 IC con ordine byte WRGB, ma si adatta ad altre — vedi [Adattamento a una striscia LED diversa](#adattamento-a-una-striscia-led-diversa). In futuro potrebbe essere esteso per supportare più tipi di striscia, ma per ora è hardcoded per WS2812 WRGB.
+Il firmware è tarato per FCOB 24V a 16 IC con ordine byte WRGB, ma si adatta ad altre — vedi [Adattamento a una striscia LED diversa](#adattamento-a-una-striscia-led-diversa).
 
 ## Requisiti
 
 - CMake
 - Python 3
-- [ESP-IDF](https://github.com/espressif/esp-idf) v5.5.X (usata in sviluppo) — [Guida installazione](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/index.html#installation)
+- [ESP-IDF](https://github.com/espressif/esp-idf) v5.5.X — [Guida installazione](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/index.html#installation)
 
 **Driver USB (macOS/Windows)**: a seconda della dev board, l'ESP32-S3 appare via USB nativo (nessun driver, come `/dev/cu.usbmodem*`) oppure tramite un chip bridge USB-UART. Se la porta non viene riconosciuta, installa il driver del bridge della tua board: **CH340/CH9102** (WCH, appare come `/dev/cu.wchusbserial*`) o **CP210x** (Silicon Labs, appare come `/dev/cu.SLAB_USBtoUART`). Usa `ls /dev/cu.*` per vedere come si presenta la tua board. Su Linux questi driver sono di solito già nel kernel.
 
@@ -27,12 +27,15 @@ La configurazione è presente in [`sdkconfig.defaults`](./sdkconfig.defaults).
 ESP-IDF la combina con i propri default per generare `sdkconfig` al build time:
 
 - `CONFIG_BT_BLE_42_FEATURES_SUPPORTED=y` — richiesto dal server GATT del BLE provisioning.
-- `CONFIG_LWIP_UDP_RECVMBOX_SIZE=6` — receive mailbox UDP piccola per design. Sotto sovraccarico il kernel droppa i nuovi arrivi (drop-tail) invece di accumulare frame vecchi; il ritardo è limitato a ~36 ms con poll a 6 ms. Vedi "Scelte progettuali" per il razionale.
+- `CONFIG_LWIP_MAX_UDP_PCBS=32` — numero massimo di PCB UDP attivi contemporaneamente; il default (16) è basso per uno stack che gestisce traffico animazione ad alto frame rate.
+- `CONFIG_LWIP_UDP_RECVMBOX_SIZE=6` — receive mailbox UDP piccola per design. Sotto sovraccarico il kernel droppa i nuovi arrivi (drop-tail) invece di accumulare frame vecchi; il ritardo è limitato a ~12 ms con poll a 2 ms. Vedi "Scelte progettuali" per il razionale.
 - `CONFIG_LWIP_TCPIP_TASK_PRIO=1` — priorità TCP/IP bassa così il protocol task (priorità 5) può interromperla sotto carico.
-- `CONFIG_FREERTOS_HZ=1000` — granularità 1 ms per `vTaskDelay`.
+- `CONFIG_FREERTOS_HZ=1000` — granularità 1 ms per `vTaskDelay`. Necessario per il poll del protocollo a 2 ms: col default a 100 Hz, `pdMS_TO_TICKS(2)` si arrotonderebbe a 0 tick e andrebbe in busy-spin.
 - `CONFIG_RMT_ISR_IRAM_SAFE=y` — tiene l'interrupt RMT in IRAM, così il timing del segnale LED non viene disturbato dagli accessi alla flash (cache miss). Conta per avere forme d'onda WS2812 pulite.
-- `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y`, `CONFIG_COMPILER_OPTIMIZATION_PERF=y`, `CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y` — tuning di performance (clock massimo, `-O2`, I-cache più grande) per il percorso realtime.
-- `CONFIG_LOG_DEFAULT_LEVEL_WARN=y` — il log level di default a runtime è WARN, quindi le tracce verbose `ESP_LOGV`/`ESP_LOGD` vengono escluse dalla build. Alzalo (menuconfig → Log output) se ti servono in debug.
+- `CONFIG_GDMA_ISR_IRAM_SAFE=y` — la striscia LED pilota RMT via DMA, quindi anche l'interrupt GDMA deve restare in IRAM. Va in coppia con `CONFIG_RMT_ISR_IRAM_SAFE` per tenere al sicuro un transfer anche se una finestra flash-cache-disable (es. una scrittura NVS) lo sovrappone.
+- `CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y`, `CONFIG_FREERTOS_TIMER_TASK_AFFINITY_CPU0=y` — pinnano lo stack WiFi/lwIP sul core 0, lasciando il core 1 al task protocollo/render (`xTaskCreatePinnedToCore(..., 1)` in `main.c`). Isola il percorso realtime dallo stack di rete.
+- `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y`, `CONFIG_COMPILER_OPTIMIZATION_PERF=y`, `CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y`, `CONFIG_ESP32S3_DATA_CACHE_64KB=y` — tuning di performance (clock massimo, `-O2`, I-cache e D-cache più grandi) per il percorso realtime.
+- `CONFIG_LOG_DEFAULT_LEVEL_INFO=y` — il log level di default a runtime è INFO. Il percorso realtime non ne risente: ogni log per-pacchetto/per-frame (`SET_LEDS`, `PING`, …) è `ESP_LOGV` (verbose), che resta sopra INFO e viene compilato fuori, quindi il loop caldo non paga nulla. Vengono stampati solo gli eventi INFO one-shot (boot, connessione WiFi, provisioning, scritture di config). Alzalo a VERBOSE (menuconfig → Log output) per le tracce di debug per-pacchetto.
 - Partition table custom (vedi [`partitions.csv`](./partitions.csv)).
 - Default device (`CONFIG_LED_PIN=18`, `CONFIG_NUM_LEDS=16`, `CONFIG_PORT=4210`, `CONFIG_LWIP_LOCAL_HOSTNAME="esp32-X"`).
 
@@ -55,21 +58,21 @@ Di default ESP-IDF la deriva da `git describe --tags --long --dirty`, quindi bas
 
 ### Una build, molti dispositivi
 
-Serve compilare una sola volta. I default in `sdkconfig.defaults` (`pin=18`, `num_leds=16`, `port=4210`) sono un punto di partenza — dopo il flash puoi cambiarli tutti a runtime con `rleds config <ip> <chiave> <valore>` senza ricompilare. Il device si riavvia e carica la nuova config da NVS.
+Serve compilare una sola volta. I default in `sdkconfig.defaults` (`pin=18`, `num_leds=16`, `port=4210`) sono un punto di partenza — dopo il flash puoi cambiarli tutti a runtime con `rleds config <address> <port> <chiave> <valore>` senza ricompilare. Il device si riavvia e carica la nuova config da NVS.
 
 Questo significa che puoi flashare lo stesso binario su tutti i tuoi device e configurarne ognuno singolarmente dalla CLI.
 
 La cosa più importante da impostare su ogni device è l'**hostname** — identifica il device in modo univoco sulla rete ed è quello che `rleds scan` mostra. Impostalo subito dopo il primo flash:
 
 ```bash
-rleds config <ip> hostname esp32-1
+rleds config <address> <port> hostname esp32-1
 ```
 
 Dopo puoi usare l'hostname al posto dell'IP in qualsiasi comando:
 
 ```bash
 rleds ping esp32-1
-rleds config esp32-1 num_leds 32
+rleds config esp32-1 4210 num_leds 32
 ```
 
 ### Build e flash
@@ -104,7 +107,10 @@ Il protocollo WS2812 richiede una temporizzazione precisa al nanosecondo. Invece
 **UDP invece di TCP**
 Gli aggiornamenti LED viaggiano su UDP. L'obiettivo è la latenza minima: le garanzie di consegna di TCP introdurrebbero buffer e ritrasmissioni che nel contesto real-time sono controproducenti. Un frame perso è sempre meglio di un frame in ritardo.
 
-Sotto carico sostenuto, la mailbox UDP piccola (`CONFIG_LWIP_UDP_RECVMBOX_SIZE = 6`) limita il ritardo: quando la coda è piena il kernel droppa i nuovi arrivi (drop-tail), così il firmware processa i pacchetti in ordine di arrivo con un ritardo massimo di ~36 ms rispetto al presente. Testato empiricamente, questo si percepisce come più fluido rispetto al drenare la coda e mostrare solo l'ultimo frame (i frame intermedi verrebbero persi e le animazioni risultano scattose).
+Sotto carico sostenuto, la mailbox UDP piccola (`CONFIG_LWIP_UDP_RECVMBOX_SIZE = 6`) limita il ritardo: quando la coda è piena il kernel droppa i nuovi arrivi (drop-tail), così il firmware processa i pacchetti in ordine di arrivo con un ritardo massimo di ~12 ms rispetto al presente (6 slot × 2 ms di poll). Testato empiricamente, questo si percepisce come più fluido rispetto al drenare la coda e mostrare solo l'ultimo frame (i frame intermedi verrebbero persi e le animazioni risultano scattose).
+
+**WiFi tarato per un dispositivo fisso**
+Il dispositivo non si sposta mai, quindi il roaming 802.11k/v è disabilitato (`rm_enabled = 0`, `btm_enabled = 0` in `wifi.c`) e l'associazione usa `WIFI_FAST_SCAN`. Gli scan periodici di canale in background che il roaming innesca interrompono brevemente la ricezione UDP — visibile come uno stutter nell'animazione. Disabilitarli ha eliminato i singhiozzi periodici; lo stutter casuale residuo è un limite intrinseco del WiFi, non qualcosa che ulteriori tweak di config risolvono.
 
 **Provisioning via BLE invece del captive portal**
 Con la [CLI](../cli/README-it.md) puoi inviare le credenziali Wi-Fi tramite Bluetooth.
@@ -200,6 +206,10 @@ echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210
 
 **Le credenziali Wi-Fi non funzionano più (es. hai cambiato password sul router).** Power-cycle del device. Al boot tenta la rete salvata per ~20 s, fallisce, e ricade in BLE provisioning — a quel punto puoi inviare le nuove credenziali con la CLI (`rleds bt-credential`). Se il device è già acceso quando cambi la password, vale lo stesso rimedio: il reconnect task in [`main.c`](../firmware/main/main.c) continua a riprovare con le credenziali memorizzate (ora sbagliate) finché non riavvii. È intenzionale: un frame congelato durante una performance live è preferibile a un reboot improvviso.
 
-**Cancellare tutte le credenziali Wi-Fi da un device acceso.** Manda `RESET_WIFI` via UDP (`rleds reset-wifi <ip>`). Il device pulisce NVS, si riavvia e riparte in modalità BLE provisioning.
+**Cancellare tutte le credenziali Wi-Fi da un device acceso.** Manda `RESET_WIFI` via UDP (`rleds reset-wifi <address> <port?>`). Il device pulisce NVS, si riavvia e riparte in modalità BLE provisioning.
 
 **`SET_CONFIG` è best-effort, non atomico.** Ogni campo (pin, num_leds, port, hostname) viene scritto su NVS separatamente. Se si verifica un errore di storage a metà sequenza, il device potrebbe riavviarsi con una config parzialmente aggiornata. Soluzione: invia di nuovo `SET_CONFIG`, oppure `RESET_WIFI` e ri-fai il provisioning.
+
+## Link
+
+- [Torna al README principale](../README-it.md)

@@ -42,8 +42,8 @@ export enum PacketStatus {
 	ERROR = 0,
 }
 
-export type DeviceIP = string | [number, number, number, number]
-export type DeviceAddress = Uint8Array // [number, number, number, number, number, number]
+export type Address = string | [number, number, number, number]
+export type DeviceIP = Uint8Array // [number, number, number, number, number, number]
 
 export const EMPTY_PACKET_ID = 0
 
@@ -120,28 +120,28 @@ export function statusToBuffer(status: Status): Uint8Array {
 	return buffer
 }
 
-/** Convert address (ip + port) to buffer */
-export function addressToBuffer(ip: DeviceIP, port: number): DeviceAddress {
+/** Convert address (address + port) to buffer */
+export function addressToBuffer(address: Address, port: number): DeviceIP {
 	const buffer = new Uint8Array(6) // 4 bytes for IP + 2 bytes for port
 
-	if (typeof ip === "string") {
-		const parts = ip.split(".")
+	if (typeof address === "string") {
+		const parts = address.split(".")
 		if (parts.length !== 4) {
-			throw new Error(`Invalid IP address: "${ip}"`)
+			throw new Error(`Invalid IP address: "${address}"`)
 		}
 		const octets = parts.map(Number)
 		if (octets.some(o => isNaN(o) || o < 0 || o > 255)) {
-			throw new Error(`Invalid IP address: "${ip}"`)
+			throw new Error(`Invalid IP address: "${address}"`)
 		}
 		buffer[0] = octets[0]
 		buffer[1] = octets[1]
 		buffer[2] = octets[2]
 		buffer[3] = octets[3]
 	} else {
-		if (ip.length < 4) {
-			throw new Error(`IP array too short: ${ip.length} elements`)
+		if (address.length < 4) {
+			throw new Error(`IP array too short: ${address.length} elements`)
 		}
-		buffer.set(ip.slice(0, 4), 0)
+		buffer.set(address.slice(0, 4), 0)
 	}
 
 	buffer[4] = (port >> 8) & 0xff

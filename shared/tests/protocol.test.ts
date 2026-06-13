@@ -106,10 +106,10 @@ describe("Status", () => {
 
 describe("addressToBuffer", () => {
 	test("should convert string IP and port to buffer", () => {
-		const ip = "192.168.1.1"
+		const address = "192.168.1.1"
 		const port = 8080
 
-		const buffer = addressToBuffer(ip, port)
+		const buffer = addressToBuffer(address, port)
 		expect(buffer).toBeInstanceOf(Uint8Array)
 		expect(buffer.length).toBe(6) // 4 bytes for IP + 2 bytes for port
 		expect(buffer[0]).toBe(192)
@@ -121,8 +121,8 @@ describe("addressToBuffer", () => {
 	})
 
 	test("should convert array IP and port to buffer", () => {
-		const ip: [number, number, number, number] = [10, 0, 0, 1]
-		const buffer = addressToBuffer(ip, 4210)
+		const address: [number, number, number, number] = [10, 0, 0, 1]
+		const buffer = addressToBuffer(address, 4210)
 		expect(buffer[0]).toBe(10)
 		expect(buffer[1]).toBe(0)
 		expect(buffer[2]).toBe(0)

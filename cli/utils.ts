@@ -17,10 +17,10 @@ export function validateByte(value: string): boolean {
 }
 
 /** Check if a string is a valid IPv4 address (four dot-separated octets 0-255). */
-export function validateAddress(ip: string) {
-	if (!ip) return false
+export function validateAddress(address: string) {
+	if (!address) return false
 
-	const parts = ip.split(".")
+	const parts = address.split(".")
 	if (parts.length !== 4 || parts.some(p => isNaN(Number(p)) || Number(p) < 0 || Number(p) > 255)) return false
 
 	return true

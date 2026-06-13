@@ -38,8 +38,12 @@ CONFIG_NUM_LEDS=16
 CONFIG_PORT=4210
 
 # --- Production (performance-first) ---
-CONFIG_LOG_DEFAULT_LEVEL_WARN=y
-CONFIG_LOG_DEFAULT_LEVEL=2
+# INFO default. Safe for the realtime path: every per-packet/per-frame log
+# (protocol.c SET_LEDS, PING, etc.) is ESP_LOGV (verbose), which stays above
+# INFO and is compiled out — so the hot loop pays nothing. Only one-shot INFO
+# events (boot, WiFi connect, provisioning, config writes) are emitted.
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_DEFAULT_LEVEL=3
 CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
 CONFIG_BOOTLOADER_LOG_LEVEL=2
 CONFIG_BOOTLOADER_COMPILER_OPTIMIZATION_PERF=y

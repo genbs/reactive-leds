@@ -76,7 +76,6 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
             uint32_t start = esp_log_timestamp();
             while (esp_log_timestamp() - start < WIFI_CONNECT_TIMEOUT) {
                 if (wifi_connected()) {
-                    ESP_LOGI(TAG, "Connected to %s", credentials->ssid);
                     free(networks);
                     return true;
                 }
@@ -213,7 +212,7 @@ void app_main(void)
     }
     
     // Start application
-    ESP_LOGI(TAG, "Connected to WiFi");
+    ESP_LOGI(TAG, "Connected to WiFi: %s", credentials.ssid);
     ESP_LOGI(TAG, "IP address: %s", wifi_ip());
     ESP_LOGI(TAG, "Hostname: %s", config.hostname);
     ESP_LOGI(TAG, "MAC address: %s", wifi_mac());
