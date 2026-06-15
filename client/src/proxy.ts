@@ -13,8 +13,15 @@ import {
 	WorkerRequestType,
 	WorkerRequestTypeMap,
 } from "./comm"
+// document.currentScript is only valid during the initial script evaluation,
+// so it must be captured at load time. It's the worker-URL base for the UMD
+// build, where import.meta.url doesn't exist (esbuild lowers it to undefined).
+const scriptSrc =
+	typeof document !== "undefined" ? (document.currentScript as HTMLScriptElement | null)?.src : undefined
+
 function createWorker() {
-	return new Worker(new URL("./daemon.worker.js", import.meta.url).href, { type: "module" })
+	const base = import.meta.url || scriptSrc || ""
+	return new Worker(new URL("./daemon.worker.js", base).href, { type: "module" })
 }
 
 // Pending sync requests waiting for a response from the worker
@@ -60,10 +67,14 @@ function handleResponse(event: MessageEvent) {
 	if (!request) {
 		// connection change events don't require a prior request
 		if (responseId == CONNECTION_CHANGE_REQUEST_ID && responseData[0] === WorkerRequestType.ConnectionChange) {
-			connected = responseData[1] === TRUE
-			debug && console.log(`[Proxy] Connection change event: ${connected}`)
-
-			connectionChangeCallbacks.forEach(callback => callback(connected))
+			const next = responseData[1] === TRUE
+			// Dedupe: failed reconnect retries emit one `false` each (ws.ts notifies
+			// every close) — only forward actual state transitions to subscribers.
+			if (next !== connected) {
+				connected = next
+				debug && console.log(`[Proxy] Connection change event: ${connected}`)
+				connectionChangeCallbacks.forEach(callback => callback(connected))
+			}
 			return
 		}
 
@@ -103,20 +114,20 @@ export function wsconnect(serverURL: string, _debug = false): Promise<boolean> {
 	encodeBuffer(serverURL, buffer, 1)
 	buffer[1 + serverURL.length] = debug ? TRUE : FALSE
 
-	debug && console.log(`[Proxy] connect to ${serverURL}`, buffer)
-	return sendSync(buffer).then(response => (connected = response[1] === TRUE))
+	debug && console.log(`[Proxy] try to connect to ${serverURL}`, buffer)
+	return sendSync(buffer).then((response => response[1] === TRUE))
 }
 
 /** Register a callback for connection state changes, returns an unsubscribe function */
 export function onConnectionChange(callback: (connected: boolean) => void) {
 	checkConnected()
 
-	if (!connectionChangeCallbacks.includes(callback)) {
-		connectionChangeCallbacks.push(callback)
+	if (connectionChangeCallbacks.includes(callback))
+		return
 
-		return () => {
-			connectionChangeCallbacks = connectionChangeCallbacks.filter(cb => cb !== callback)
-		}
+	connectionChangeCallbacks.push(callback)
+	return () => {
+		connectionChangeCallbacks = connectionChangeCallbacks.filter(cb => cb !== callback)
 	}
 }
 

@@ -72,17 +72,19 @@ function handleConnectionChange(status: boolean) {
 	debug && console.log("[Worker] websocket connection change", status)
 
 	const packet = new Uint8Array(3)
+	packet[1] = WorkerRequestType.ConnectionChange
+	packet[2] = status ? TRUE : FALSE
+
+	// send message to wsconnect
 	if (connectionChangeRequestId) {
 		// Only "connect" request can have a requestId
 		packet[0] = connectionChangeRequestId
 		connectionChangeRequestId = null
-	} else {
-		// otherwise call handleConnectionChange
-		packet[0] = CONNECTION_CHANGE_REQUEST_ID
+		self.postMessage(packet)
 	}
-	packet[1] = WorkerRequestType.ConnectionChange
-	packet[2] = status ? TRUE : FALSE
 
+	// send message to connection change subscribers
+	packet[0] = CONNECTION_CHANGE_REQUEST_ID
 	self.postMessage(packet)
 }
 

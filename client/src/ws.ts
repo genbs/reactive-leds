@@ -21,6 +21,7 @@ const defaultSettings: Partial<WSSettings> = {
 
 export default class WS {
 	private retries = 0
+	private retryTimer: ReturnType<typeof setTimeout> | null = null
 	public settings: WSSettings
 	public connected: boolean
 	private socket!: WebSocket | null
@@ -39,6 +40,12 @@ export default class WS {
 	 * If already connected, it will close the existing connection and create a new one.
 	 */
 	public connect() {
+		if (this.retryTimer) {
+			clearTimeout(this.retryTimer)
+			this.retryTimer = null
+			this.retries = 0
+		}
+
 		this.settings.debug && console.log("[WS] Connecting to", this.settings.url)
 
 		if (this.socket) {
@@ -64,7 +71,12 @@ export default class WS {
 			this.settings.onMessage?.(data)
 		}
 
-		this.socket = new WebSocket(this.settings.url)
+		try {
+			this.socket = new WebSocket(this.settings.url)
+		} catch {
+			this.settings.onConnectionChange?.(false)
+			return
+		}
 
 		this.socket.binaryType = "arraybuffer"
 		this.socket.addEventListener("open", onOpen)
@@ -80,6 +92,9 @@ export default class WS {
 	public close() {
 		this.settings.debug && console.log("[WS] Closing connection")
 
+		clearTimeout(this.retryTimer)
+		this.retryTimer = null
+		this.retries = 0
 		this.connected = false
 		this.socket?.close()
 	}
@@ -101,10 +116,12 @@ export default class WS {
 		this.settings.debug && console.log("[WS] Connection closed", e)
 
 		this.socket = null
-		if (this.connected) {
-			this.settings.onConnectionChange?.(false)
-			this.connected = false
-		}
+		// Always notify, even if the connection never opened: a pending Connect
+		// request in the worker is resolved by this event — without it, a failed
+		// first connect would leave begin() hanging forever. Duplicate `false`
+		// events during reconnect retries are deduped client-side (proxy.ts).
+		this.settings.onConnectionChange?.(false)
+		this.connected = false
 
 		const shouldReconnect =
 			typeof this.settings.shouldReconnect === "function"
@@ -119,7 +136,10 @@ export default class WS {
 
 			this.settings.debug && console.log(`[WS] Reconnecting in ${WS_RECONNECTION_TIMEOUT / 1000}s...`)
 			this.retries++
-			setTimeout(() => this.connect(), WS_RECONNECTION_TIMEOUT)
+			this.retryTimer = setTimeout(() => {
+				this.retryTimer = null
+				this.connect()
+			}, WS_RECONNECTION_TIMEOUT)
 		}
 	}
 }

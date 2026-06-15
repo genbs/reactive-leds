@@ -27,7 +27,6 @@ Configuration is in [`sdkconfig.defaults`](./sdkconfig.defaults).
 ESP-IDF combines it with its own defaults to generate `sdkconfig` at build time:
 
 - `CONFIG_BT_BLE_42_FEATURES_SUPPORTED=y` — required by the BLE provisioning GATT server.
-- `CONFIG_LWIP_MAX_UDP_PCBS=32` — maximum concurrent active UDP PCBs; the default (16) is too low for a stack handling high frame-rate animation traffic.
 - `CONFIG_LWIP_UDP_RECVMBOX_SIZE=6` — small UDP receive mailbox by design. Under overload the kernel drops new arrivals (drop-tail) instead of accumulating stale frames; delay is bounded to ~12 ms with a 2 ms poll. See "Design choices" for the rationale.
 - `CONFIG_LWIP_TCPIP_TASK_PRIO=1` — low TCP/IP priority so the protocol task (priority 5) can preempt it under load.
 - `CONFIG_FREERTOS_HZ=1000` — 1 ms granularity for `vTaskDelay`. Load-bearing for the 2 ms protocol poll: at the 100 Hz default, `pdMS_TO_TICKS(2)` would round down to 0 ticks and busy-spin.
@@ -35,7 +34,8 @@ ESP-IDF combines it with its own defaults to generate `sdkconfig` at build time:
 - `CONFIG_GDMA_ISR_IRAM_SAFE=y` — the LED strip drives RMT via DMA, so the GDMA interrupt must also stay in IRAM. Pairs with `CONFIG_RMT_ISR_IRAM_SAFE` to keep a transfer safe even if a flash-cache-disable window (e.g. an NVS write) overlaps it.
 - `CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y`, `CONFIG_FREERTOS_TIMER_TASK_AFFINITY_CPU0=y` — pin the WiFi/lwIP stack to core 0, leaving core 1 for the protocol/render task (`xTaskCreatePinnedToCore(..., 1)` in `main.c`). Keeps the realtime path isolated from the network stack.
 - `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y`, `CONFIG_COMPILER_OPTIMIZATION_PERF=y`, `CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y`, `CONFIG_ESP32S3_DATA_CACHE_64KB=y` — performance tuning (max clock, `-O2`, larger I-cache and D-cache) for the realtime path.
-- `CONFIG_LOG_DEFAULT_LEVEL_INFO=y` — default runtime log level is INFO. The realtime path is unaffected: every per-packet/per-frame log (`SET_LEDS`, `PING`, …) is `ESP_LOGV` (verbose), which stays above INFO and is compiled out, so the hot loop pays nothing. Only one-shot INFO events (boot, WiFi connect, provisioning, config writes) are printed. Raise it to VERBOSE (menuconfig → Log output) for per-packet debug traces.
+- `CONFIG_LOG_DEFAULT_LEVEL_INFO=y` — default runtime log level is INFO. Only one-shot INFO events (boot, WiFi connect, provisioning, config writes) are printed at runtime.
+- `CONFIG_LOG_MAXIMUM_LEVEL_INFO=y` — compile-time log ceiling. Every per-packet/per-frame log (`SET_LEDS`, `PING`, …) is `ESP_LOGV` (verbose); with the maximum level capped at INFO, the compiler strips those calls entirely from the binary — the hot loop pays nothing, not even a branch. Raise both to VERBOSE (menuconfig → Log output) for per-packet debug traces.
 - Custom partition table (see [`partitions.csv`](./partitions.csv)).
 - Device defaults (`CONFIG_LED_PIN=18`, `CONFIG_NUM_LEDS=16`, `CONFIG_PORT=4210`, `CONFIG_LWIP_LOCAL_HOSTNAME="esp32-X"`).
 

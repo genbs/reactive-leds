@@ -21,7 +21,7 @@ Ogni pacchetto inizia con due byte:
 [PacketID, PacketType, ...PacketData]
 ```
 
-- **PacketID**: numero di sequenza usato per abbinare le risposte alle richieste.
+- **PacketID**: numero di sequenza usato per abbinare le risposte alle richieste sincrone.
 - **PacketType**: uno dei valori nella tabella seguente.
 
 | Tipo          | Valore | Direzione          | Descrizione                                                                                      |
@@ -76,7 +76,7 @@ Più LED possono essere raggruppati in un singolo pacchetto:
 ### Aggiornare la configurazione
 
 ```
-[PacketID, GET_CONFIG/SET_CONFIG, pin, num_leds, port_h, port_l, hostname...]
+[PacketID, SET_CONFIG, pin, num_leds, port_h, port_l, hostname...]
 ```
 
 La porta è divisa su due byte (big-endian). L'hostname è length-delimited dal pacchetto — il firmware legge `packet_length - 6` byte a partire dall'offset 6.

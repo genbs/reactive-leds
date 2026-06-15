@@ -1,9 +1,9 @@
 import {
+	Address,
 	addressToBuffer,
 	bufferToConfig,
 	bufferToStatus,
 	Config,
-	DeviceAddress,
 	DeviceIP,
 	PacketType,
 	Status,
@@ -15,16 +15,16 @@ import { isConnected, onConnectionChange, send, sendSync, wsconnect } from "./pr
 export { isConnected, mapPixels, onConnectionChange }
 import { Device } from "./types"
 
-const addressBufferMap = new Map<string, DeviceAddress>()
+const deviceIPMap = new Map<string, DeviceIP>()
 
 // @internal Create a packet to send to the worker and then to the server.
-function createPacket(ip: DeviceIP, port: number, type: PacketType, data?: Uint8Array): Uint8Array {
-	const key = `${ip}:${port}`
-	let addressPacket = addressBufferMap.get(key)
+function createPacket(address: Address, port: number, type: PacketType, data?: Uint8Array): Uint8Array {
+	const key = `${address}:${port}`
+	let addressPacket = deviceIPMap.get(key)
 
 	if (!addressPacket) {
-		addressPacket = addressToBuffer(ip, port)
-		addressBufferMap.set(key, addressPacket)
+		addressPacket = addressToBuffer(address, port)
+		deviceIPMap.set(key, addressPacket)
 	}
 
 	const addrLen = addressPacket.length
@@ -47,44 +47,44 @@ export function begin(serverURL: string, debug = false): Promise<boolean> {
 }
 
 /** Send a ping to the device and wait for the response. */
-export function ping(ip: DeviceIP, port = 4210): Promise<boolean> {
-	return sendSync(createPacket(ip, port, PacketType.PING)).then(
+export function ping(address: Address, port = 4210): Promise<boolean> {
+	return sendSync(createPacket(address, port, PacketType.PING)).then(
 		response => response.length === 1 && response[0] === TRUE
 	)
 }
 
 /** Get the configuration of the device. */
-export function getConfig(ip: DeviceIP, port = 4210): Promise<Config | null> {
-	return sendSync(createPacket(ip, port, PacketType.GET_CONFIG)).then(response => {
+export function getConfig(address: Address, port = 4210): Promise<Config | null> {
+	return sendSync(createPacket(address, port, PacketType.GET_CONFIG)).then(response => {
 		if (response.length === 1 && response[0] === FALSE) return null
 		return bufferToConfig(response)
 	})
 }
 
 /** Get device status: uptime (seconds), free heap (bytes), WiFi RSSI (dBm). */
-export function getStatus(ip: DeviceIP, port = 4210): Promise<Status | null> {
-	return sendSync(createPacket(ip, port, PacketType.GET_STATUS)).then(response => {
+export function getStatus(address: Address, port = 4210): Promise<Status | null> {
+	return sendSync(createPacket(address, port, PacketType.GET_STATUS)).then(response => {
 		if (response.length === 1 && response[0] === FALSE) return null
 		return bufferToStatus(response)
 	})
 }
 
 /** Send LED colors to the device — fire-and-forget, no response expected. */
-export function setLEDs(ip: DeviceIP, port = 4210, leds: Uint8Array): void {
-	send(createPacket(ip, port, PacketType.SET_LEDS, leds))
+export function setLEDs(address: Address, port = 4210, leds: Uint8Array): void {
+	send(createPacket(address, port, PacketType.SET_LEDS, leds))
 }
 
 /** Ping the device and fetch its config. Returns null if unreachable. */
-export async function connect(ip: DeviceIP, port = 4210): Promise<Device | null> {
-	const alive = await ping(ip, port)
+export async function connect(address: Address, port = 4210): Promise<Device | null> {
+	const alive = await ping(address, port)
 	if (!alive) return null
 
-	const config = await getConfig(ip, port)
+	const config = await getConfig(address, port)
 	if (!config) return null
 
 	return {
 		config,
-		send: (leds: Uint8Array) => setLEDs(ip, port, leds),
+		send: (leds: Uint8Array) => setLEDs(address, port, leds),
 	}
 }
 

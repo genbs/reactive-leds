@@ -12,17 +12,35 @@ JavaScript client for realtime LED control over WiFi. Designed to integrate with
 
 ```bash
 npm install
-npm run build   # produces build/reactive-leds.js and build/daemon.worker.js
+npm run build
 ```
+
+This produces four artifacts in `build/`:
+
+- `reactive-leds.js` — ESM bundle (`import` / `<script type="module">`)
+- `reactive-leds.umd.js` — UMD bundle (`require` / AMD / `<script>` global `reactiveLeds`)
+- `reactive-leds.d.ts` — bundled type declarations (IDE autocomplete, no install needed — picked up via `types` in package.json)
+- `daemon.worker.js` — module worker, loaded at runtime; keep it next to the bundle you serve
 
 ## Usage
 
 ### Connect
 
+As an ES module:
+
 ```ts
 import leds from "./build/reactive-leds.js"
 
 await leds.begin("ws://localhost:8000")
+```
+
+Or as a classic script (UMD) — the API is available as the global `reactiveLeds`:
+
+```html
+<script src="./build/reactive-leds.umd.js"></script>
+<script>
+    reactiveLeds.begin("ws://localhost:8000")
+</script>
 ```
 
 > Need the device IPs? Run `rleds proxy` from the terminal — it prints the LAN scan at startup, copy the IPs into your code.

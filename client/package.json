@@ -18,17 +18,31 @@
         "directory": "client"
     },
     "homepage": "https://github.com/genbs/reactive-leds/tree/master/client#readme",
-    "main": "build/reactive-leds.js",
+    "main": "build/reactive-leds.umd.js",
     "module": "build/reactive-leds.js",
-    "files": ["build/", "README.md", "README-it.md"],
+    "types": "build/reactive-leds.d.ts",
+    "exports": {
+        ".": {
+            "types": "./build/reactive-leds.d.ts",
+            "import": "./build/reactive-leds.js",
+            "require": "./build/reactive-leds.umd.js",
+            "default": "./build/reactive-leds.js"
+        }
+    },
+    "files": [
+        "build/",
+        "README.md",
+        "README-it.md"
+    ],
     "scripts": {
-        "build": "esbuild src/main.ts --bundle --format=esm --outfile=build/reactive-leds.js && esbuild src/daemon.worker.ts --bundle --format=esm --outfile=build/daemon.worker.js",
+        "build": "node build.mjs",
         "prepare": "npm run build",
         "test": "jest"
     },
     "license": "MIT",
     "devDependencies": {
         "@jest/globals": "^29.7.0",
+        "dts-bundle-generator": "^9.5.1",
         "esbuild": "^0.25.0",
         "ts-jest": "^29.3.2",
         "typescript": "^5.4.5"

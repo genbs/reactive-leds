@@ -1,0 +1,86 @@
+<script>
+	function main() {
+		const { devices } = window
+
+		const inputs = {
+			r: document.getElementById("leds_r"),
+			g: document.getElementById("leds_g"),
+			b: document.getElementById("leds_b"),
+			w: document.getElementById("leds_w"),
+		}
+		const vals = {
+			r: document.getElementById("val_r"),
+			g: document.getElementById("val_g"),
+			b: document.getElementById("val_b"),
+			w: document.getElementById("val_w"),
+		}
+		const swatch = document.getElementById("color-swatch")
+		const canvas = document.getElementById("color-canvas")
+		const ctx = canvas.getContext("2d")
+
+		const size = window.stripsCanvasSize(devices, canvas.parentElement)
+		canvas.width = size.width
+		canvas.height = size.height
+
+		const saved = JSON.parse(localStorage.getItem("leds") || "{}")
+		for (const [ch, input] of Object.entries(inputs)) {
+			if (saved[ch] !== undefined) input.value = saved[ch]
+			vals[ch].textContent = input.value
+		}
+
+		function updateLeds() {
+			const r = parseInt(inputs.r.value)
+			const g = parseInt(inputs.g.value)
+			const b = parseInt(inputs.b.value)
+			const w = parseInt(inputs.w.value)
+
+			vals.r.textContent = r
+			vals.g.textContent = g
+			vals.b.textContent = b
+			vals.w.textContent = w
+
+			const mix = w / 255
+			const sr = Math.round(r + (255 - r) * mix)
+			const sg = Math.round(g + (255 - g) * mix)
+			const sb = Math.round(b + (255 - b) * mix)
+			swatch.style.background = `rgb(${sr},${sg},${sb})`
+			swatch.style.boxShadow = sr + sg + sb > 0
+				? `0 0 2rem rgba(${sr},${sg},${sb},0.4)`
+				: "none"
+
+			const colors = new Map(
+				[...devices.entries()].map(([ip, config]) => [
+					ip,
+					Array.from({ length: config.num_leds }, () => [r, g, b, w])
+				])
+			)
+
+			ctx.clearRect(0, 0, canvas.width, canvas.height)
+			window.drawStrips(ctx, devices, colors)
+			window.sendLEDs(devices, colors)
+
+			localStorage.setItem("leds", JSON.stringify({ r, g, b, w }))
+		}
+
+		for (const input of Object.values(inputs)) {
+			input.addEventListener("input", updateLeds)
+		}
+
+		updateLeds()
+	}
+	window.main = main
+</script>
+
+<div class="example-wrap">
+	<p class="example-desc" data-i18n="example.color.desc">Set RGBW color for all connected strips simultaneously. W adds white to the mix.</p>
+	<div class="slides-layout">
+		<div class="controls-v">
+			<label class="slider">R <input type="range" id="leds_r" min="0" max="255" value="0" /> <span class="slider-value" id="val_r">0</span></label>
+			<label class="slider">G <input type="range" id="leds_g" min="0" max="255" value="0" /> <span class="slider-value" id="val_g">0</span></label>
+			<label class="slider">B <input type="range" id="leds_b" min="0" max="255" value="0" /> <span class="slider-value" id="val_b">0</span></label>
+			<label class="slider">W <input type="range" id="leds_w" min="0" max="255" value="0" /> <span class="slider-value" id="val_w">0</span></label>
+		</div>
+		<div class="color-swatch" id="color-swatch"></div>
+	</div>
+	<canvas id="color-canvas"></canvas>
+</div>
