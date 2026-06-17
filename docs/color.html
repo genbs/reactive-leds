@@ -1,76 +1,3 @@
-<script>
-	function main() {
-		const { devices } = window
-
-		const inputs = {
-			r: document.getElementById("leds_r"),
-			g: document.getElementById("leds_g"),
-			b: document.getElementById("leds_b"),
-			w: document.getElementById("leds_w"),
-		}
-		const vals = {
-			r: document.getElementById("val_r"),
-			g: document.getElementById("val_g"),
-			b: document.getElementById("val_b"),
-			w: document.getElementById("val_w"),
-		}
-		const swatch = document.getElementById("color-swatch")
-		const canvas = document.getElementById("color-canvas")
-		const ctx = canvas.getContext("2d")
-
-		const size = window.stripsCanvasSize(devices, canvas.parentElement)
-		canvas.width = size.width
-		canvas.height = size.height
-
-		const saved = JSON.parse(localStorage.getItem("leds") || "{}")
-		for (const [ch, input] of Object.entries(inputs)) {
-			if (saved[ch] !== undefined) input.value = saved[ch]
-			vals[ch].textContent = input.value
-		}
-
-		function updateLeds() {
-			const r = parseInt(inputs.r.value)
-			const g = parseInt(inputs.g.value)
-			const b = parseInt(inputs.b.value)
-			const w = parseInt(inputs.w.value)
-
-			vals.r.textContent = r
-			vals.g.textContent = g
-			vals.b.textContent = b
-			vals.w.textContent = w
-
-			const mix = w / 255
-			const sr = Math.round(r + (255 - r) * mix)
-			const sg = Math.round(g + (255 - g) * mix)
-			const sb = Math.round(b + (255 - b) * mix)
-			swatch.style.background = `rgb(${sr},${sg},${sb})`
-			swatch.style.boxShadow = sr + sg + sb > 0
-				? `0 0 2rem rgba(${sr},${sg},${sb},0.4)`
-				: "none"
-
-			const colors = new Map(
-				[...devices.entries()].map(([ip, config]) => [
-					ip,
-					Array.from({ length: config.num_leds }, () => [r, g, b, w])
-				])
-			)
-
-			ctx.clearRect(0, 0, canvas.width, canvas.height)
-			window.drawStrips(ctx, devices, colors)
-			window.sendLEDs(devices, colors)
-
-			localStorage.setItem("leds", JSON.stringify({ r, g, b, w }))
-		}
-
-		for (const input of Object.values(inputs)) {
-			input.addEventListener("input", updateLeds)
-		}
-
-		updateLeds()
-	}
-	window.main = main
-</script>
-
 <div class="example-wrap">
 	<p class="example-desc" data-i18n="example.color.desc">Set RGBW color for all connected strips simultaneously. W adds white to the mix.</p>
 	<div class="slides-layout">
@@ -82,5 +9,46 @@
 		</div>
 		<div class="color-swatch" id="color-swatch"></div>
 	</div>
-	<canvas id="color-canvas"></canvas>
 </div>
+
+<script>
+	function main() {
+		const { devices } = window
+		const channels = ["r", "g", "b", "w"]
+		const inputs = Object.fromEntries(channels.map(ch => [ch, document.getElementById("leds_" + ch)]))
+		const vals = Object.fromEntries(channels.map(ch => [ch, document.getElementById("val_" + ch)]))
+		const swatch = document.getElementById("color-swatch")
+		const ctx = window.fitPreview()
+
+		const saved = JSON.parse(localStorage.getItem("leds") || "{}")
+		for (const ch of channels) {
+			if (saved[ch] !== undefined) inputs[ch].value = saved[ch]
+			vals[ch].textContent = inputs[ch].value
+		}
+
+		function updateLeds() {
+			const rgbw = channels.map(ch => parseInt(inputs[ch].value))
+			channels.forEach((ch, i) => (vals[ch].textContent = rgbw[i]))
+
+			const [r, g, b, w] = rgbw
+			const mix = w / 255
+			const [sr, sg, sb] = [r, g, b].map(c => Math.round(c + (255 - c) * mix))
+			swatch.style.background = `rgb(${sr},${sg},${sb})`
+			swatch.style.boxShadow = sr + sg + sb > 0 ? `0 0 2rem rgba(${sr},${sg},${sb},0.4)` : "none"
+
+			const colors = new Map(
+				[...devices.entries()].map(([ip, config]) => [ip, Array.from({ length: config.num_leds }, () => rgbw)])
+			)
+
+			ctx.clearRect(0, 0, window.previewCanvas.width, window.previewCanvas.height)
+			window.drawStrips(ctx, devices, colors)
+			window.sendLEDs(devices, colors)
+
+			localStorage.setItem("leds", JSON.stringify({ r, g, b, w }))
+		}
+
+		for (const ch of channels) inputs[ch].addEventListener("input", updateLeds)
+		updateLeds()
+	}
+	window.main = main
+</script>

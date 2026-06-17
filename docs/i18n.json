@@ -5,8 +5,12 @@
     "nav.flash": "Firmware",
     "nav.cli": "CLI",
     "nav.preview": "Live Preview",
+    "nav.mapping": "Mapping <small>(Beta)</small>",
+    "mapping.title": "Mapping",
+    "mapping.desc": "Canvas mapping will be useful if you want to project what you're seeing on a canvas onto the strips; it can be useful for live coding. Place each strip on a virtual grid. Export the mapping and use it in your sketch with <code>sampleMatrix()</code>.<br />For more details, see <a href=\"https://github.com/genbs/reactive-leds/blob/master/client/README.md\" class=\"dark-link\">README</a>.",
+    "mapping.device_layout_note": "The cols×rows layout shown next to each device depends on the canvas' rendered pixel size — it may change if you resize the browser window.",
     "flash.title": "Install the Firmware",
-    "flash.desc": "<div><i class=\"dialog-note\">Chrome or Edge only.</i><div>Use the \"Connect\" button below to install <a href=\"https://github.com/genbs/reactive-leds/releases/latest\">the latest firmware release</a> directly from your browser.</div></div>",
+    "flash.desc": "<i class=\"note\">Chrome or Edge only.</i><p>Use the \"Connect\" button below to install <a href=\"https://github.com/genbs/reactive-leds/releases/latest\">the latest firmware release</a> directly from your browser.</p>",
     "flash.unsupported": "Your browser doesn't support Web Serial. Try <a href=\"https://www.google.com/chrome/\">Chrome</a> or Edge.",
     "flash.context": "After flashing, from the <button class=\"link\" command=\"show-modal\" commandfor=\"install-cli-dialog\">CLI</button> run <code>rleds bt-scan</code> to check the device is ready to receive Bluetooth messages, then <code>rleds bt-credential</code> to send WiFi credentials to the device.",
     "flash.readme": "<a href=\"https://github.com/genbs/reactive-leds/blob/master/firmware/README.md\">Firmware README →</a>",
@@ -33,7 +37,7 @@
     "example.chase.trail": "Trail",
     "example.audio.desc": "Microphone input mapped to LED strips via logarithmic frequency bands. Each strip reacts to a different part of the spectrum.",
     "example.audio.sensitivity": "Sensitivity",
-    "footer.lost": "Not sure how you got here? <a href=\"https://github.com/genbs/reactive-leds/blob/master/README.md\">The README has the full story.</a>"
+    "footer.lost": "Not sure how you got here? <a href=\"https://github.com/genbs/reactive-leds/blob/master/README.md\" class=\"dark-link\">The README has the full story.</a>"
   },
   "it": {
     "tagline": "Un ESP32-S3, una strip LED, un browser. Basta così.",
@@ -41,8 +45,12 @@
     "nav.flash": "Firmware",
     "nav.cli": "CLI",
     "nav.preview": "Live Preview",
+    "nav.mapping": "Mapping <small>(Beta)</small>",
+    "mapping.title": "Mapping",
+    "mapping.desc": "Il mapping del canvas ti servirà se vorrai proiettare sulle strisce quello che stai vedendo in un canvas, può essere utile per il live coding. Posiziona ogni strip su una griglia virtuale. Esporta il mappging ed utilizzalo nel tuo sketch con <code>sampleMatrix()</code>.<br />Per maggiori dettagli consulta il <a href=\"https://github.com/genbs/reactive-leds/blob/master/client/README.md\" class=\"dark-link\">README</a>.",
+    "mapping.device_layout_note": "Il layout cols×rows mostrato per ogni dispositivo dipende dalla dimensione renderizzata del canvas — può cambiare ridimensionando la finestra del browser.",
     "flash.title": "Installa il Firmware",
-    "flash.desc": "<div><i class=\"dialog-note\">Questo strumento funziona solo su Chrome o Edge.</i><div>Tramite il pulsante \"Connect\" puoi installare <a href=\"https://github.com/genbs/reactive-leds/releases/latest\">l'ultima versione del firmware</a> direttamente dal browser.</div></div>",
+    "flash.desc": "<i class=\"note\">Questo strumento funziona solo su Chrome o Edge.</i><p>Tramite il pulsante \"Connect\" puoi installare <a href=\"https://github.com/genbs/reactive-leds/releases/latest\">l'ultima versione del firmware</a> direttamente dal browser.</p>",
     "flash.unsupported": "Il tuo browser non supporta Web Serial. Prova <a href=\"https://www.google.com/chrome/\">Chrome</a> o Edge.",
     "flash.context": "Dopo il flash, dalla <button class=\"link\" command=\"show-modal\" commandfor=\"install-cli-dialog\">CLI</button> esegui <code>rleds bt-scan</code> per vedere se il dispositivo è pronto a ricevere messaggi tramite Bluetooth, poi <code>rleds bt-credential</code> per inviare le credenziali WiFi al dispositivo.",
     "flash.readme": "<a href=\"https://github.com/genbs/reactive-leds/blob/master/firmware/README-it.md\">README Firmware</a>",
@@ -69,6 +77,6 @@
     "example.chase.trail": "Scia",
     "example.audio.desc": "Il microfono viene mappato sulle strip tramite bande di frequenza logaritmiche. Ogni strip reagisce a una parte diversa dello spettro.",
     "example.audio.sensitivity": "Sensibilità",
-    "footer.lost": "Non sai come sei arrivato qui? <a href=\"https://github.com/genbs/reactive-leds/blob/master/README-it.md\">Il README spiega tutto.</a>"
+    "footer.lost": "Non sai come sei arrivato qui? <a href=\"https://github.com/genbs/reactive-leds/blob/master/README-it.md\" class=\"dark-link\">Il README spiega tutto.</a>"
   }
 }

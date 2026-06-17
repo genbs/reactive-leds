@@ -12,7 +12,6 @@
 			<span class="slider-value" id="trail-val"></span>
 		</label>
 	</div>
-	<canvas></canvas>
 </div>
 
 <script>
@@ -40,7 +39,7 @@
 	}
 
 	let col = 0, row = 0, lastStep = 0, rafId = null
-	let canvas, ctx
+	let ctx
 
 	function render() {
 		const { devices } = window
@@ -63,7 +62,7 @@
 			colors.set(ip, leds)
 		})
 
-		ctx.clearRect(0, 0, canvas.width, canvas.height)
+		ctx.clearRect(0, 0, window.previewCanvas.width, window.previewCanvas.height)
 		window.drawStrips(ctx, devices, colors)
 		window.sendLEDs(devices, colors)
 	}
@@ -80,11 +79,7 @@
 	}
 
 	function main() {
-		canvas = document.querySelector("canvas")
-		ctx = canvas.getContext("2d")
-		const size = window.stripsCanvasSize(window.devices, canvas.parentElement)
-		canvas.width = size.width
-		canvas.height = size.height
+		ctx = window.fitPreview()
 		col = row = lastStep = 0
 		if (rafId) cancelAnimationFrame(rafId)
 		render()

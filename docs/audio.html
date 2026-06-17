@@ -50,14 +50,14 @@
 			source.connect(analyser)
 			dataArray = new Uint8Array(analyser.frequencyBinCount)
 		} catch {
-			ctx.fillStyle = "#888"
-			ctx.font = "14px system-ui"
-			ctx.fillText("Microphone permission denied", window.STRIP_PAD, window.STRIP_PAD + 20)
+			specCtx.fillStyle = "#888"
+			specCtx.font = "14px system-ui"
+			specCtx.fillText("Microphone permission denied", window.STRIP_PAD, window.STRIP_PAD + 20)
 		}
 	}
 
 	let rafId = null
-	let canvas, ctx
+	let specCanvas, specCtx
 
 	function render() {
 		const { devices } = window
@@ -66,11 +66,10 @@
 
 		analyser.getByteFrequencyData(dataArray)
 		const bins = dataArray.length
-		const bw = (canvas.width - window.STRIP_PAD * 2) / bins
+		const bw = (specCanvas.width - window.STRIP_PAD * 2) / bins
 
-		ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-		// spectrum
+		// spectrum (own canvas)
+		specCtx.clearRect(0, 0, specCanvas.width, specCanvas.height)
 		for (let i = 0; i < bins; i++) {
 			const amp = Math.min(1, (dataArray[i] / 255) * sensitivity)
 			const c = entries.findIndex((_, idx) => {
@@ -78,11 +77,11 @@
 				return i >= lo && i < hi
 			})
 			const hue = c >= 0 ? (c / entries.length) * 360 : 0
-			ctx.fillStyle = `hsl(${hue},100%,50%)`
-			ctx.fillRect(window.STRIP_PAD + i * bw, window.STRIP_PAD + SPEC_H - amp * SPEC_H, bw - 1, amp * SPEC_H)
+			specCtx.fillStyle = `hsl(${hue},100%,50%)`
+			specCtx.fillRect(window.STRIP_PAD + i * bw, window.STRIP_PAD + SPEC_H - amp * SPEC_H, bw - 1, amp * SPEC_H)
 		}
 
-		// strips
+		// strips (shared preview)
 		const colors = new Map()
 		entries.forEach(([ip, config], c) => {
 			const hue = (c / entries.length) * 360
@@ -96,7 +95,8 @@
 			colors.set(ip, leds)
 		})
 
-		window.drawStrips(ctx, devices, colors, window.stripOrientation, canvas.width, window.STRIP_PAD + SPEC_H + window.STRIP_GAP)
+		window.previewCtx.clearRect(0, 0, window.previewCanvas.width, window.previewCanvas.height)
+		window.drawStrips(window.previewCtx, devices, colors)
 		window.sendLEDs(devices, colors)
 	}
 
@@ -106,13 +106,11 @@
 	}
 
 	async function main() {
-		canvas = document.querySelector("canvas")
-		ctx = canvas.getContext("2d")
-		const size = window.stripsCanvasSize(window.devices, canvas.parentElement)
-		canvas.width = window.stripOrientation === "h" ? size.width : Math.max(size.width, canvas.parentElement.clientWidth)
-		canvas.height = window.stripOrientation === "h"
-			? window.STRIP_PAD * 2 + SPEC_H + window.STRIP_GAP + window.devices.size * (window.STRIP_CELL + window.STRIP_GAP) - window.STRIP_GAP
-			: size.height
+		specCanvas = document.querySelector("canvas")
+		specCtx = specCanvas.getContext("2d")
+		specCanvas.width = specCanvas.parentElement.clientWidth
+		specCanvas.height = window.STRIP_PAD * 2 + SPEC_H
+		window.fitPreview()
 		if (rafId) cancelAnimationFrame(rafId)
 		await startAudio()
 		rafId = requestAnimationFrame(loop)
