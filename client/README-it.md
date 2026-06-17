@@ -85,9 +85,9 @@ await leds.ping("192.168.X.Y") // true se il device risponde
 await leds.getConfig("192.168.X.Y") // { pin, num_leds, port, hostname }
 ```
 
-### mapPixels — da canvas a LED
+### sampleMatrix / sampleStrip — da canvas a LED
 
-`mapPixels` è la funzione pensata per il live coding: prende i pixel di un canvas (o qualsiasi sorgente RGBA) e li rimappa su una striscia LED fisica, gestendo il layout a serpentina e la proiezione prospettica tramite interpolazione bilineare.
+Entrambe le funzioni sono pensate per il live coding: prendono i pixel di un canvas (o qualsiasi sorgente RGBA) e li rimappano su un layout LED fisico, tramite interpolazione bilineare di un poligono con proiezione prospettica. Condividono la stessa firma — scegli quella che corrisponde al tuo cablaggio fisico.
 
 ```ts
 // pixels: ImageData.data (RGBA, 4 byte per pixel)
@@ -97,11 +97,17 @@ await leds.getConfig("192.168.X.Y") // { pin, num_leds, port, hostname }
 //          in coordinate griglia come (x0,y0, x1,y1, x2,y2, x3,y3)
 // steps: numero di LED
 // wa: canale bianco — numero fisso, true = usa alpha sorgente, oppure funzione(r,g,b)=>w
-const ledsData = leds.mapPixels(pixels, pixelsSize, grid, polygon, steps, wa)
+const ledsData = leds.sampleMatrix(pixels, pixelsSize, grid, polygon, steps, wa)
 leds.setLEDs("192.168.X.Y", 4210, ledsData)
 ```
 
-I LED sono distribuiti in una griglia 2D con percorso a serpentina (righe dispari invertite), che rispecchia il cablaggio fisico tipico dei pannelli LED.
+`sampleMatrix` distribuisce i LED in una griglia 2D con percorso a serpentina (righe dispari invertite), che rispecchia il cablaggio fisico tipico dei pannelli LED a matrice.
+
+`sampleStrip` invece campiona una singola linea retta lungo la centerline del poligono — usala per una striscia LED semplice, senza serpentina:
+
+```ts
+const ledsData = leds.sampleStrip(pixels, pixelsSize, grid, polygon, steps, wa)
+```
 
 ## Note
 

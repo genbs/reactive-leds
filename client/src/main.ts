@@ -9,10 +9,10 @@ import {
 	Status,
 } from "@reactive-leds/shared"
 import { FALSE, TRUE, WorkerRequestType } from "./comm"
-import { mapPixels } from "./mapping"
+import { sampleMatrix, sampleStrip } from "./mapping"
 import { isConnected, onConnectionChange, send, sendSync, wsconnect } from "./proxy"
 
-export { isConnected, mapPixels, onConnectionChange }
+export { isConnected, sampleMatrix, sampleStrip, onConnectionChange }
 import { Device } from "./types"
 
 const deviceIPMap = new Map<string, DeviceIP>()
@@ -97,7 +97,8 @@ const reactiveLeds = {
 	getConfig,
 	getStatus,
 	setLEDs,
-	mapPixels,
+	sampleMatrix,
+	sampleStrip,
 }
 
 export default reactiveLeds

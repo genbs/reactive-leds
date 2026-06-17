@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals"
-import { mapPixels } from "../src/mapping" // Assuming mapPixels is here
+import { sampleMatrix, sampleStrip } from "../src/mapping"
 
 const RED = [255, 0, 0]
 const GREEN = [0, 255, 0]
@@ -57,7 +57,7 @@ describe("mapping module", () => {
 			].flat()
 		)
 
-		const result = mapPixels(sourcePixels, sourceSize, grid, polygon, steps, w, output)
+		const result = sampleMatrix(sourcePixels, sourceSize, grid, polygon, steps, w, output)
 
 		expect(result.length).toBe(expected.length)
 		expect(result).toEqual(expected)
@@ -135,7 +135,7 @@ describe("mapping module", () => {
 			].flat()
 		)
 
-		const result = mapPixels(sourcePixels, sourceSize, grid, polygon, steps, w, output)
+		const result = sampleMatrix(sourcePixels, sourceSize, grid, polygon, steps, w, output)
 
 		expect(result.length).toBe(expected.length)
 		expect(result).toEqual(expected)
@@ -201,7 +201,7 @@ describe("mapping module", () => {
 				[3, ...RED, w], // LED 3 -> red
 			].flat()
 		)
-		const result = mapPixels(sourcePixels, sourceSize, grid, polygon, steps, w, output)
+		const result = sampleMatrix(sourcePixels, sourceSize, grid, polygon, steps, w, output)
 		expect(result.length).toBe(expected.length)
 		expect(result).toEqual(expected)
 	})
@@ -266,7 +266,7 @@ describe("mapping module", () => {
 				[3, ...RED, w], // LED 3 -> red
 			].flat()
 		)
-		const result = mapPixels(sourcePixels, sourceSize, grid, polygon, steps, w, output)
+		const result = sampleMatrix(sourcePixels, sourceSize, grid, polygon, steps, w, output)
 		expect(result.length).toBe(expected.length)
 		expect(result).toEqual(expected)
 	})
@@ -330,7 +330,7 @@ describe("mapping module", () => {
 				[3, ...GREEN, w], // LED 3 -> black
 			].flat()
 		)
-		const result = mapPixels(sourcePixels, sourceSize, grid, polygon, steps, w, output)
+		const result = sampleMatrix(sourcePixels, sourceSize, grid, polygon, steps, w, output)
 
 		expect(result.length).toBe(expected.length)
 		expect(result).toEqual(expected)
@@ -379,14 +379,14 @@ describe("mapping module", () => {
 			7, ...CYAN, w,   // row 1, col 0 (flipped from col 3)
 		])
 
-		const result = mapPixels(sourcePixels, sourceSize, grid, polygon, steps, w)
+		const result = sampleMatrix(sourcePixels, sourceSize, grid, polygon, steps, w)
 		expect(result).toEqual(expected)
 	})
 
 	test("wa as function maps r,g,b to white channel", () => {
 		// Single red pixel (100, 0, 0) — wa returns the red value
 		const sourcePixels = new Uint8Array([100, 0, 0, 255])
-		const result = mapPixels(
+		const result = sampleMatrix(
 			sourcePixels,
 			[1, 1],
 			[1, 1],
@@ -400,7 +400,7 @@ describe("mapping module", () => {
 	test("wa=true uses source alpha as white channel", () => {
 		// Single pixel with alpha=128
 		const sourcePixels = new Uint8Array([255, 0, 0, 128])
-		const result = mapPixels(
+		const result = sampleMatrix(
 			sourcePixels,
 			[1, 1],
 			[1, 1],
@@ -409,5 +409,50 @@ describe("mapping module", () => {
 			true
 		)
 		expect(result[4]).toBe(128)
+	})
+
+	test("sampleStrip samples the centerline, ignoring width (no serpentine)", () => {
+		// Source 3x4: left column all red, right column all white, center column a
+		// top-to-bottom gradient. A linear strip must read ONLY the center column.
+		/**
+		 * +----+----+----+
+		 * | R  | G  | W  | row 0
+		 * | R  | Bl | W  | row 1
+		 * | R  | Y  | W  | row 2
+		 * | R  | M  | W  | row 3
+		 * +----+----+----+
+		 */
+		const YELLOW = [255, 255, 0]
+		const MAGENTA = [255, 0, 255]
+		const sourcePixels = new Uint8Array(
+			[
+				...REDA, ...GREENA, ...WHITEA,
+				...REDA, ...BLUEA, ...WHITEA,
+				...REDA, ...YELLOW, 255, ...WHITEA,
+				...REDA, ...MAGENTA, 255, ...WHITEA,
+			].flat()
+		)
+		const sourceSize: [number, number] = [3, 4]
+		const grid: [number, number] = [3, 4]
+		const polygon = [0, 0, 3, 0, 3, 4, 0, 4] as [number, number, number, number, number, number, number, number]
+		const steps = 4
+
+		// 4 LEDs straight down the center column → G, Bl, Y, M
+		const expected = new Uint8Array(
+			[
+				[0, ...GREEN, 0],
+				[1, ...BLUE, 0],
+				[2, ...YELLOW, 0],
+				[3, ...MAGENTA, 0],
+			].flat()
+		)
+
+		const result = sampleStrip(sourcePixels, sourceSize, grid, polygon, steps)
+		expect(result).toEqual(expected)
+
+		// Same quad through sampleMatrix infers a 2x2 grid and reads the side columns
+		// instead — the two strategies genuinely differ here.
+		const serpentine = sampleMatrix(sourcePixels, sourceSize, grid, polygon, steps)
+		expect(serpentine).not.toEqual(expected)
 	})
 })

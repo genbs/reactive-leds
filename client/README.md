@@ -85,9 +85,9 @@ await leds.ping("192.168.X.Y")       // true if the device responds
 await leds.getConfig("192.168.X.Y")  // { pin, num_leds, port, hostname }
 ```
 
-### mapPixels — from canvas to LEDs
+### sampleMatrix / sampleStrip — from canvas to LEDs
 
-`mapPixels` is designed for live coding: it takes pixels from a canvas (or any RGBA source) and remaps them onto a physical LED strip, handling the serpentine layout and perspective projection via bilinear interpolation.
+Both functions are designed for live coding: they take pixels from a canvas (or any RGBA source) and remap them onto a physical LED layout, via bilinear interpolation of a perspective-projected polygon. They share the same signature — pick the one matching your physical wiring.
 
 ```ts
 // pixels: ImageData.data (RGBA, 4 bytes per pixel)
@@ -97,11 +97,17 @@ await leds.getConfig("192.168.X.Y")  // { pin, num_leds, port, hostname }
 //          as (x0,y0, x1,y1, x2,y2, x3,y3) in grid coordinates
 // steps: number of LEDs
 // wa: white channel — fixed number, true = use source alpha, or function(r,g,b)=>w
-const ledsData = leds.mapPixels(pixels, pixelsSize, grid, polygon, steps, wa)
+const ledsData = leds.sampleMatrix(pixels, pixelsSize, grid, polygon, steps, wa)
 leds.setLEDs("192.168.X.Y", 4210, ledsData)
 ```
 
-LEDs are distributed in a 2D grid with a serpentine path (odd rows reversed), matching the typical physical wiring of LED panels.
+`sampleMatrix` distributes LEDs in a 2D grid with a serpentine path (odd rows reversed), matching the typical physical wiring of LED matrix panels.
+
+`sampleStrip` instead samples a single straight line along the centerline of the polygon — use it for a plain, non-zigzagging LED strip:
+
+```ts
+const ledsData = leds.sampleStrip(pixels, pixelsSize, grid, polygon, steps, wa)
+```
 
 ## Notes
 
