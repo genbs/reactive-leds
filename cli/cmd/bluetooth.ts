@@ -68,8 +68,11 @@ export const btCredentialCommand: Command = {
 		if (!ssid) ssid = await ask("Insert SSID: ")
 		const password = await ask("Insert password: ", true)
 
-		if (!ssid || !password) {
-			console.error("Invalid credentials")
+		// Same limits the firmware enforces (ble.c): SSID ≤ 32 bytes (IEEE 802.11),
+		// password ≤ 63 (WPA2). The arg validator only covers the CLI argument path;
+		// prompted input must be checked here too.
+		if (!ssid || ssid.length > 32 || !password || password.length > 63) {
+			console.error("Invalid credentials (SSID max 32 chars, password max 63)")
 			return false
 		}
 
@@ -158,7 +161,11 @@ async function scanDevices(timeout = SCAN_TIMEOUT): Promise<Peripheral[]> {
 		}
 
 		noble.on("discover", onDiscover)
-		noble.startScanningAsync([], false)
+		noble.startScanningAsync([], false).catch(err => {
+			debug("ble", "startScanning failed:", err)
+			noble.removeListener("discover", onDiscover)
+			resolve(found)
+		})
 		console.log("Scanning for devices...")
 
 		setTimeout(() => {

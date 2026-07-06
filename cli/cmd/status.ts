@@ -1,6 +1,6 @@
 import type { Command } from "../cmd"
 import proto from "../protocol"
-import { fail, green, validateAddressOrHostname, validatePort } from "../utils"
+import { fail, green, validateHost, validatePort } from "../utils"
 import { resolveTargets } from "./wifi"
 
 export const statusCommand: Command = {
@@ -11,12 +11,12 @@ export const statusCommand: Command = {
 	examples: ["status", "status 192.168.1.100 4210"],
 
 	args: [
-		{ required: false, name: "address", type: String, validator: validateAddressOrHostname },
+		{ required: false, name: "host", type: String, validator: validateHost },
 		{ required: false, name: "port", type: Number, validator: validatePort, default: 4210 },
 	],
 
-	execute: async (address?: string, port?: number) => {
-		const targets = await resolveTargets(address, port ?? 4210)
+	execute: async (host?: string, port?: number) => {
+		const targets = await resolveTargets(host, port ?? 4210)
 		if (targets.length === 0) {
 			console.log("No devices found.")
 			return false
@@ -24,9 +24,9 @@ export const statusCommand: Command = {
 
 		let anyOk = false
 		for (const t of targets) {
-			const status = await proto.getStatus(t.address, t.port)
+			const status = await proto.getStatus(t.ip, t.port)
 			if (!status) {
-				console.log(`${t.address}:${t.port}  ${fail("offline")}`)
+				console.log(`${t.ip}:${t.port}  ${fail("offline")}`)
 				continue
 			}
 
@@ -34,7 +34,7 @@ export const statusCommand: Command = {
 			const uptimeStr = formatUptime(status.uptime)
 			const heapStr = formatHeap(status.heap)
 			const rssiStr = status.rssi === 0 ? "N/A" : `${status.rssi} dBm`
-			console.log(`${t.address}:${t.port}  ${green("up")} ${uptimeStr}  heap ${heapStr}  rssi ${rssiStr}`)
+			console.log(`${t.ip}:${t.port}  ${green("up")} ${uptimeStr}  heap ${heapStr}  rssi ${rssiStr}`)
 		}
 
 		return anyOk

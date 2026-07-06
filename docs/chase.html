@@ -1,5 +1,8 @@
 <div class="example-wrap">
-	<p class="example-desc" data-i18n="example.chase.desc">Single light chasing across all strips in sequence. Speed controls step interval, Trail sets how many LEDs fade behind.</p>
+	<p class="example-desc" data-i18n="example.chase.desc">
+		Single light chasing across all strips in sequence. Speed controls step interval, Trail sets how many LEDs fade
+		behind.
+	</p>
 	<div class="controls">
 		<label class="slider">
 			<span data-i18n="example.chase.speed">Speed</span>
@@ -8,7 +11,7 @@
 		</label>
 		<label class="slider">
 			<span data-i18n="example.chase.trail">Trail</span>
-			<input type="range" id="trail" min="0" max="30" step="1" />
+			<input type="range" id="trail" min="0" max="50" step="1" />
 			<span class="slider-value" id="trail-val"></span>
 		</label>
 	</div>
@@ -29,8 +32,8 @@
 		})
 	}
 
-	initSlider("speed", "speed-val", "chase-speed", speed, v => speed = v)
-	initSlider("trail", "trail-val", "chase-trail", trail, v => trail = v)
+	initSlider("speed", "speed-val", "chase-speed", speed, v => (speed = v))
+	initSlider("trail", "trail-val", "chase-trail", trail, v => (trail = v))
 
 	function linearPos(entries, c, r) {
 		let pos = r
@@ -38,7 +41,10 @@
 		return pos
 	}
 
-	let col = 0, row = 0, lastStep = 0, rafId = null
+	let col = 0,
+		row = 0,
+		lastStep = 0,
+		rafId = null
 	let ctx
 
 	function render() {
@@ -64,13 +70,20 @@
 
 		ctx.clearRect(0, 0, window.previewCanvas.width, window.previewCanvas.height)
 		window.drawStrips(ctx, devices, colors)
-		window.sendLEDs(devices, colors)
 	}
 
 	function loop(now) {
-		if (!window.devices.size) { rafId = requestAnimationFrame(loop); return }
+		if (!window.devices.size) {
+			rafId = requestAnimationFrame(loop)
+			return
+		}
 		if (now - lastStep >= speed) {
 			const entries = [...window.devices.entries()]
+			// the device set can shrink mid-run (heartbeat prune, manual remove)
+			if (col >= entries.length) {
+				col = 0
+				row = 0
+			}
 			row = row + 1 >= entries[col][1].num_leds ? ((col = (col + 1) % entries.length), 0) : row + 1
 			render()
 			lastStep = now

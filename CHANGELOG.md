@@ -29,6 +29,7 @@ First public release.
 
 ### client (`@reactive-leds/client`)
 - `begin`, `ping`, `getConfig`, `getStatus`, `connect`, `setLEDs`
-- `mapPixels` — bilinear canvas-to-LED mapping for live coding
+- `sendRaw`, `sendRawSync` — raw protocol escape hatch for any `PacketType` (re-exported)
+- `sample` — canvas-to-LED mapping for live coding (bilinear polygon sampling)
 - Daemon worker architecture (non-blocking browser UI)
 - MIT license

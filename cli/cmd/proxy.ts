@@ -2,7 +2,7 @@ import { bufferToConfig, configToBuffer, encodeBuffer, PacketType, PacketTypeMap
 import { WebSocketServer } from "ws"
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { debug, validateAddressOrHostname, validatePort } from "../utils"
+import { debug, validateHost, validatePort } from "../utils"
 import { formatDevice, scan } from "./wifi"
 
 const SCAN_INTERVAL = 10_000
@@ -12,7 +12,7 @@ export const proxyCommand: Command = {
 	description:
 		"Start the WebSocket proxy between browser clients and the firmware.\nScans the LAN every 10 seconds and shows discovered devices, updating live in the terminal.",
 	args: [
-		{ required: false, name: "host", type: String, default: "0.0.0.0", validator: validateAddressOrHostname },
+		{ required: false, name: "host", type: String, default: "0.0.0.0", validator: validateHost },
 		{ required: false, name: "port", type: Number, default: 8000, validator: validatePort },
 		{ required: false, name: "device_port", type: Number, default: 4210, validator: validatePort },
 	],
@@ -22,7 +22,7 @@ export const proxyCommand: Command = {
 /**
  * Handle one decoded proxy request and produce the WebSocket response bytes.
  *
- * Request layout: `[requestId, address(4), port_h, port_l, packetType, ...data]`.
+ * Request layout: `[requestId, ip(4), port_h, port_l, packetType, ...data]`.
  * Returns `[requestId, ...payload]` (no PacketType byte — the browser correlates
  * by requestId), or `null` for fire-and-forget requests with no response (SET_LEDS).
  *
@@ -30,12 +30,12 @@ export const proxyCommand: Command = {
  */
 export async function handleProxyMessage(payload: Uint8Array): Promise<Uint8Array | null> {
 	const requestId = payload[0]
-	const address = payload[1] + "." + payload[2] + "." + payload[3] + "." + payload[4]
+	const ip = payload[1] + "." + payload[2] + "." + payload[3] + "." + payload[4]
 	const port = (payload[5] << 8) | payload[6]
 	const packetType = payload[7] as PacketType
 	const packet = payload.slice(8)
 
-	debug("proxy", `Address: ${address}, Port: ${port}, Packet type: ${PacketTypeMap[packetType]}`)
+	debug("proxy", `IP: ${ip}, Port: ${port}, Packet type: ${PacketTypeMap[packetType]}`)
 
 	// A fresh buffer per response — never share a module-level Uint8Array across
 	// concurrent in-flight messages.
@@ -49,32 +49,32 @@ export async function handleProxyMessage(payload: Uint8Array): Promise<Uint8Arra
 
 	switch (packetType) {
 		case PacketType.PING:
-			return status(await proto.ping(address, port))
+			return status(await proto.ping(ip, port))
 
 		case PacketType.SET_CONFIG:
-			return status(await proto.setConfig(address, port, bufferToConfig(packet)))
+			return status(await proto.setConfig(ip, port, bufferToConfig(packet)))
 
 		case PacketType.GET_CONFIG: {
-			const config = await proto.getConfig(address, port)
+			const config = await proto.getConfig(ip, port)
 			return config ? withPayload(configToBuffer(config)) : status(false)
 		}
 
 		case PacketType.SET_LEDS:
-			proto.setLEDs(address, port, packet)
+			proto.setLEDs(ip, port, packet)
 			return null // fire-and-forget
 
 		case PacketType.GET_VERSION: {
-			const version = await proto.getVersion(address, port)
+			const version = await proto.getVersion(ip, port)
 			return version ? withPayload(encodeBuffer(version)) : status(false)
 		}
 
 		case PacketType.GET_STATUS: {
-			const s = await proto.getStatus(address, port)
+			const s = await proto.getStatus(ip, port)
 			return s ? withPayload(statusToBuffer(s)) : status(false)
 		}
 
 		case PacketType.RESET_WIFI:
-			return status(await proto.resetWifi(address, port))
+			return status(await proto.resetWifi(ip, port))
 
 		default: {
 			console.warn(`Unhandled packet type: ${packetType}`)

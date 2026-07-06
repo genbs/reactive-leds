@@ -1,7 +1,10 @@
 {
     "name": "reactive-leds",
     "private": true,
-    "license": "GPL-3.0",
+    "license": "GPL-3.0-only",
+    "scripts": {
+        "test": "npm test --workspaces"
+    },
     "workspaces": [
         "client",
         "cli",

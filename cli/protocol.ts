@@ -73,8 +73,8 @@ class Protocol {
 	 *
 	 * @returns (Promise) true if response received, false otherwise
 	 */
-	async ping(address: string, port: number): Promise<boolean> {
-		return (await this.sendSync(address, port, PacketType.PING, null, Protocol.PING_TIMEOUT)) !== null
+	async ping(ip: string, port: number): Promise<boolean> {
+		return (await this.sendSync(ip, port, PacketType.PING, null, Protocol.PING_TIMEOUT)) !== null
 	}
 
 	/**
@@ -84,8 +84,8 @@ class Protocol {
 	 *
 	 * @returns (Promise) null if no response, otherwise {pin, num_leds, port, hostname}
 	 */
-	async getConfig(address: string, port: number): Promise<Config | null> {
-		const response = await this.sendSync(address, port, PacketType.GET_CONFIG, null, Protocol.GET_CONFIG_TIMEOUT)
+	async getConfig(ip: string, port: number): Promise<Config | null> {
+		const response = await this.sendSync(ip, port, PacketType.GET_CONFIG, null, Protocol.GET_CONFIG_TIMEOUT)
 		if (!response) return null
 
 		return bufferToConfig(response.slice(2))
@@ -96,11 +96,11 @@ class Protocol {
 	 *
 	 * @returns [MessageID, MessageType, Status (boolean)]
 	 */
-	async setConfig(address: string, port: number, config: Config): Promise<boolean> {
+	async setConfig(ip: string, port: number, config: Config): Promise<boolean> {
 		const configBuffer = configToBuffer(config)
 
 		const response = await this.sendSync(
-			address,
+			ip,
 			port,
 			PacketType.SET_CONFIG,
 			configBuffer,
@@ -118,8 +118,8 @@ class Protocol {
 	 *
 	 * @param data [led_index, r, g, b, brightness / whiteness, led_index, r, g, b, brightness / whiteness, ...]
 	 */
-	setLEDs(address: string, port: number, data: Uint8Array): Promise<void> {
-		return this.send(address, port, PacketType.SET_LEDS, data)
+	setLEDs(ip: string, port: number, data: Uint8Array): Promise<void> {
+		return this.send(ip, port, PacketType.SET_LEDS, data)
 	}
 
 	/**
@@ -127,9 +127,9 @@ class Protocol {
 	 *
 	 * @returns
 	 */
-	resetWifi(address: string, port: number): Promise<boolean> {
+	resetWifi(ip: string, port: number): Promise<boolean> {
 		// retries=1: not idempotent — the device reboots after clearing credentials.
-		return this.sendSync(address, port, PacketType.RESET_WIFI, null, Protocol.SET_CONFIG_TIMEOUT, 1).then(
+		return this.sendSync(ip, port, PacketType.RESET_WIFI, null, Protocol.SET_CONFIG_TIMEOUT, 1).then(
 			response => response !== null && response.length >= 3 && response[2] === PacketStatus.OK
 		)
 	}
@@ -139,8 +139,8 @@ class Protocol {
 	 *
 	 * @returns version string, or null if no response (offline or firmware too old to support GET_VERSION)
 	 */
-	async getVersion(address: string, port: number): Promise<string | null> {
-		const response = await this.sendSync(address, port, PacketType.GET_VERSION, null, Protocol.GET_VERSION_TIMEOUT)
+	async getVersion(ip: string, port: number): Promise<string | null> {
+		const response = await this.sendSync(ip, port, PacketType.GET_VERSION, null, Protocol.GET_VERSION_TIMEOUT)
 		if (!response || response.length < 2) return null
 		return decodeBuffer(response.slice(2))
 	}
@@ -150,8 +150,8 @@ class Protocol {
 	 *
 	 * @returns (Promise) null if no response, otherwise {uptime, heap, rssi}
 	 */
-	async getStatus(address: string, port: number): Promise<Status | null> {
-		const response = await this.sendSync(address, port, PacketType.GET_STATUS, null, Protocol.GET_STATUS_TIMEOUT)
+	async getStatus(ip: string, port: number): Promise<Status | null> {
+		const response = await this.sendSync(ip, port, PacketType.GET_STATUS, null, Protocol.GET_STATUS_TIMEOUT)
 		if (!response || response.length < 11) return null
 
 		return bufferToStatus(response.slice(2))
@@ -162,7 +162,7 @@ class Protocol {
 	 *
 	 * @param data any
 	 */
-	private send(address: string, port: number, type: PacketType, data: Uint8Array): Promise<void> {
+	private send(ip: string, port: number, type: PacketType, data: Uint8Array): Promise<void> {
 		this.ensureSocket()
 
 		const message = new Uint8Array(1 + 1 + data.length)
@@ -170,13 +170,13 @@ class Protocol {
 		message[1] = type
 		message.set(data, 2)
 
-		debug("Request (not sync)", `Sending ${PacketTypeMap[type]} to ${address}:${port}`, data)
+		debug("Request (not sync)", `Sending ${PacketTypeMap[type]} to ${ip}:${port}`, data)
 
 		// Promisify dgram.send so callers can await. Without the callback returning
 		// control to the event loop, a short-lived CLI command would call
 		// process.exit() before the kernel actually transmits the packet.
 		return new Promise(resolve => {
-			this.socket!.send(message, 0, message.length, port, address, err => {
+			this.socket!.send(message, 0, message.length, port, ip, err => {
 				if (err) debug("Request (not sync)", err)
 				resolve()
 			})
@@ -194,7 +194,7 @@ class Protocol {
 	 * @param retries total attempts (use 1 for non-idempotent requests)
 	 */
 	private async sendSync(
-		address: string,
+		ip: string,
 		port: number,
 		type: PacketType,
 		data: Uint8Array | null = null,
@@ -202,7 +202,7 @@ class Protocol {
 		retries: number = Protocol.SYNC_RETRIES
 	): Promise<Packet | null> {
 		for (let attempt = 0; attempt < retries; attempt++) {
-			const response = await this.sendSyncOnce(address, port, type, data, timeoutDuration)
+			const response = await this.sendSyncOnce(ip, port, type, data, timeoutDuration)
 			if (response !== null) return response
 		}
 		return null
@@ -213,7 +213,7 @@ class Protocol {
 	 * After timeout (or send error), resolve with null.
 	 */
 	private sendSyncOnce(
-		address: string,
+		ip: string,
 		port: number,
 		type: PacketType,
 		data: Uint8Array | null = null,
@@ -235,7 +235,7 @@ class Protocol {
 		message[1] = type
 		if (data) message.set(data, 2)
 
-		debug(`Request:${requestID}`, `Sending ${PacketTypeMap[type]} to ${address}:${port}`, data)
+		debug(`Request:${requestID}`, `Sending ${PacketTypeMap[type]} to ${ip}:${port}`, data)
 
 		return new Promise((resolve) => {
 			const startTime = performance.now()
@@ -250,7 +250,7 @@ class Protocol {
 
 			this.pendingRequests.set(requestID, { resolve, type, timeout, startTime })
 
-			this.socket!.send(message, 0, message.length, port, address, err => {
+			this.socket!.send(message, 0, message.length, port, ip, err => {
 				if (err) {
 					clearTimeout(timeout)
 					this.pendingRequests.delete(requestID)

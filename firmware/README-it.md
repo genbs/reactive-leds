@@ -11,6 +11,8 @@ Al primo avvio, il firmware entra in modalità provisioning BLE, dove aspetta le
 
 Il firmware è tarato per FCOB 24V a 16 IC con ordine byte WRGB, ma si adatta ad altre — vedi [Adattamento a una striscia LED diversa](#adattamento-a-una-striscia-led-diversa).
 
+> **Non vuoi compilare?** Puoi flashare l'ultima release direttamente dal browser sul [sito del progetto](https://genbs.github.io/reactive-leds/) (Chrome/Edge, via Web Serial) — senza installare ESP-IDF. Il resto di questo README serve solo se vuoi modificare o ricompilare il firmware.
+
 ## Requisiti
 
 - CMake
@@ -58,14 +60,14 @@ Di default ESP-IDF la deriva da `git describe --tags --long --dirty`, quindi bas
 
 ### Una build, molti dispositivi
 
-Serve compilare una sola volta. I default in `sdkconfig.defaults` (`pin=18`, `num_leds=16`, `port=4210`) sono un punto di partenza — dopo il flash puoi cambiarli tutti a runtime con `rleds config <address> <port> <chiave> <valore>` senza ricompilare. Il device si riavvia e carica la nuova config da NVS.
+Serve compilare una sola volta. I default in `sdkconfig.defaults` (`pin=18`, `num_leds=16`, `port=4210`) sono un punto di partenza — dopo il flash puoi cambiarli tutti a runtime con `rleds config <host> <port> <chiave> <valore>` senza ricompilare. Il device si riavvia e carica la nuova config da NVS.
 
 Questo significa che puoi flashare lo stesso binario su tutti i tuoi device e configurarne ognuno singolarmente dalla CLI.
 
 La cosa più importante da impostare su ogni device è l'**hostname** — identifica il device in modo univoco sulla rete ed è quello che `rleds scan` mostra. Impostalo subito dopo il primo flash:
 
 ```bash
-rleds config <address> <port> hostname esp32-1
+rleds config <host> <port> hostname esp32-1
 ```
 
 Dopo puoi usare l'hostname al posto dell'IP in qualsiasi comando:
@@ -206,7 +208,7 @@ echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210
 
 **Le credenziali Wi-Fi non funzionano più (es. hai cambiato password sul router).** Power-cycle del device. Al boot tenta la rete salvata per ~20 s, fallisce, e ricade in BLE provisioning — a quel punto puoi inviare le nuove credenziali con la CLI (`rleds bt-credential`). Se il device è già acceso quando cambi la password, vale lo stesso rimedio: il reconnect task in [`main.c`](../firmware/main/main.c) continua a riprovare con le credenziali memorizzate (ora sbagliate) finché non riavvii. È intenzionale: un frame congelato durante una performance live è preferibile a un reboot improvviso.
 
-**Cancellare tutte le credenziali Wi-Fi da un device acceso.** Manda `RESET_WIFI` via UDP (`rleds reset-wifi <address> <port?>`). Il device pulisce NVS, si riavvia e riparte in modalità BLE provisioning.
+**Cancellare tutte le credenziali Wi-Fi da un device acceso.** Manda `RESET_WIFI` via UDP (`rleds reset-wifi <host> <port?>`). Il device pulisce NVS, si riavvia e riparte in modalità BLE provisioning.
 
 **`SET_CONFIG` è best-effort, non atomico.** Ogni campo (pin, num_leds, port, hostname) viene scritto su NVS separatamente. Se si verifica un errore di storage a metà sequenza, il device potrebbe riavviarsi con una config parzialmente aggiornata. Soluzione: invia di nuovo `SET_CONFIG`, oppure `RESET_WIFI` e ri-fai il provisioning.
 

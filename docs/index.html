@@ -40,10 +40,24 @@
 			}
 		</script>
 
-		<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
-		<script type="module" src="main.js" async defer></script>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Space+Mono:wght@400;700&display=swap"
+			media="print"
+			onload="this.media = 'all'"
+		/>
+		<noscript
+			><link
+				rel="stylesheet"
+				href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Space+Mono:wght@400;700&display=swap"
+		/></noscript>
 		<link rel="icon" type="image/svg+xml" href="favicon.svg" />
 		<link rel="stylesheet" href="style.css" />
+
+		<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+		<script type="module" src="main.js" async defer></script>
 	</head>
 	<body>
 		<main id="root">
@@ -91,9 +105,9 @@
 			</div>
 
 			<header class="text-center">
-				<div data-i18n="tagline">An ESP32-S3, an LED strip, a browser. That's it.</div>
-				<div class="color-medium text-xs" data-i18n="tagline.note">
-					...and a 24V PSU, an XL4015 DC-DC module and a 330Ω resistor, but those are details.
+				<div id="tagline" data-i18n="tagline">An ESP32-S3, an LED strip, a browser. That's it.</div>
+				<div id="tagline_note" class="color-medium text-xs" data-i18n="tagline.note">
+					...and a 24V PSU, an XL4015 DC-DC module, a 330Ω resistor and a few solder joints.<br />But those are details.
 				</div>
 			</header>
 			<nav class="mg-y-s flex gap-m flex-wrap flex-center">
@@ -251,9 +265,8 @@
 					<h3 class="subtitle" data-i18n="mapping.title">Mapping</h3>
 					<div class="pd-m flex flex-col gap-m">
 						<div class="text-xs color-medium" data-i18n="mapping.desc">
-							Position each strip on a virtual grid. Copy the exported <code>window.gridSize</code> and
-							<code>window.mappings</code> into your sketch and use them with <code>sampleMatrix()</code> to sample a
-							canvas frame onto the LEDs.
+							Canvas mapping projects what you draw on a canvas onto the strips — made for live coding. Place each strip
+							on the virtual grid, then copy the ready-to-use snippet from the Usage panel below.
 						</div>
 					</div>
 				</div>
@@ -280,11 +293,7 @@
 						<span data-i18n="devices.title">Devices</span>
 						<span id="device-count"></span>
 					</h3>
-					<div class="pd-m flex flex-col gap-m flex-1 overflow-hidden">
-						<div class="text-xs color-medium" data-i18n="mapping.device_layout_note">
-							The cols×rows layout shown next to each device depends on the canvas' rendered pixel size — it may change
-							if you resize the browser window.
-						</div>
+					<div class="pd-m flex flex-col gap-m flex-1 overflow-hidden mh">
 						<div id="map-device-list" class="flex-1 overflow-auto"></div>
 						<div class="input-group add-device">
 							<output class="input-message add-device-message"></output>
@@ -305,12 +314,15 @@
 				<!-- Grid -->
 				<div>
 					<h3 class="subtitle">Grid</h3>
-					<div class="pd-m flex gap-m justify-between">
+					<div class="pd-m flex gap-m justify-between flex-col">
 						<label class="map-grid-label">
 							Cols <input type="number" id="map-cols" min="1" max="200" value="10" /> × Rows
 							<input type="number" id="map-rows" min="1" max="200" value="10" />
 						</label>
-						<button id="map-reset">↻</button>
+						<div class="flex gap-s content-center">
+							<button id="map-reset">⇅</button>
+							<button id="map-reset-v">⇄</button>
+						</div>
 					</div>
 				</div>
 
@@ -318,10 +330,25 @@
 				<div>
 					<h3 class="subtitle" data-i18n="export.title">Export</h3>
 					<div class="pd-m flex flex-col gap-m flex-1 overflow-hidden">
-						<code class="flex-1 overflow-auto">
+						<code class="flex-1 overflow-auto mh">
 							<pre id="map-snippet"></pre>
 						</code>
 						<button id="map-copy">Copy</button>
+					</div>
+				</div>
+
+				<!-- Usage -->
+				<div>
+					<h3 class="subtitle" data-i18n="usage.title">Usage</h3>
+					<div class="pd-m flex flex-col gap-m flex-1 overflow-hidden">
+						<div class="text-xs color-medium" data-i18n="usage.desc">
+							Ready to paste into your sketch: connects to the proxy, keeps only the devices that answer, and streams
+							the canvas — sampled along each polygon's centerline — to the strips.
+						</div>
+						<code class="flex-1 overflow-auto mh">
+							<pre id="usage-snippet"></pre>
+						</code>
+						<button id="usage-copy">Copy</button>
 					</div>
 				</div>
 			</aside>

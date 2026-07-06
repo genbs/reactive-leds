@@ -1,35 +1,35 @@
 import { availableConfigKeys } from "@reactive-leds/shared"
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { fail, ok, validateAddressOrHostname, validatePort } from "../utils"
+import { fail, ok, validateHost, validatePort } from "../utils"
 import { clearScanCache, resolveTargets } from "./wifi"
 
 export const configCommand: Command = {
 	name: "config",
 
 	description:
-		"Get configuration of the device at <address>:<port>.\nIf <key> and <value> are provided, set the configuration.",
+		"Get configuration of the device at <host>:<port>.\nIf <key> and <value> are provided, set the configuration.",
 
 	examples: ["config 192.168.1.1 4210", "config 192.168.1.1 4210 hostname my-device"],
 
 	args: [
-		{ required: true, name: "address", type: String, validator: validateAddressOrHostname },
+		{ required: true, name: "host", type: String, validator: validateHost },
 		{ required: false, name: "port", type: Number, validator: validatePort, default: 4210 },
 		{ required: false, name: "key", type: String, validator: validateConfigKey },
 		{ required: false, name: "value", type: String, validator: (value, args) => validateConfigValue(args[2], value) },
 	],
 
-	execute: async (address: string, port: number, key?: string, value?: string) => {
+	execute: async (host: string, port: number, key?: string, value?: string) => {
 		// resolveTargets resolves a hostname (accepted by the validator) to a real IP.
-		const targets = await resolveTargets(address, port)
+		const targets = await resolveTargets(host, port)
 		const target = targets[0]
 		if (!target || !target.config) {
-			console.log(fail(`Failed to get config for ${address}:${port}`))
+			console.log(fail(`Failed to get config for ${host}:${port}`))
 			return false
 		}
 		const config = target.config
 		if (typeof key !== "undefined" && typeof value !== "undefined") {
-			const result = await proto.setConfig(target.address, target.port, { ...config, [key]: value })
+			const result = await proto.setConfig(target.ip, target.port, { ...config, [key]: value })
 			if (!result) {
 				console.log(fail("Failed to update config"))
 				return false
@@ -51,10 +51,10 @@ export const configCommand: Command = {
 export const ledsCommand: Command = {
 	name: "leds",
 	description:
-		"Set the LEDs on the device at <address>:<port>.\nThe <led_package> argument must be a comma-separated list of values in the format <led_index>,<r>,<g>,<b>,<brightness/whiteness>.",
+		"Set the LEDs on the device at <host>:<port>.\nThe <led_package> argument must be a comma-separated list of values in the format <led_index>,<r>,<g>,<b>,<brightness/whiteness>.",
 	examples: ["leds 192.168.1.100 4210 0,255,0,128,0,1,0,255,128,0"],
 	args: [
-		{ required: true, name: "address", type: String, validator: validateAddressOrHostname },
+		{ required: true, name: "host", type: String, validator: validateHost },
 		{ required: false, name: "port", type: Number, validator: validatePort, default: 4210 },
 		{
 			required: true,
@@ -63,18 +63,18 @@ export const ledsCommand: Command = {
 			validator: validateLedsPackage,
 		},
 	],
-	execute: async (address: string, port: number, ledsPackage: string) => {
-		// Resolve so a hostname (accepted by validateIPOrHostname) becomes a real IP.
-		const targets = await resolveTargets(address, port)
+	execute: async (host: string, port: number, ledsPackage: string) => {
+		// Resolve so a hostname (accepted by validateHost) becomes a real IP.
+		const targets = await resolveTargets(host, port)
 		if (targets.length === 0) {
-			console.log(fail(`Device ${address} not found`))
+			console.log(fail(`Device ${host} not found`))
 			return false
 		}
 		const target = targets[0]
 
 		const data = new Uint8Array(ledsPackage.split(",").map(Number)) // validated
 		// Await so the kernel transmits before process exit.
-		await proto.setLEDs(target.address, target.port, data)
+		await proto.setLEDs(target.ip, target.port, data)
 		console.log(ok("LEDs request sent"))
 	},
 }

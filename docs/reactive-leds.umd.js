@@ -26,19 +26,32 @@ var reactiveLeds = (() => {
   // src/main.ts
   var main_exports = {};
   __export(main_exports, {
+    PacketType: () => PacketType,
     begin: () => begin,
     connect: () => connect,
     default: () => main_default,
     getConfig: () => getConfig,
     getStatus: () => getStatus,
     isConnected: () => isConnected,
-    mapPixels: () => mapPixels,
     onConnectionChange: () => onConnectionChange,
     ping: () => ping,
+    sample: () => sample,
+    sendRaw: () => sendRaw,
+    sendRawSync: () => sendRawSync,
     setLEDs: () => setLEDs
   });
 
   // ../shared/protocol.ts
+  var PacketType = /* @__PURE__ */ ((PacketType2) => {
+    PacketType2[PacketType2["PING"] = 0] = "PING";
+    PacketType2[PacketType2["GET_CONFIG"] = 1] = "GET_CONFIG";
+    PacketType2[PacketType2["SET_CONFIG"] = 2] = "SET_CONFIG";
+    PacketType2[PacketType2["SET_LEDS"] = 3] = "SET_LEDS";
+    PacketType2[PacketType2["RESET_WIFI"] = 4] = "RESET_WIFI";
+    PacketType2[PacketType2["GET_VERSION"] = 5] = "GET_VERSION";
+    PacketType2[PacketType2["GET_STATUS"] = 6] = "GET_STATUS";
+    return PacketType2;
+  })(PacketType || {});
   function bufferToConfig(buffer) {
     if (buffer.length < 4) {
       throw new Error(`Config buffer too short: ${buffer.length} bytes, need at least 4`);
@@ -47,7 +60,7 @@ var reactiveLeds = (() => {
       pin: buffer[0],
       num_leds: buffer[1],
       port: buffer[2] << 8 | buffer[3],
-      hostname: decodeBuffer(buffer.slice(4)).substring(0, 32)
+      hostname: decodeBuffer(buffer.subarray(4)).substring(0, 32)
     };
   }
   function bufferToStatus(buffer) {
@@ -58,26 +71,28 @@ var reactiveLeds = (() => {
     const rssi = buffer[8] << 24 >> 24;
     return { uptime, heap, rssi };
   }
-  function addressToBuffer(address, port) {
+  function addressToBuffer(ip, port) {
     const buffer = new Uint8Array(6);
-    if (typeof address === "string") {
-      const parts = address.split(".");
+    if (typeof ip === "string") {
+      const parts = ip.split(".");
       if (parts.length !== 4) {
-        throw new Error(`Invalid IP address: "${address}"`);
+        throw new Error(`Invalid IP: "${ip}"`);
       }
-      const octets = parts.map(Number);
-      if (octets.some((o) => isNaN(o) || o < 0 || o > 255)) {
-        throw new Error(`Invalid IP address: "${address}"`);
+      for (let i = 0; i < 4; i++) {
+        const octet = Number(parts[i]);
+        if (isNaN(octet) || octet < 0 || octet > 255) {
+          throw new Error(`Invalid IP: "${ip}"`);
+        }
+        buffer[i] = octet;
       }
-      buffer[0] = octets[0];
-      buffer[1] = octets[1];
-      buffer[2] = octets[2];
-      buffer[3] = octets[3];
     } else {
-      if (address.length < 4) {
-        throw new Error(`IP array too short: ${address.length} elements`);
+      if (ip.length < 4) {
+        throw new Error(`IP array too short: ${ip.length} elements`);
       }
-      buffer.set(address.slice(0, 4), 0);
+      buffer[0] = ip[0];
+      buffer[1] = ip[1];
+      buffer[2] = ip[2];
+      buffer[3] = ip[3];
     }
     buffer[4] = port >> 8 & 255;
     buffer[5] = port & 255;
@@ -116,35 +131,28 @@ var reactiveLeds = (() => {
   var FIRST_REQUEST_ID = 2;
 
   // src/mapping.ts
-  function step(t, xStart, yStart, xEnd, yEnd) {
-    const x = (1 - t) * xStart + t * xEnd;
-    const y = (1 - t) * yStart + t * yEnd;
-    return [x, y];
+  function step(t, xStart, yStart, xEnd, yEnd, out) {
+    out[0] = (1 - t) * xStart + t * xEnd;
+    out[1] = (1 - t) * yStart + t * yEnd;
   }
-  function mapPixels(pixels, pixelsSize, grid, polygon, steps, wa = 0, output = new Uint8Array(steps * 5)) {
+  function sample(pixels, pixelsSize, grid, polygon, steps, wa = 0, output = new Uint8Array(steps * 5)) {
     const [imgWidth, imgHeight] = pixelsSize;
     const [cells, rows] = grid;
     const [x0, y0, x1, y1, x2, y2, x3, y3] = polygon;
     const cellWidth = imgWidth / cells;
     const cellHeight = imgHeight / rows;
-    const physicalWidth = (x1 - x0) * cellWidth;
-    const physicalHeight = (y3 - y0) * cellHeight;
-    const aspectRatio = physicalHeight > 0 ? physicalWidth / physicalHeight : 1;
-    const ledCols = Math.max(1, Math.round(Math.sqrt(steps * aspectRatio)));
-    const ledRows = Math.ceil(steps / ledCols);
+    const top = [0, 0];
+    const bot = [0, 0];
+    const point = [0, 0];
+    step(0.5, x0, y0, x1, y1, top);
+    step(0.5, x3, y3, x2, y2, bot);
+    const fixedW = typeof wa === "number" ? wa : 0;
+    const whiteFn = typeof wa === "function" ? wa : null;
+    const useAlpha = wa === true;
     for (let i = 0; i < steps; i++) {
-      let ledRow = Math.floor(i / ledCols);
-      let ledCol = i % ledCols;
-      if (ledRow % 2 === 1) {
-        ledCol = ledCols - 1 - ledCol;
-      }
-      const u = (ledCol + 0.5) / ledCols;
-      const v = (ledRow + 0.5) / ledRows;
-      const [topX, topY] = step(u, x0, y0, x1, y1);
-      const [botX, botY] = step(u, x3, y3, x2, y2);
-      const [gridX, gridY] = step(v, topX, topY, botX, botY);
-      let sx = Math.floor(gridX * cellWidth);
-      let sy = Math.floor(gridY * cellHeight);
+      step((i + 0.5) / steps, top[0], top[1], bot[0], bot[1], point);
+      let sx = Math.floor(point[0] * cellWidth);
+      let sy = Math.floor(point[1] * cellHeight);
       if (sx < 0) sx = 0;
       else if (sx >= imgWidth) sx = imgWidth - 1;
       if (sy < 0) sy = 0;
@@ -155,7 +163,7 @@ var reactiveLeds = (() => {
       output[dstIndex + 1] = pixels[srcIndex];
       output[dstIndex + 2] = pixels[srcIndex + 1];
       output[dstIndex + 3] = pixels[srcIndex + 2];
-      output[dstIndex + 4] = typeof wa === "number" ? wa : typeof wa === "function" ? wa(pixels[srcIndex], pixels[srcIndex + 1], pixels[srcIndex + 2]) : wa === true ? pixels[srcIndex + 3] : 0;
+      output[dstIndex + 4] = whiteFn ? whiteFn(pixels[srcIndex], pixels[srcIndex + 1], pixels[srcIndex + 2]) : useAlpha ? pixels[srcIndex + 3] : fixedW;
     }
     return output;
   }
@@ -165,9 +173,15 @@ var reactiveLeds = (() => {
   var scriptSrc = typeof document !== "undefined" ? document.currentScript?.src : void 0;
   function createWorker() {
     const base = import_meta.url || scriptSrc || "";
-    return new Worker(new URL("./daemon.worker.js", base).href, { type: "module" });
+    const url = new URL("./daemon.worker.js", base).href;
+    try {
+      return new Worker(url, { type: "module" });
+    } catch {
+      const blob = new Blob([`import ${JSON.stringify(url)}`], { type: "text/javascript" });
+      return new Worker(URL.createObjectURL(blob), { type: "module" });
+    }
   }
-  var requests = [];
+  var requests = /* @__PURE__ */ new Map();
   var connectionChangeCallbacks = [];
   var connected = false;
   var rid = 0;
@@ -177,21 +191,17 @@ var reactiveLeds = (() => {
     newBuffer[0] = requestId;
     newBuffer.set(buffer, 1);
     const request = new Promise((resolve) => {
-      requests.push({
-        resolve,
-        requestId,
-        message: newBuffer
-      });
+      requests.set(requestId, { resolve });
     });
     return [request, newBuffer, requestId];
   }
   function handleResponse(event) {
     const message = event.data;
     const responseId = message[0];
-    const responseData = message.slice(1);
-    const request = requests.find((r) => r.requestId === responseId);
+    const responseData = message.subarray(1);
+    const request = requests.get(responseId);
     if (!request) {
-      if (responseId == CONNECTION_CHANGE_REQUEST_ID && responseData[0] === 1 /* ConnectionChange */) {
+      if (responseId === CONNECTION_CHANGE_REQUEST_ID && responseData[0] === 1 /* ConnectionChange */) {
         const next = responseData[1] === TRUE;
         if (next !== connected) {
           connected = next;
@@ -203,7 +213,7 @@ var reactiveLeds = (() => {
       debug && console.log(`[Proxy] Unknown request id ${responseId}`);
       return;
     }
-    requests = requests.filter((r) => r.requestId !== responseId);
+    requests.delete(responseId);
     request.resolve(responseData);
   }
   var daemon = null;
@@ -228,9 +238,8 @@ var reactiveLeds = (() => {
   }
   function onConnectionChange(callback) {
     checkConnected();
-    if (connectionChangeCallbacks.includes(callback))
-      return;
-    connectionChangeCallbacks.push(callback);
+    if (!connectionChangeCallbacks.includes(callback))
+      connectionChangeCallbacks.push(callback);
     return () => {
       connectionChangeCallbacks = connectionChangeCallbacks.filter((cb) => cb !== callback);
     };
@@ -256,56 +265,66 @@ var reactiveLeds = (() => {
   }
 
   // src/main.ts
-  var deviceIPMap = /* @__PURE__ */ new Map();
-  function createPacket(address, port, type, data) {
-    const key = `${address}:${port}`;
-    let addressPacket = deviceIPMap.get(key);
+  var addressBuffers = /* @__PURE__ */ new Map();
+  function createPacket(ip, port, type, data) {
+    const address = `${ip}:${port}`;
+    let addressPacket = addressBuffers.get(address);
     if (!addressPacket) {
-      addressPacket = addressToBuffer(address, port);
-      deviceIPMap.set(key, addressPacket);
+      addressPacket = addressToBuffer(ip, port);
+      addressBuffers.set(address, addressPacket);
     }
     const addrLen = addressPacket.length;
     const dataLen = data ? data.length : 0;
     const totalLen = 1 + addrLen + 1 + dataLen;
+    let offset = 0;
     const buffer = new Uint8Array(totalLen);
-    buffer[0] = 2 /* Send */;
-    buffer.set(addressPacket, 1);
-    buffer[1 + addrLen] = type;
-    if (data) buffer.set(data, 1 + addrLen + 1);
+    buffer[offset++] = 2 /* Send */;
+    buffer.set(addressPacket, offset);
+    offset += addrLen;
+    buffer[offset++] = type;
+    if (data) buffer.set(data, offset);
     return buffer;
   }
   function begin(serverURL, debug2 = false) {
     return wsconnect(serverURL, debug2);
   }
-  function ping(address, port = 4210) {
-    return sendSync(createPacket(address, port, 0 /* PING */)).then(
+  function ping(ip, port = 4210) {
+    return sendSync(createPacket(ip, port, 0 /* PING */)).then(
       (response) => response.length === 1 && response[0] === TRUE
     );
   }
-  function getConfig(address, port = 4210) {
-    return sendSync(createPacket(address, port, 1 /* GET_CONFIG */)).then((response) => {
+  function getConfig(ip, port = 4210) {
+    return sendSync(createPacket(ip, port, 1 /* GET_CONFIG */)).then((response) => {
       if (response.length === 1 && response[0] === FALSE) return null;
       return bufferToConfig(response);
     });
   }
-  function getStatus(address, port = 4210) {
-    return sendSync(createPacket(address, port, 6 /* GET_STATUS */)).then((response) => {
+  function getStatus(ip, port = 4210) {
+    return sendSync(createPacket(ip, port, 6 /* GET_STATUS */)).then((response) => {
       if (response.length === 1 && response[0] === FALSE) return null;
       return bufferToStatus(response);
     });
   }
-  function setLEDs(address, port = 4210, leds) {
-    send(createPacket(address, port, 3 /* SET_LEDS */, leds));
+  function setLEDs(ip, port = 4210, leds) {
+    send(createPacket(ip, port, 3 /* SET_LEDS */, leds));
   }
-  async function connect(address, port = 4210) {
-    const alive = await ping(address, port);
+  async function connect(ip, port = 4210) {
+    const alive = await ping(ip, port);
     if (!alive) return null;
-    const config = await getConfig(address, port);
+    const config = await getConfig(ip, port);
     if (!config) return null;
     return {
       config,
-      send: (leds) => setLEDs(address, port, leds)
+      send: (leds) => setLEDs(ip, port, leds),
+      sendRaw: (type, data) => sendRaw(ip, port, type, data),
+      sendRawSync: (type, data) => sendRawSync(ip, port, type, data)
     };
+  }
+  function sendRaw(ip, port, type, data) {
+    send(createPacket(ip, port, type, data));
+  }
+  function sendRawSync(ip, port, type, data) {
+    return sendSync(createPacket(ip, port, type, data));
   }
   var reactiveLeds = {
     begin,
@@ -316,7 +335,10 @@ var reactiveLeds = (() => {
     getConfig,
     getStatus,
     setLEDs,
-    mapPixels
+    sendRaw,
+    sendRawSync,
+    sample,
+    PacketType
   };
   var main_default = reactiveLeds;
   return __toCommonJS(main_exports);

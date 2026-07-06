@@ -30,7 +30,7 @@ Every packet starts with two bytes:
 | `GET_CONFIG`  | 1     | request/response   | Read device configuration                                                                          |
 | `SET_CONFIG`  | 2     | request/response   | Write device configuration (device reboots on success — see below)                                |
 | `SET_LEDS`    | 3     | request only       | Update LED colors (no response)                                                                    |
-| `RESET_WIFI`  | 4     | request only       | Clear saved WiFi credentials                                                                       |
+| `RESET_WIFI`  | 4     | request/response   | Clear saved WiFi credentials (device replies OK, then reboots)                                     |
 | `GET_VERSION` | 5     | request/response   | Read firmware version (from `PROJECT_VER` / `git describe`)                                       |
 | `GET_STATUS`  | 6     | request/response   | Read device status (uptime, free heap, WiFi RSSI)                                                  |
 
@@ -43,7 +43,7 @@ A concrete example: PING to device 192.168.1.10 on port 4210.
 ←  01 00 01            # response:  PacketID=1, PING, status=OK (1)
 ```
 
-The same pattern applies to every request/response type: send `[id, type, ...data]`, receive `[id, type, ...response]`. Fire-and-forget types (`SET_LEDS`, `RESET_WIFI`) have no response.
+The same pattern applies to every request/response type: send `[id, type, ...data]`, receive `[id, type, ...response]`. The only fire-and-forget type is `SET_LEDS`, which has no response.
 
 ### Packet sizes
 
@@ -52,7 +52,7 @@ The same pattern applies to every request/response type: send `[id, type, ...dat
 | `PING`        | 2 B (fixed)                          | 3 B (fixed)                             |
 | `GET_CONFIG`  | 2 B (fixed)                          | 6–38 B (header + hostname 0–32 B)       |
 | `SET_CONFIG`  | 6–38 B (header + hostname 0–32 B)    | 3 B (`id, type, status`)                |
-| `SET_LEDS`    | 7–1497 B (2 + N×5, N = 1..299 LEDs) | — (no response)                         |
+| `SET_LEDS`    | 7–82 B (2 + N×5, N = 1..num_leds, 16 by default) | — (no response)            |
 | `RESET_WIFI`  | 2 B (fixed)                          | 3 B (fixed)                             |
 | `GET_VERSION` | 2 B (fixed)                          | 2–34 B (header + version string 0–32 B) |
 | `GET_STATUS`  | 2 B (fixed)                          | 11 B (fixed)                            |
@@ -73,10 +73,12 @@ Multiple LEDs can be grouped in a single packet:
 
 `SET_LEDS` has no response — it is fire-and-forget to minimize latency.
 
+**255 LEDs per device is the protocol ceiling**: both `pixel_index` and the `num_leds` config field are single bytes. This is a deliberate fit for segment strips (16 segments/m ≈ 15 m of FCOB per device), not for high-density panels.
+
 ### Updating configuration
 
 ```
-[PacketID, GET_CONFIG/SET_CONFIG, pin, num_leds, port_h, port_l, hostname...]
+[PacketID, SET_CONFIG, pin, num_leds, port_h, port_l, hostname...]
 ```
 
 The port is split across two bytes (big-endian). The hostname is length-delimited by the packet — the firmware reads `packet_length - 6` bytes starting at offset 6.

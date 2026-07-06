@@ -1,27 +1,24 @@
-import { Config } from "@reactive-leds/shared"
+import { Config, PacketStatus, PacketType } from "@reactive-leds/shared"
+import dgram from "dgram"
 import fs from "fs"
 import os from "os"
 import path from "path"
-import { exec } from "child_process"
 
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { debug, fail, green, ok, validateAddressOrHostname, validatePort } from "../utils"
+import { debug, fail, green, ok, validateHost, validatePort } from "../utils"
 
 ////////////////////// Commands
 
 export const scanCommand: Command = {
 	name: "scan",
-	description: "Scan for available devices over Wi-Fi (results cached for 5 minutes).",
+	description: "Scan for available devices over Wi-Fi via UDP broadcast (results cached for 5 minutes).",
 	args: [
 		{ name: "port", type: Number, required: false, default: 4210, validator: validatePort },
-		{ name: "timeout", type: Number, required: false, default: 10000 },
+		{ name: "timeout", type: Number, required: false, default: 1500 },
 	],
 	execute: async (port: number, timeout: number) => {
-		const devices = await Promise.race([
-			scan(port, { useCache: false }),
-			new Promise<ScanResult[]>(resolve => setTimeout(() => resolve([]), timeout)),
-		])
+		const devices = await scan(port, { useCache: false, timeoutMs: timeout })
 
 		if (devices.length === 0) {
 			console.log(fail("No devices found"))
@@ -34,18 +31,18 @@ export const scanCommand: Command = {
 
 export const pingCommand: Command = {
 	name: "ping",
-	description: "Ping a device over Wi-Fi. If <address> is omitted, every device discovered on the network is pinged.",
+	description: "Ping a device over Wi-Fi. If <host> is omitted, every device discovered on the network is pinged.",
 	args: [
-		{ name: "address", required: false, validator: validateAddressOrHostname },
+		{ name: "host", required: false, validator: validateHost },
 		{ name: "port", type: Number, required: false, default: 4210, validator: validatePort },
 	],
-	execute: async (address: string | undefined, port: number) => {
-		const targets = await resolveTargets(address, port)
+	execute: async (host: string | undefined, port: number) => {
+		const targets = await resolveTargets(host, port)
 		if (targets.length === 0) return false
 
 		for (const target of targets) {
-			const result = await ping(target.address, target.port)
-			const label = target.config?.hostname ? `${target.config.hostname} (${target.address})` : target.address
+			const result = await ping(target.ip, target.port)
+			const label = target.config?.hostname ? `${target.config.hostname} (${target.ip})` : target.ip
 			console.log(`${label}: ${result ? ok("online") : fail("offline")}`)
 		}
 	},
@@ -53,18 +50,18 @@ export const pingCommand: Command = {
 
 export const resetWifiCommand: Command = {
 	name: "reset-wifi",
-	description: "Reset the Wi-Fi credentials on a device. If <address> is omitted, every discovered device is reset.",
+	description: "Reset the Wi-Fi credentials on a device. If <host> is omitted, every discovered device is reset.",
 	args: [
-		{ name: "address", required: false, validator: validateAddressOrHostname },
+		{ name: "host", required: false, validator: validateHost },
 		{ name: "port", type: Number, required: false, default: 4210, validator: validatePort },
 	],
-	execute: async (address: string | undefined, port: number) => {
-		const targets = await resolveTargets(address, port)
+	execute: async (host: string | undefined, port: number) => {
+		const targets = await resolveTargets(host, port)
 		if (targets.length === 0) return false
 
 		for (const target of targets) {
-			const result = await proto.resetWifi(target.address, target.port)
-			const label = target.config?.hostname ? `${target.config.hostname} (${target.address})` : target.address
+			const result = await proto.resetWifi(target.ip, target.port)
+			const label = target.config?.hostname ? `${target.config.hostname} (${target.ip})` : target.ip
 			console.log(`${label}: ${result ? ok("reset successfully") : fail("failed")}`)
 		}
 	},
@@ -73,7 +70,8 @@ export const resetWifiCommand: Command = {
 ////////////////////// Public API for other commands
 
 export type ScanResult = {
-	address: string
+	ip: string
+	/** Device MAC when the firmware exposes one. Never use ARP as identity. */
 	mac: string
 	port: number
 	/** Device configuration as returned by GET_CONFIG, or `null` if the device
@@ -84,20 +82,25 @@ export type ScanResult = {
 
 /** Subset of ScanResult that consumer commands actually need. */
 export type Target = {
-	address: string
+	ip: string
 	port: number
 	config: Config | null
 }
 
 const CACHE_FILE = path.join(os.tmpdir(), "reactive-leds-scan.json")
 const CACHE_MAX_MINUTES = 5
+const BROADCAST_ADDRESS = "255.255.255.255"
+const BROADCAST_SCAN_TIMEOUT = 1200
+const BROADCAST_SCAN_ROUNDS = 3
+const UNKNOWN_MAC = "unknown"
 
 /** Pretty one-line representation of a device. Hostname (from config) is
  *  shown first when available — it's the physical label the user wrote on
  *  the case's tape and is much more memorable than the IP. */
 export function formatDevice(d: ScanResult, showPort: boolean = true): string {
-	const addr = d.address + (showPort ? `:${d.port}` : "")
+	const addr = d.ip + (showPort ? `:${d.port}` : "")
 	const head = d.config?.hostname ? `${d.config.hostname} (${addr})` : addr
+	if (!d.mac || d.mac === UNKNOWN_MAC) return green(head)
 	return `${green(head)} ${d.mac}`
 }
 
@@ -121,9 +124,9 @@ export function clearScanCache(): void {
  */
 export async function scan(
 	port: number,
-	opts: { useCache?: boolean; cacheMaxMinutes?: number; verbose?: boolean } = {}
+	opts: { useCache?: boolean; cacheMaxMinutes?: number; verbose?: boolean; timeoutMs?: number } = {}
 ): Promise<ScanResult[]> {
-	const { useCache = true, cacheMaxMinutes = CACHE_MAX_MINUTES, verbose = true } = opts
+	const { useCache = true, cacheMaxMinutes = CACHE_MAX_MINUTES, verbose = true, timeoutMs = BROADCAST_SCAN_TIMEOUT } = opts
 
 	if (useCache) {
 		const cached = readCache(cacheMaxMinutes)
@@ -134,7 +137,7 @@ export async function scan(
 	}
 
 	if (verbose) console.log("Scanning for devices...")
-	const fresh = await runArpScan(port)
+	const fresh = await runBroadcastScan(port, timeoutMs)
 	if (fresh.length > 0) writeCache(fresh)
 	return fresh
 }
@@ -162,12 +165,12 @@ export async function resolveTargets(
 			console.log("No devices found")
 			return []
 		}
-		return devices.map(d => ({ address: d.address, port, config: d.config }))
+		return devices.map(d => ({ ip: d.ip, port, config: d.config }))
 	}
 
 	if (isIPv4(identifier)) {
 		const config = await proto.getConfig(identifier, port).catch(() => null)
-		return [{ address: identifier, port, config }]
+		return [{ ip: identifier, port, config }]
 	}
 
 	// Treat as hostname: cache lookup, then fresh-scan fallback.
@@ -185,7 +188,7 @@ export async function resolveTargets(
 		return []
 	}
 
-	return [{ address: found.address, port, config: found.config }]
+	return [{ ip: found.ip, port, config: found.config }]
 }
 
 function isIPv4(value: string): boolean {
@@ -197,11 +200,11 @@ function isIPv4(value: string): boolean {
 /**
  * Ping a device, retrying up to `retries` times. Returns true on first success.
  */
-export async function ping(address: string, port: number): Promise<boolean> {
+export async function ping(ip: string, port: number): Promise<boolean> {
 	try {
-		return await proto.ping(address, port)
+		return await proto.ping(ip, port)
 	} catch (err) {
-		debug("ping", `${address} failed:`, err)
+		debug("ping", `${ip} failed:`, err)
 		return false
 	}
 }
@@ -215,6 +218,10 @@ function readCache(maxMinutes: number): ScanResult[] | null {
 	try {
 		const data = JSON.parse(fs.readFileSync(CACHE_FILE, "utf-8")) as ScanResult[]
 		if (!Array.isArray(data) || data.length === 0) return null
+		// pre-rename cache files carry `address` instead of `ip` — treat them as stale
+		if (data.some(d => !d.ip)) return null
+		// pre-broadcast cache files used ARP MACs, which are not reliable device IDs.
+		if (data.some(d => d.mac && d.mac !== UNKNOWN_MAC)) return null
 
 		// Bump mtime to "now" on every hit: the cache TTL becomes "time since last
 		// access" instead of "time since written", so calling scan every minute keeps
@@ -240,38 +247,68 @@ function writeCache(devices: ScanResult[]): void {
 	}
 }
 
-function runArpScan(port: number): Promise<ScanResult[]> {
+function runBroadcastScan(port: number, timeoutMs = BROADCAST_SCAN_TIMEOUT): Promise<ScanResult[]> {
 	return new Promise(resolve => {
-		exec("arp -a", async (error, stdout, stderr) => {
-			if (error || stderr) return resolve([])
+		const socket = dgram.createSocket({ type: "udp4", reuseAddr: true })
+		const requestId = (Date.now() % 255) + 1
+		const message = new Uint8Array([requestId, PacketType.PING])
+		const ips = new Set<string>()
+		let interval: ReturnType<typeof setInterval> | undefined
+		let done = false
+		const timeout = setTimeout(() => {
+			finish()
+		}, timeoutMs)
+
+		const sendRound = () => {
+			socket.send(message, port, BROADCAST_ADDRESS, err => {
+				if (err) debug("scan", `broadcast to ${BROADCAST_ADDRESS}:${port} failed:`, err)
+			})
+		}
+
+		const finish = async () => {
+			if (done) return
+			done = true
+			clearTimeout(timeout)
+			if (interval) clearInterval(interval)
+			try {
+				socket.close()
+			} catch {
+				// The socket may fail before bind completes; discovery still resolves.
+			}
 
 			const devices = await Promise.all(
-				stdout.split("\n").map(async line => {
-					const parts = line.split(/\s+/)
-					if (parts.length < 4) return null
-					if (parts[3] === "(incomplete)" || parts[3] === "ff:ff:ff:ff:ff:ff") return null
-
-					debug("scan", "Found ARP entry:", line)
-
-					const address = parts[1].replace(/[()]/g, "")
-					const mac = parts[3]
-						.split(":")
-						.map(part => parseInt(part, 16).toString(16).padStart(2, "0").toUpperCase())
-						.join(":")
-
-					// use the retrying ping wrapper: a single UDP ping is unreliable on
-					// noisy Wi-Fi and would false-negative an online device.
-					if (!(await ping(address, port))) return null
-
-					// Pull the config once during the scan so consumers don't have to
-					// re-fetch before every setLEDs. `null` is fine if it times out —
-					// downstream code falls back to num_leds=16.
-					const config = await proto.getConfig(address, port).catch(() => null)
-					return { address, mac, port, config }
+				[...ips].sort().map(async ip => {
+					const config = await proto.getConfig(ip, port).catch(() => null)
+					return { ip, mac: UNKNOWN_MAC, port, config }
 				})
 			)
+			resolve(devices)
+		}
 
-			resolve(devices.filter(Boolean) as ScanResult[])
+		socket.on("message", (msg, rinfo) => {
+			if (msg.length < 3) return
+			if (msg[0] !== requestId || msg[1] !== PacketType.PING || msg[2] !== PacketStatus.OK) return
+			if (isIPv4(rinfo.address)) ips.add(rinfo.address)
+		})
+
+		socket.on("error", err => {
+			debug("scan", "broadcast socket error:", err)
+			finish()
+		})
+
+		socket.bind(0, () => {
+			socket.setBroadcast(true)
+			sendRound()
+
+			let rounds = 1
+			interval = setInterval(() => {
+				if (rounds >= BROADCAST_SCAN_ROUNDS) {
+					clearInterval(interval)
+					return
+				}
+				rounds++
+				sendRound()
+			}, Math.max(250, Math.floor(timeoutMs / BROADCAST_SCAN_ROUNDS)))
 		})
 	})
 }

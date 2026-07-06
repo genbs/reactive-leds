@@ -6,6 +6,11 @@ on:
     paths:
       - client/**
       - shared/**
+  push:
+    branches: [master]
+    paths:
+      - client/**
+      - shared/**
 
 jobs:
   test:
@@ -17,4 +22,6 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm install
+      - name: Type-check
+        run: npx tsc --noEmit -p client/tsconfig.json
       - run: npm test --workspace=client

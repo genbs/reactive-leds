@@ -63,7 +63,7 @@ export default class WS {
 		}
 
 		const onMessage = (e: MessageEvent) => {
-			if (e.data.length <= 0) return
+			if (e.data.byteLength <= 0) return
 
 			const data = new Uint8Array(e.data)
 			this.settings.debug && console.log("[WS] Received", data)
@@ -71,28 +71,34 @@ export default class WS {
 			this.settings.onMessage?.(data)
 		}
 
+		let socket: WebSocket
 		try {
-			this.socket = new WebSocket(this.settings.url)
+			socket = new WebSocket(this.settings.url)
 		} catch {
 			this.settings.onConnectionChange?.(false)
 			return
 		}
 
-		this.socket.binaryType = "arraybuffer"
-		this.socket.addEventListener("open", onOpen)
-		this.socket.addEventListener("message", onMessage)
-		this.socket.addEventListener("close", e => {
-			this.onSocketClose(e)
+		this.socket = socket
+		socket.binaryType = "arraybuffer"
+		socket.addEventListener("open", onOpen)
+		socket.addEventListener("message", onMessage)
+		socket.addEventListener("close", e => {
+			socket.removeEventListener("open", onOpen)
+			socket.removeEventListener("message", onMessage)
 
-			this.socket?.removeEventListener("open", onOpen)
-			this.socket?.removeEventListener("message", onMessage)
+			// A replaced socket (connect() called while connected) fires its own
+			// close later; only the current socket may reset state and reconnect.
+			if (this.socket === socket) this.onSocketClose(e)
 		})
 	}
 
 	public close() {
 		this.settings.debug && console.log("[WS] Closing connection")
 
-		clearTimeout(this.retryTimer)
+		if (this.retryTimer)
+			clearTimeout(this.retryTimer)
+
 		this.retryTimer = null
 		this.retries = 0
 		this.connected = false

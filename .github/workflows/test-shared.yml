@@ -5,6 +5,10 @@ on:
     branches: [master]
     paths:
       - shared/**
+  push:
+    branches: [master]
+    paths:
+      - shared/**
 
 jobs:
   test:
@@ -16,4 +20,6 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm install
+      - name: Type-check
+        run: npx tsc --noEmit -p shared/tsconfig.json
       - run: npm test --workspace=shared

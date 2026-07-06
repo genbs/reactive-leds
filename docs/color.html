@@ -42,7 +42,6 @@
 
 			ctx.clearRect(0, 0, window.previewCanvas.width, window.previewCanvas.height)
 			window.drawStrips(ctx, devices, colors)
-			window.sendLEDs(devices, colors)
 
 			localStorage.setItem("leds", JSON.stringify({ r, g, b, w }))
 		}

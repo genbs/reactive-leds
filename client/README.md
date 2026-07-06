@@ -8,7 +8,25 @@ Language: [English](./README.md) | [Italiano](./README-it.md)
 
 JavaScript client for realtime LED control over WiFi. Designed to integrate with browser-based tools for interactive visuals — live coding, installations, performances — but works from any JS runtime that supports WebSocket.
 
-## Build
+## Install
+
+```bash
+npm install @reactive-leds/client
+```
+
+```ts
+import leds from "@reactive-leds/client"
+
+await leds.begin("ws://localhost:8000")
+```
+
+Or with no install at all, straight from a CDN:
+
+```ts
+import leds from "https://cdn.jsdelivr.net/npm/@reactive-leds/client/build/reactive-leds.js"
+```
+
+## Build (from a repository checkout)
 
 ```bash
 npm install
@@ -47,6 +65,25 @@ Or as a classic script (UMD) — the API is available as the global `reactiveLed
 
 Pass `true` as a second argument to enable debug logs (`[Proxy]`, `[Worker]`, `[WS]`).
 
+### Connect to a device
+
+`connect` combines ping + getConfig in a single call and returns a handle with `send`:
+
+```ts
+const device = await leds.connect("192.168.X.Y")
+if (device) {
+    console.log(device.config.num_leds) // number of configured LEDs
+    device.send(data)                   // equivalent to setLEDs — for `data` see "LED control"
+}
+```
+
+### Device status
+
+```ts
+const status = await leds.getStatus("192.168.X.Y")
+// { uptime: 3600, heap: 180000, rssi: -62 }
+```
+
 ### LED control
 
 Send colors to a device — fire-and-forget, no response expected:
@@ -59,25 +96,6 @@ leds.setLEDs("192.168.X.Y", 4210, data)
 
 For details on the data format see the [protocol docs](../shared/README.md#set_leds-format).
 
-### Connect to a device
-
-`connect` combines ping + getConfig in a single call and returns a handle with `send`:
-
-```ts
-const device = await leds.connect("192.168.X.Y")
-if (device) {
-    console.log(device.config.num_leds) // number of configured LEDs
-    device.send(data)                   // equivalent to setLEDs
-}
-```
-
-### Device status
-
-```ts
-const status = await leds.getStatus("192.168.X.Y")
-// { uptime: 3600, heap: 180000, rssi: -62 }
-```
-
 ### Other calls
 
 ```ts
@@ -85,11 +103,15 @@ await leds.ping("192.168.X.Y")       // true if the device responds
 await leds.getConfig("192.168.X.Y")  // { pin, num_leds, port, hostname }
 ```
 
-### sampleMatrix / sampleStrip — from canvas to LEDs
+### sample — from canvas to LEDs
 
-Both functions are designed for live coding: they take pixels from a canvas (or any RGBA source) and remap them onto a physical LED layout, via bilinear interpolation of a perspective-projected polygon. They share the same signature — pick the one matching your physical wiring.
+Designed for live coding: takes pixels from a canvas (or any RGBA source) and remaps them onto the strip, via bilinear interpolation of a perspective-projected polygon.
 
 ```ts
+// from a canvas: extract the pixels once per frame
+const ctx = canvas.getContext("2d", { willReadFrequently: true })
+const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+
 // pixels: ImageData.data (RGBA, 4 bytes per pixel)
 // pixelsSize: source image dimensions [width, height]
 // grid: how the image is divided into cells [cols, rows]
@@ -97,17 +119,13 @@ Both functions are designed for live coding: they take pixels from a canvas (or 
 //          as (x0,y0, x1,y1, x2,y2, x3,y3) in grid coordinates
 // steps: number of LEDs
 // wa: white channel — fixed number, true = use source alpha, or function(r,g,b)=>w
-const ledsData = leds.sampleMatrix(pixels, pixelsSize, grid, polygon, steps, wa)
+const ledsData = leds.sample(pixels, [canvas.width, canvas.height], grid, polygon, steps, wa)
 leds.setLEDs("192.168.X.Y", 4210, ledsData)
 ```
 
-`sampleMatrix` distributes LEDs in a 2D grid with a serpentine path (odd rows reversed), matching the typical physical wiring of LED matrix panels.
+The strip is read as a single line along the centerline of the polygon, from the start edge (TL→TR) to the end edge (BL→BR) — to run it horizontally, rotate the polygon so the start edge is on the left. The polygon's width doesn't matter: only the centerline is sampled. Skewed, rotated or perspective-distorted polygons all work.
 
-`sampleStrip` instead samples a single straight line along the centerline of the polygon — use it for a plain, non-zigzagging LED strip:
-
-```ts
-const ledsData = leds.sampleStrip(pixels, pixelsSize, grid, polygon, steps, wa)
-```
+> Tip: the [Mapping tool](https://genbs.github.io/reactive-leds/) on the project site draws the polygons for you and exports a ready-to-use snippet.
 
 ## Notes
 
@@ -127,7 +145,19 @@ See [`cli/README.md`](../cli/README.md) for the full provisioning flow.
 
 ## Going beyond the API
 
-The client exposes the most common operations. If you need lower-level access (e.g. `SET_CONFIG`, `RESET_WIFI`, `GET_VERSION`) you can use the proxy directly by sending raw binary packets — the format is documented in [`shared/README.md`](../shared/README.md).
+The client exposes the most common operations. For the packet types the API doesn't wrap (e.g. `SET_CONFIG`, `RESET_WIFI`, `GET_VERSION`) there are `sendRaw` and `sendRawSync`, which accept any `PacketType`:
+
+```ts
+import leds, { PacketType } from "@reactive-leds/client"
+
+// request/response: resolves with [status] (1 = OK) or the payload bytes
+const ok = await leds.sendRawSync("192.168.X.Y", 4210, PacketType.RESET_WIFI)
+
+// fire-and-forget, no response expected
+leds.sendRaw("192.168.X.Y", 4210, PacketType.SET_LEDS, data)
+```
+
+The `connect` handle exposes them too, without repeating ip and port: `device.sendRaw(type, data?)` and `device.sendRawSync(type, data?)`. The packet format is documented in [`shared/README.md`](../shared/README.md).
 
 ## Links
 

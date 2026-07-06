@@ -16,11 +16,11 @@ export function validateByte(value: string): boolean {
 	return !isNaN(byte) && byte >= 0 && byte <= 255
 }
 
-/** Check if a string is a valid IPv4 address (four dot-separated octets 0-255). */
-export function validateAddress(address: string) {
-	if (!address) return false
+/** Check if a string is a valid IPv4 (four dot-separated octets 0-255). */
+export function validateIP(ip: string) {
+	if (!ip) return false
 
-	const parts = address.split(".")
+	const parts = ip.split(".")
 	if (parts.length !== 4 || parts.some(p => isNaN(Number(p)) || Number(p) < 0 || Number(p) > 255)) return false
 
 	return true
@@ -36,16 +36,16 @@ export function validatePort(port: string): boolean {
 }
 
 /**
- * Accept either an IPv4 address or a hostname (the one stored on the device,
+ * Accept a host: an IPv4 or a hostname (the one stored on the device,
  * matching the firmware's 32-char limit and RFC 1123 alphanumeric+hyphen rules).
  * Commands that target a device use this so the user can type either form.
  */
-export function validateAddressOrHostname(value: string): boolean | string {
+export function validateHost(value: string): boolean | string {
 	if (!value) return false
-	if (validateAddress(value)) return true
+	if (validateIP(value)) return true
 	// Hostname: 1–32 chars, must start with alphanumeric, then alphanumeric or hyphens.
 	if (/^[a-zA-Z0-9][a-zA-Z0-9-]{0,31}$/.test(value)) return true
-	return `"${value}" is not a valid IPv4 address or hostname`
+	return `"${value}" is not a valid IPv4 or hostname`
 }
 
 ////////////////////// ANSI helpers

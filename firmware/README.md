@@ -11,6 +11,8 @@ On first boot, the firmware enters BLE provisioning mode, where it waits for WiF
 
 The firmware is tuned for a 24V FCOB strip with 16 ICs and WRGB byte order, but it can be adapted to others — see [Adapting to a different LED strip](#adapting-to-a-different-led-strip).
 
+> **Don't want to build?** You can flash the latest release straight from the browser on the [project site](https://genbs.github.io/reactive-leds/) (Chrome/Edge, via Web Serial) — no ESP-IDF install needed. The rest of this README only matters if you want to modify or rebuild the firmware.
+
 ## Requirements
 
 - CMake
@@ -58,14 +60,14 @@ By default ESP-IDF derives it from `git describe --tags --long --dirty`, so just
 
 ### One build, many devices
 
-You only need to build once. The defaults in `sdkconfig.defaults` (`pin=18`, `num_leds=16`, `port=4210`) are a starting point — after flashing you can change any of them at runtime via `rleds config <address> <port> <key> <value>` without recompiling. The device reboots and picks up the new config from NVS.
+You only need to build once. The defaults in `sdkconfig.defaults` (`pin=18`, `num_leds=16`, `port=4210`) are a starting point — after flashing you can change any of them at runtime via `rleds config <host> <port> <key> <value>` without recompiling. The device reboots and picks up the new config from NVS.
 
 This means you can flash the same binary on all your devices and configure each one individually from the CLI.
 
 The most important thing to set per device is the **hostname** — it uniquely identifies the device on the network and is what `rleds scan` shows. Set it right after the first flash:
 
 ```bash
-rleds config <address> <port> hostname esp32-1
+rleds config <host> <port> hostname esp32-1
 ```
 
 After that you can use the hostname instead of the IP in any command:
@@ -206,7 +208,7 @@ echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210
 
 **WiFi credentials no longer work (e.g. you changed the router password).** Power-cycle the device. On boot it tries the saved network for ~20 s, fails, and falls back to BLE provisioning — at that point you can send new credentials with the CLI (`rleds bt-credential`). If the device is already running when you change the password, the same remedy applies: the reconnect task in [`main.c`](../firmware/main/main.c) keeps retrying with the stored (now wrong) credentials until you reboot. This is intentional: a frozen frame during a live performance is preferable to a sudden reboot.
 
-**Clear all WiFi credentials from a running device.** Send `RESET_WIFI` via UDP (`rleds reset-wifi <address> <port?>`). The device clears NVS, reboots, and starts in BLE provisioning mode.
+**Clear all WiFi credentials from a running device.** Send `RESET_WIFI` via UDP (`rleds reset-wifi <host> <port?>`). The device clears NVS, reboots, and starts in BLE provisioning mode.
 
 **`SET_CONFIG` is best-effort, not atomic.** Each field (pin, num_leds, port, hostname) is written to NVS separately. If a storage error occurs mid-sequence, the device may boot with a partially updated config. Workaround: send `SET_CONFIG` again, or `RESET_WIFI` and re-provision from scratch.
 

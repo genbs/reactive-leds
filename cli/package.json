@@ -28,12 +28,16 @@
     "engines": {
         "node": ">=18"
     },
-    "scripts": {
-        "build": "esbuild main.ts --bundle --platform=node --outfile=bin/rleds.js --external:@stoprocent/noble --banner:js='#!/usr/bin/env node'",
-        "test": "jest",
-        "prepare": "npm run build"
+    "publishConfig": {
+        "access": "public"
     },
-    "license": "GPL-3.0",
+    "scripts": {
+        "build": "esbuild main.ts --bundle --platform=node --outfile=bin/rleds.js --external:@stoprocent/noble --external:ws --banner:js='#!/usr/bin/env node'",
+        "test": "jest",
+        "prepare": "npm run build",
+        "prepublishOnly": "npm test"
+    },
+    "license": "GPL-3.0-only",
     "devDependencies": {
         "@types/jest": "^29.5.14",
         "@types/ws": "^8.0.0",

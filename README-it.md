@@ -47,13 +47,14 @@ La prima volta il dispositivo si configura via BLE: un comando CLI manda le cred
 
 ## Struttura del Repository
 
-Questo e' un piccolo monorepo. Ogni area principale ha la propria cartella e il proprio README.
+Questo è un piccolo monorepo. Ogni area principale ha la propria cartella e il proprio README.
 
-- `firmware/`: Firmware ESP32-S3 e istruzioni di build.
-- `cli/`: Strumenti CLI e script per configurare e testare i dispositivi ed avviare il server WebSocket di controllo.
-- `client/`: Client JavaScript per controllo real-time dal browser.
-- `shared/`: Protocollo e tipi condivisi usati tra i pacchetti.
-- `3dprint/`: Modelli STL e sorgenti CAD.
+- [`firmware/`](firmware/): Firmware ESP32-S3 e istruzioni di build.
+- [`cli/`](cli/): Strumenti CLI e script per configurare e testare i dispositivi ed avviare il server WebSocket di controllo.
+- [`client/`](client/): Client JavaScript per controllo real-time dal browser.
+- [`shared/`](shared/): Protocollo e tipi condivisi usati tra i pacchetti.
+- [`3dprint/`](3dprint/): Modelli STL e sorgenti CAD per il case e il binario LED.
+- [`docs/`](docs/): il [sito del progetto](https://genbs.github.io/reactive-leds/) (GitHub Pages): installazione guidata (CLI + flash del firmware dal browser via Web Serial), esempi live e tool di mapping delle strisce.
 
 ## Come Iniziare
 
@@ -69,7 +70,7 @@ Questo e' un piccolo monorepo. Ogni area principale ha la propria cartella e il 
 - [ESP32-S3](https://it.aliexpress.com/item/1005005045724400.html)
 - [Alimentatore 24V](https://www.amazon.it/dp/B0C8CM7GS7)
 - [Cavo di alimentazione](https://it.aliexpress.com/item/1005007046323657.html)
-- [JST](https://it.aliexpress.com/item/1005005362711029.html) ([alternativa](https://it.aliexpress.com/item/1005004615616698.html))
+- [JST](https://it.aliexpress.com/item/1005005362711029.html) ([alternativa](https://it.aliexpress.com/item/1005004615616698.html)) seleziona la variante a 3 pin (VCC, GND, DATA)
 - Resistenza da 330 Ω in serie sulla linea dati LED
 
 Questi sono i materiali che ho usato, ma il progetto è adattabile a strisce e componenti simili. Assicurati solo di configurare correttamente il firmware per la tua striscia (ordine dei colori, numero di segmenti, ecc).
@@ -79,16 +80,17 @@ Questi sono i materiali che ho usato, ma il progetto è adattabile a strisce e c
 I modelli e impostazioni sono solo un punto di partenza, non sono un esperto di stampa 3D.
 Il case è progettato per alloggiare l'ESP32-S3 e il modulo DC-DC elencati sopra, insieme a un profilo per striscia LED da 12mm.
 
-Per il profilo ho stampato 5 pezzi in PLA, ciascuno lungo 20 cm. Per la barra diffusore ho usato PETG trasparente, con pezzi da 25 cm.
+Per il profilo ho stampato 5 pezzi in PLA, ciascuno lungo 20 cm. Per la barra diffusore ho usato PETG trasparente, 4 pezzi da 25 cm.
 
 ## Limitazioni e problemi noti
 
 - **Controllo a segmenti, non per LED**: la striscia FCOB ha 896 LED per metro ma solo 16 IC per metro. Il controllo avviene per segmento (16 segmenti/m), non per singolo LED. È una scelta consapevole: ho preferito una striscia più luminosa a scapito della risoluzione.
+- **255 LED per device**: `num_leds` e `pixel_index` sono singoli byte nel protocollo UDP. Più che sufficienti per strisce a segmenti (~15 m di FCOB per device); non è pensato per pannelli a matrice ad alta densità.
 - **Ordine dei colori**: la sequenza di byte RGB/WRGB dipende dall'IC della striscia. Il firmware è configurato per la striscia indicata nei Materiali. Strisce diverse potrebbero richiedere un ordine diverso (vedi `firmware/main/leds.c`).
 - **WiFi sleep disabilitato**: la modalità risparmio energetico della radio WiFi è disabilitata esplicitamente per evitare picchi di latenza e perdita di pacchetti durante gli aggiornamenti real-time.
 - **Credenziali WiFi in chiaro via BLE**: durante il provisioning le credenziali vengono inviate senza cifratura. Per un progetto personale la semplicità ha priorità, ma tienilo a mente se usi reti sensibili.
 
 ## Alimentazione e sicurezza
 
-La striscia LED funziona a 24V. Il dimensionamento dell'alimentatore dipende dalle specifiche della striscia e dal carico reale. Usa un alimentatore con margine adeguato e un cablaggio corretto.
+La striscia LED funziona a 24V. Il dimensionamento dell'alimentatore dipende dalle specifiche della striscia e dal carico reale — come riferimento, con tutti i LED accesi la striscia assorbe circa **1 A per metro**. Usa un alimentatore con margine adeguato e un cablaggio corretto.
 Metti la resistenza da 330 Ω in serie sulla linea dati tra ESP32 e striscia, il più vicino possibile alla striscia.

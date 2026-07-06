@@ -7,9 +7,20 @@
 Language: [English](./README.md) | [Italiano](./README-it.md)
 
 Questo pacchetto è la CLI per interagire con i dispositivi `reactive-leds` in rete.
-Con il comando `rleds` si potranno eseguire: scan, ping, colori, effetti, configurazione, provisioning BLE e proxy WebSocket — tutto dal terminale.
+Con il comando `rleds` si potrà dialogare con i device, effettuare il provisioning BLE ed avviare il proxy WebSocket — tutto dal terminale.
 
 ## Avvio Rapido
+
+> L'installazione guidata (CLI + flash del firmware dal browser) è anche sul [sito del progetto](https://genbs.github.io/reactive-leds/) — nessun clone del repository necessario.
+
+Da npm:
+
+```bash
+npm install -g @reactive-leds/cli
+rleds <comando>
+```
+
+Oppure dal repository:
 
 ```bash
 npm install
@@ -20,24 +31,24 @@ rleds <comando>
 ## Flag globali
 
 - `--version` / `-v` — stampa la versione della CLI ed esce.
-- `--help` / `-h` — stampa la lista dei comandi (equivalente a lanciare `rleds` senza argomenti). Per l'help di un singolo comando: `rleds help <comando>`.
+- `--help` / `-h` — stampa la lista dei comandi (equivalente a lanciare `rleds` senza argomenti).
 
 ## Comandi
 
-- `scan [port]` - scopre dispositivi nella LAN tramite ARP + ping UDP. Ogni risultato include anche l'hostname del device (dalla sua config), così puoi associare l'IP al nastro che hai messo sul case. Il risultato è cacheato su disco (`/tmp/reactive-leds-scan.json` su macOS/Linux) per velocizzare i comandi successivi (invalidato dopo 5 minuti).
-- `clear-cache` - elimina la cache dello scan su disco (`/tmp/reactive-leds-scan.json`). Utile quando hai aggiunto/spostato un device, cambiato rete Wi-Fi, o vuoi semplicemente forzare una nuova discovery al prossimo comando. `config` con scrittura pulisce automaticamente la cache (visto che riavvia il device).
-- `ping [addressOrHostname] [port]` - verifica se un dispositivo è online. Se `addressOrHostname` è omesso, pinga tutti i device scoperti in rete.
-- `reset-wifi [addressOrHostname] [port]` - cancella le credenziali Wi-Fi. Se `addressOrHostname` è omesso, applica a tutti i device scoperti.
-- `config <addressOrHostname> [port] [key] [value]` - legge o aggiorna la configurazione del dispositivo. In lettura stampa chiavi e valori correnti. In scrittura riavvia il device (~5 s offline prima del recovery). Richiede `addressOrHostname` esplicito. Chiavi supportate: `hostname` (stringa, max 32 caratteri), `pin` (numero, GPIO del LED), `num_leds` (numero), `port` (numero, porta UDP).
-- `leds <addressOrHostname> [port] <leds_package>` - invia aggiornamenti LED. Il pacchetto è una lista di valori separati da virgole in gruppi di 5: `<led_index>,<r>,<g>,<b>,<w>` (w = bianco/luminosità). Si possono controllare più LED concatenando gruppi: `0,255,0,0,0,1,0,128,128,0`. Ogni valore tra 0 e 255. Richiede `addressOrHostname` esplicito.
+- `scan [port] [timeout_ms]` - scopre dispositivi nella LAN tramite UDP broadcast. Ogni risultato include anche l'hostname del device (dalla sua config), così puoi associare l'IP all'etichetta che hai messo sul case. Il risultato è cacheato su disco (`/tmp/reactive-leds-scan.json` su macOS/Linux) per velocizzare i comandi successivi (invalidato dopo 5 minuti).
+- `ping [host] [port]` - verifica se un dispositivo è online. Se `host` è omesso, pinga tutti i device scoperti in rete.
+- `reset-wifi [host] [port]` - cancella le credenziali Wi-Fi. Se `host` è omesso, applica a tutti i device scoperti.
+- `config <host> [port] [key] [value]` - legge o aggiorna la configurazione del dispositivo. In lettura stampa chiavi e valori correnti. In scrittura riavvia il device (~5 s offline prima del recovery). Richiede `host` esplicito. Chiavi supportate: `hostname` (stringa, max 32 caratteri), `pin` (numero, GPIO del LED), `num_leds` (numero), `port` (numero, porta UDP).
+- `leds <host> [port] <leds_package>` - invia aggiornamenti LED. Il pacchetto è una lista di valori separati da virgole in gruppi di 5: `<led_index>,<r>,<g>,<b>,<w>` (w = bianco/luminosità). Si possono controllare più LED concatenando gruppi: `0,255,0,0,0,1,0,128,128,0`. Ogni valore tra 0 e 255. Richiede `host` esplicito.
 - `bt-scan` - scansione dispositivi via Bluetooth.
 - `bt-credential [indexOrHost] [ssid]` - invia credenziali Wi-Fi via Bluetooth. Se `indexOrHost` è omesso, parte in modalità interattiva: mostra la lista dei dispositivi trovati e chiede quale selezionare (per indice numerico o nome). Se `ssid` è omesso, lo chiede al prompt (la password viene chiesta sempre, nascosta). Se `indexOrHost` è un numero, viene usato come indice della lista `bt-scan` (1-based).
-- `proxy [host] [port] [device_port]` - avvia il proxy WebSocket tra client browser e firmware. Scansiona la LAN ogni 10 secondi e mostra i device trovati in tempo reale — IP, hostname e MAC.
-- `rainbow [seconds] [speed] [addressOrHostname] [port]` - effetto arcobaleno che scorre sulla strip. Se `addressOrHostname` è omesso, l'effetto va su tutti i device scoperti.
-- `color [r] [g] [b] [w] [addressOrHostname] [port]` - imposta un colore solido su tutti i LED. Se `r g b` sono omessi usa un colore casuale. Se `addressOrHostname` è omesso applica a tutti i device scoperti.
-- `off [addressOrHostname] [port]` - spegne tutti i LED. Se `addressOrHostname` è omesso applica a tutti i device scoperti. Alias di comodo per `color 0 0 0 0`.
-- `status [addressOrHostname] [port]` - legge lo stato del device (uptime, heap libero, RSSI WiFi). Se `addressOrHostname` è omesso, interroga tutti i device scoperti.
-- `version [addressOrHostname] [port]` - legge la versione firmware (da `PROJECT_VER` / `git describe`). Se `addressOrHostname` è omesso, interroga tutti i device scoperti.
+- `proxy [host] [port] [device_port]` - avvia il proxy WebSocket tra client browser e firmware. Scansiona la LAN ogni 10 secondi e mostra i device trovati in tempo reale — IP e hostname.
+- `rainbow [seconds] [speed] [host] [port]` - effetto arcobaleno che scorre sulla strip. Se `host` è omesso, l'effetto va su tutti i device scoperti.
+- `color [r] [g] [b] [w] [host] [port]` - imposta un colore solido su tutti i LED. Se `r g b` sono omessi usa un colore casuale. Se `host` è omesso applica a tutti i device scoperti.
+- `off [host] [port]` - spegne tutti i LED. Se `host` è omesso applica a tutti i device scoperti. Alias di comodo per `color 0 0 0 0`.
+- `status [host] [port]` - legge lo stato del device (uptime, heap libero, RSSI WiFi). Se `host` è omesso, interroga tutti i device scoperti.
+- `version [host] [port]` - legge la versione firmware (da `PROJECT_VER` / `git describe`). Se `host` è omesso, interroga tutti i device scoperti.
+- `clear-cache` - elimina la cache dello scan su disco (`/tmp/reactive-leds-scan.json`). Utile quando hai aggiunto/spostato un device, cambiato rete Wi-Fi, o vuoi semplicemente forzare una nuova discovery al prossimo comando. `config` con scrittura pulisce automaticamente la cache (visto che riavvia il device).
 
 ## Esempi (minimi)
 
@@ -71,18 +82,14 @@ Il proxy scansiona la LAN ogni 10 secondi e aggiorna la lista dei device in temp
 $ rleds proxy
 Proxy: ws://0.0.0.0:8000  devices: 1
 
-  esp32-X (192.168.X.X) [aa:bb:cc:dd:ee:ff]
+  esp32-X (192.168.X.X:4210)
 ```
-
-## Note
-
-- `scan` usa `arp -a` che funziona su macOS e Linux. Su Windows il formato dell'output è diverso e il comando non funziona correttamente.
 
 ## Troubleshooting
 
 ### macOS: tutti i device risultano `offline` ma rispondono a `nc`
 
-Sintomo: `rleds ping <address>` riporta `offline` (con `DEBUG=1`: `send EHOSTUNREACH` su ogni tentativo, istantaneo), eppure il device risponde a una prova manuale come `echo -ne '\x01\x00' | nc -u -w1 <address> 4210`.
+Sintomo: `rleds ping <ip>` riporta `offline` (con `DEBUG=1`: `send EHOSTUNREACH` su ogni tentativo, istantaneo), eppure il device risponde a una prova manuale come `echo -ne '\x01\x00' | nc -u -w1 <ip> 4210`.
 
 Causa: la privacy **Rete locale** di macOS (Impostazioni di Sistema → Privacy e Sicurezza → Rete locale). Il controllo si applica solo ai binari di terze parti — i tool Apple come `nc` sono esenti, ed è per questo che continuano a funzionare. Node (e quindi `rleds`) viene bloccato, e il permesso è attribuito all'**app terminale** da cui lo lanci (iTerm, Terminal, …), quindi `node` non compare mai nella lista.
 
@@ -90,7 +97,7 @@ Soluzione: attiva il toggle del tuo terminale in Privacy e Sicurezza → Rete lo
 
 ## Flusso Provisioning BLE
 
-`bt-scan` -> `bt-credential` -> riavvio dispositivo -> Wi-Fi pronto.
+`bt-scan` → `bt-credential` → riavvio dispositivo → Wi-Fi pronto.
 
 ## Requisiti Bluetooth
 

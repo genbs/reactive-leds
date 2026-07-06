@@ -33,7 +33,7 @@ Il file `.f3d` è il sorgente Fusion 360 — aprilo se vuoi modificare le dimens
 
 ### Impostazioni dello slicer
 
-Ho stampato tutto con il profilo di default di Creality Slicer — niente di tarato apposta per questo progetto. Ha funzionato. Se hai un profilo migliore, contributi benvenuti.
+Ho stampato tutto con il profilo di default di Creality Slicer — niente di tarato apposta per questo progetto. Ha funzionato. Se hai un profilo migliore, i contributi sono benvenuti.
 
 ## Assemblaggio
 
@@ -45,9 +45,9 @@ Il case è progettato per:
 
 Vedi il [README principale](../README-it.md) per la lista completa dei materiali e per il cablaggio.
 
-## Remix
+## Licenza
 
-Se cambi larghezza striscia, modello board o modulo DC-DC, parti da `TubeLED v1.f3d` invece di modificare gli STL. L'STL è un formato senza ritorno — il sorgente parametrico ti permette di ri-esportare parti coerenti tra loro.
+I modelli in questa cartella (`.f3d` e `.stl`) sono rilasciati sotto [CC0 1.0](./LICENSE) — di fatto pubblico dominio. Usali, modificali e ridistribuiscili liberamente; nessuna attribuzione richiesta. Sono prototipi funzionanti, non design ottimizzati: se li migliori, condividere il risultato è apprezzato ma mai obbligatorio.
 
 ## Link
 

@@ -30,7 +30,7 @@ Ogni pacchetto inizia con due byte:
 | `GET_CONFIG`  | 1      | richiesta/risposta | Legge la configurazione del dispositivo                                                          |
 | `SET_CONFIG`  | 2      | richiesta/risposta | Scrive la configurazione del dispositivo (il device si riavvia in caso di successo — vedi sotto) |
 | `SET_LEDS`    | 3      | solo richiesta     | Aggiorna i colori dei LED (nessuna risposta)                                                     |
-| `RESET_WIFI`  | 4      | solo richiesta     | Cancella le credenziali WiFi salvate                                                             |
+| `RESET_WIFI`  | 4      | richiesta/risposta | Cancella le credenziali WiFi salvate (il device risponde OK, poi si riavvia)                     |
 | `GET_VERSION` | 5      | richiesta/risposta | Legge la versione firmware (da `PROJECT_VER` / `git describe`)                                   |
 | `GET_STATUS`  | 6      | richiesta/risposta | Legge lo stato del device (uptime, heap libero, RSSI WiFi)                                       |
 
@@ -43,7 +43,7 @@ Un esempio concreto: PING al device 192.168.1.10 sulla porta 4210.
 ←  01 00 01            # risposta:   PacketID=1, PING, status=OK (1)
 ```
 
-Lo stesso pattern vale per ogni tipo richiesta/risposta: invia `[id, type, ...data]`, ricevi `[id, type, ...risposta]`. I tipi fire-and-forget (`SET_LEDS`, `RESET_WIFI`) non hanno risposta.
+Lo stesso pattern vale per ogni tipo richiesta/risposta: invia `[id, type, ...data]`, ricevi `[id, type, ...risposta]`. L'unico tipo fire-and-forget è `SET_LEDS`, che non ha risposta.
 
 ### Dimensioni dei pacchetti
 
@@ -52,7 +52,7 @@ Lo stesso pattern vale per ogni tipo richiesta/risposta: invia `[id, type, ...da
 | `PING`        | 2 B (fissa)                        | 3 B (fissa)                             |
 | `GET_CONFIG`  | 2 B (fissa)                        | 6–38 B (header + hostname 0–32 B)       |
 | `SET_CONFIG`  | 6–38 B (header + hostname 0–32 B)  | 3 B (`id, type, status`)                |
-| `SET_LEDS`    | 7–1497 B (2 + N×5, N = 1..299 LED) | — (nessuna risposta)                    |
+| `SET_LEDS`    | 7–82 B (2 + N×5, N = 1..num_leds, 16 di default) | — (nessuna risposta)      |
 | `RESET_WIFI`  | 2 B (fissa)                        | 3 B (fissa)                             |
 | `GET_VERSION` | 2 B (fissa)                        | 2–34 B (header + version string 0–32 B) |
 | `GET_STATUS`  | 2 B (fissa)                        | 11 B (fissa)                            |
@@ -72,6 +72,8 @@ Più LED possono essere raggruppati in un singolo pacchetto:
 ```
 
 `SET_LEDS` non ha risposta — è fire-and-forget per minimizzare la latenza.
+
+**Il tetto del protocollo è 255 LED per device**: sia `pixel_index` che il campo `num_leds` della config sono singoli byte. È una scelta deliberata, su misura per strisce a segmenti (16 segmenti/m ≈ 15 m di FCOB per device), non per pannelli ad alta densità.
 
 ### Aggiornare la configurazione
 

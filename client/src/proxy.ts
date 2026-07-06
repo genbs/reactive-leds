@@ -21,17 +21,24 @@ const scriptSrc =
 
 function createWorker() {
 	const base = import.meta.url || scriptSrc || ""
-	return new Worker(new URL("./daemon.worker.js", base).href, { type: "module" })
+	const url = new URL("./daemon.worker.js", base).href
+	try {
+		return new Worker(url, { type: "module" })
+	} catch {
+		// The bundle was loaded cross-origin (e.g. from a CDN): the Worker
+		// constructor requires a same-origin script, so bootstrap it through a
+		// local blob that re-imports the worker module (CDNs serve CORS headers).
+		const blob = new Blob([`import ${JSON.stringify(url)}`], { type: "text/javascript" })
+		return new Worker(URL.createObjectURL(blob), { type: "module" })
+	}
 }
 
 // Pending sync requests waiting for a response from the worker
 type ProxyRequest = {
 	resolve: (data: Uint8Array) => void
-	requestId: number
-	message: Uint8Array
 }
 
-let requests: ProxyRequest[] = []
+let requests = new Map<number, ProxyRequest>()
 let connectionChangeCallbacks: ((connected: boolean) => void)[] = []
 let connected = false
 
@@ -47,11 +54,7 @@ function createRequest(buffer: Uint8Array) {
 	newBuffer.set(buffer, 1)
 
 	const request = new Promise<Uint8Array>(resolve => {
-		requests.push({
-			resolve,
-			requestId,
-			message: newBuffer,
-		})
+		requests.set(requestId, { resolve })
 	})
 
 	return [request, newBuffer, requestId] as const
@@ -61,12 +64,12 @@ function createRequest(buffer: Uint8Array) {
 function handleResponse(event: MessageEvent) {
 	const message: Uint8Array = event.data
 	const responseId = message[0]
-	const responseData = message.slice(1) // remove the requestId from the response
-	const request = requests.find(r => r.requestId === responseId)
+	const responseData = message.subarray(1) // remove the requestId from the response
+	const request = requests.get(responseId)
 
 	if (!request) {
 		// connection change events don't require a prior request
-		if (responseId == CONNECTION_CHANGE_REQUEST_ID && responseData[0] === WorkerRequestType.ConnectionChange) {
+		if (responseId === CONNECTION_CHANGE_REQUEST_ID && responseData[0] === WorkerRequestType.ConnectionChange) {
 			const next = responseData[1] === TRUE
 			// Dedupe: failed reconnect retries emit one `false` each (ws.ts notifies
 			// every close) — only forward actual state transitions to subscribers.
@@ -82,7 +85,7 @@ function handleResponse(event: MessageEvent) {
 		return
 	}
 
-	requests = requests.filter(r => r.requestId !== responseId)
+	requests.delete(responseId)
 	request.resolve(responseData)
 }
 
@@ -122,10 +125,9 @@ export function wsconnect(serverURL: string, _debug = false): Promise<boolean> {
 export function onConnectionChange(callback: (connected: boolean) => void) {
 	checkConnected()
 
-	if (connectionChangeCallbacks.includes(callback))
-		return
+	if (!connectionChangeCallbacks.includes(callback))
+		connectionChangeCallbacks.push(callback)
 
-	connectionChangeCallbacks.push(callback)
 	return () => {
 		connectionChangeCallbacks = connectionChangeCallbacks.filter(cb => cb !== callback)
 	}

@@ -49,27 +49,28 @@ On first use the device is provisioned via BLE: a CLI command sends WiFi credent
 
 This is a small monorepo. Each major area has its own folder and README.
 
-- `firmware/`: ESP32-S3 firmware and build instructions.
-- `cli/`: CLI tools and scripts for provisioning and testing devices, and running the WebSocket proxy.
-- `client/`: JavaScript client for realtime control in the browser.
-- `shared/`: Shared protocol and types used across packages.
-- `3dprint/`: STL models and CAD source for the enclosure and LED rail. See [3dprint/README.md](./3dprint/README.md).
+- [`firmware/`](firmware/): ESP32-S3 firmware and build instructions.
+- [`cli/`](cli/): CLI tools and scripts for provisioning and testing devices, and running the WebSocket proxy.
+- [`client/`](client/): JavaScript client for realtime control in the browser.
+- [`shared/`](shared/): Shared protocol and types used across packages.
+- [`3dprint/`](3dprint/): STL models and CAD source for the enclosure and LED rail.
+- [`docs/`](docs/): the [project site](https://genbs.github.io/reactive-leds/) (GitHub Pages): guided install (CLI + firmware flashing from the browser via Web Serial), live examples, and a strip-mapping tool.
 
 ## Getting Started
 
-- Firmware build/flash: see `firmware/README.md`.
-- CLI tools: see `cli/README.md`.
-- JavaScript client: see `client/README.md`.
-- Protocol/types: see `shared/README.md`.
+- Firmware build/flash: see [firmware/README.md](./firmware/README.md).
+- CLI tools: see [cli/README.md](./cli/README.md).
+- JavaScript client: see [client/README.md](./client/README.md).
+- Protocol/types: see [shared/README.md](./shared/README.md).
 
 ## Materials
 
-- [LED strip FCOB 24V](https://it.aliexpress.com/item/1005007316659176.html)
-- [DC-DC module XL4015 (24V → 5V)](https://it.aliexpress.com/item/1005008231627584.html)
-- [ESP32-S3](https://it.aliexpress.com/item/1005005045724400.html)
+- [LED strip FCOB 24V](https://www.aliexpress.com/item/1005007316659176.html)
+- [DC-DC module XL4015 (24V → 5V)](https://www.aliexpress.com/item/1005008231627584.html)
+- [ESP32-S3](https://www.aliexpress.com/item/1005005045724400.html)
 - [24V power supply](https://www.amazon.it/dp/B0C8CM7GS7)
-- [Power cable](https://it.aliexpress.com/item/1005007046323657.html)
-- [JST](https://it.aliexpress.com/item/1005005362711029.html) ([alternative](https://it.aliexpress.com/item/1005004615616698.html))
+- [Power cable](https://www.aliexpress.com/item/1005007046323657.html)
+- [JST](https://www.aliexpress.com/item/1005005362711029.html) ([alternative](https://www.aliexpress.com/item/1005004615616698.html)) — pick the 3-pin variant (VCC, GND, DATA)
 - 330 Ω resistor in series on the LED data line
 
 These are the components I used, but the project can be adapted to similar strips and hardware. Make sure to configure the firmware correctly for your strip (color order, number of segments, etc).
@@ -79,16 +80,17 @@ These are the components I used, but the project can be adapted to similar strip
 The models and settings are a starting point — I am not a 3D printing expert.
 The case is designed to fit the ESP32-S3 and the DC-DC module listed above, along with a 12mm LED strip profile.
 
-For the profile I printed 5 pieces in PLA, each 20cm long. For the diffuser bar I used transparent PETG, each piece 25cm long.
+For the profile I printed 5 pieces in PLA, each 20cm long. For the diffuser bar I used transparent PETG, 4 pieces each 25cm long.
 
 ## Limitations and Known Issues
 
 - **Segment control, not per-LED**: the FCOB strip has 896 LEDs per meter but only 16 ICs per meter. Control is per segment (16 segments/m), not per individual LED. This was an intentional trade-off for brightness over resolution.
+- **255 LEDs per device**: `num_leds` and `pixel_index` are single bytes in the UDP protocol. Plenty for segment strips (~15 m of FCOB per device); not aimed at high-density matrix panels.
 - **Color order**: the RGB/WRGB byte order depends on the LED IC. The current firmware is set for the strip listed in Materials. Different strips may need a different order (see `firmware/main/leds.c`).
 - **WiFi sleep disabled**: power saving mode on the WiFi radio is explicitly disabled to avoid latency spikes and packet loss during realtime updates.
 - **WiFi credentials in plaintext over BLE**: during provisioning, credentials are sent unencrypted. For a personal project simplicity takes priority, but keep this in mind if you use sensitive networks.
 
 ## Power and Safety
 
-The LED strip runs at 24V. PSU sizing depends on the strip specifications and real load. Use a power supply with adequate headroom and proper wiring.
+The LED strip runs at 24V. PSU sizing depends on the strip specifications and real load — as a reference, with all LEDs on the strip draws about **1 A per meter**. Use a power supply with adequate headroom and proper wiring.
 Put the 330 Ω series resistor on the data line between the ESP32 and the strip, as close to the strip as practical.

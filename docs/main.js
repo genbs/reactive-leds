@@ -1,12 +1,9 @@
 import * as rleds from "./reactive-leds.js"
 
+// Dynamic colors/icons
 const hue = Math.floor(Math.random() * 360)
+const deviceHue = (idx, n) => ((idx / n) * 360 + 30) % 360
 document.documentElement.style.setProperty("--hue", hue)
-const cs = getComputedStyle(document.documentElement)
-const colorError = cs.getPropertyValue("--color-error").trim()
-const colorMedium = cs.getPropertyValue("--color-medium").trim()
-const colorDark = cs.getPropertyValue("--color-dark").trim()
-const colorLight = cs.getPropertyValue("--color-light").trim()
 document.querySelector("meta[name='theme-color']").content = `hsl(${hue} 72% 59%)`
 
 document.querySelector("link[rel='icon']").href = `data:image/svg+xml,${encodeURIComponent(
@@ -15,9 +12,27 @@ document.querySelector("link[rel='icon']").href = `data:image/svg+xml,${encodeUR
 
 if (Math.random() > 0.6) document.getElementById("logo-container").classList.add("fill")
 
-document.fonts.ready.then(() => {
+const cs = getComputedStyle(document.documentElement)
+let colorPrimary, colorError, colorMedium, colorDark, colorLight
+function updateColors() {
+	colorPrimary = cs.getPropertyValue("--color-primary").trim()
+	colorError = cs.getPropertyValue("--color-error").trim()
+	colorMedium = cs.getPropertyValue("--color-medium").trim()
+	colorDark = cs.getPropertyValue("--color-dark").trim()
+	colorLight = cs.getPropertyValue("--color-light").trim()
+}
+
+if (document.readyState === "loading") {
+	document.addEventListener("DOMContentLoaded", () => {
+		updateColors()
+		document.body.style.opacity = "1"
+	})
+} else {
+	updateColors()
 	document.body.style.opacity = "1"
-})
+}
+
+//////////
 
 window.rleds = rleds
 window.devices = new Map()
@@ -69,24 +84,25 @@ function saveDevices() {
 }
 
 async function getDevices() {
-	const ips = JSON.parse(localStorage.getItem("devices") || "[]")
+	// stored keys are addresses ("ip:port"); device objects carry the bare ip
+	const addresses = JSON.parse(localStorage.getItem("devices") || "[]")
 	const results = await Promise.all(
-		ips.map(async ip => {
-			const [address, p] = ip.split(":")
+		addresses.map(async address => {
+			const [ip, p] = address.split(":")
 			const port = parseInt(p || "4210")
-			const config = await rleds.getConfig(address, port)
-			return config ? [ip, { ...config, address, port }] : null
+			const config = await rleds.getConfig(ip, port)
+			return config ? [address, { ...config, ip, port }] : null
 		})
 	)
 	window.devices = new Map(results.filter(Boolean))
 	saveDevices()
 }
 
-async function addDevice(address, port) {
+async function addDevice(ip, port) {
 	try {
-		const config = await rleds.getConfig(address, port)
+		const config = await rleds.getConfig(ip, port)
 		if (!config) return false
-		window.devices.set(`${address}:${port}`, { ...config, address, port })
+		window.devices.set(`${ip}:${port}`, { ...config, ip, port })
 		saveDevices()
 		renderDevices()
 		return true
@@ -118,10 +134,12 @@ const examplesPanel = document.getElementById("examples-panel")
 
 // ping every device; drop the ones that stopped answering
 async function heartbeatDevices() {
+	if (!rleds.isConnected()) return
+
 	const checks = await Promise.all(
-		[...window.devices.entries()].map(async ([key, { address, port }]) => ({
+		[...window.devices.entries()].map(async ([key, { ip, port }]) => ({
 			key,
-			alive: await rleds.ping(address, port),
+			alive: await rleds.ping(ip, port),
 		}))
 	)
 	const dead = checks.filter(r => !r.alive)
@@ -180,17 +198,17 @@ function initAddDevice(root) {
 	})
 
 	addBtn.addEventListener("click", async () => {
-		const [address, p] = addInput.value.split(":")
+		const [ip, p] = addInput.value.split(":")
 		const port = parseInt(p || "4210")
 
 		addInput.disabled = addBtn.disabled = true
 		addMessage.textContent = t("device.looking")
 		addError.textContent = ""
 
-		const ok = await addDevice(address, port)
+		const ok = await addDevice(ip, port)
 		addMessage.textContent = ""
 		if (ok) addInput.value = ""
-		else addError.textContent = `${t("device.cannot_reach")} ${address}:${port}`
+		else addError.textContent = `${t("device.cannot_reach")} ${ip}:${port}`
 
 		addInput.disabled = false
 		addBtn.disabled = false
@@ -292,20 +310,21 @@ function drawStrips(
 	rowSize = STRIP_CELL
 ) {
 	const entries = [...devices.entries()]
+	const n = entries.length
 	const maxLeds = Math.max(...entries.map(([, c]) => c.num_leds), 1)
-	const labelColor = getComputedStyle(document.documentElement).getPropertyValue("--color-medium").trim() || "#888"
 
 	if (orientation === "h") {
 		ctx.font = `${Math.min(10, Math.round(rowSize * 0.6))}px "Space Mono", monospace`
 		const ledsX = STRIP_PAD + STRIP_LABEL_W
 		const cellW = (width - ledsX - STRIP_PAD - (maxLeds - 1) * STRIP_GAP) / maxLeds
-		entries.forEach(([ip, config], s) => {
+		entries.forEach(([address, config], s) => {
+			const entry_hue = deviceHue(s, n)
 			const y = yOffset + s * (rowSize + STRIP_GAP)
-			ctx.fillStyle = labelColor
+			ctx.fillStyle = `hsl(${entry_hue},40%,65%)`
 			ctx.textAlign = "right"
 			ctx.textBaseline = "middle"
-			ctx.fillText(config.hostname || ip, ledsX - STRIP_GAP * 2, y + rowSize / 2, STRIP_LABEL_W - STRIP_GAP * 2)
-			const leds = colors.get(ip) ?? []
+			ctx.fillText(config.hostname || address, ledsX - STRIP_GAP * 2, y + rowSize / 2, STRIP_LABEL_W - STRIP_GAP * 2)
+			const leds = colors.get(address) ?? []
 			for (let i = 0; i < config.num_leds; i++) {
 				ctx.fillStyle = ledFill(leds[i])
 				ctx.fillRect(ledsX + i * (cellW + STRIP_GAP), y, cellW, rowSize)
@@ -315,27 +334,27 @@ function drawStrips(
 		ctx.font = `10px "Space Mono", monospace`
 		const ledsY = yOffset + STRIP_LABEL_W
 		const cellH = Math.max(1, (ctx.canvas.height - ledsY - STRIP_PAD - (maxLeds - 1) * STRIP_GAP) / maxLeds)
-		entries.forEach(([ip, config], s) => {
+		entries.forEach(([address, config], s) => {
+			const entry_hue = deviceHue(s, n)
 			const x = STRIP_PAD + s * (STRIP_CELL + STRIP_GAP)
-			ctx.fillStyle = labelColor
+			ctx.fillStyle = `hsl(${entry_hue},40%,65%)`
 			ctx.textAlign = "center"
 			ctx.textBaseline = "bottom"
-			ctx.fillText(config.hostname || ip, x + STRIP_CELL / 2, ledsY - STRIP_GAP, STRIP_CELL + 20)
-			const leds = colors.get(ip) ?? []
+			ctx.fillText(config.hostname || address, x + STRIP_CELL / 2, ledsY - STRIP_GAP, STRIP_CELL + 20)
+			const leds = colors.get(address) ?? []
 			for (let i = 0; i < config.num_leds; i++) {
 				ctx.fillStyle = ledFill(leds[i])
 				ctx.fillRect(x, ledsY + (config.num_leds - 1 - i) * (cellH + STRIP_GAP), STRIP_CELL, cellH)
 			}
 		})
 	}
-}
 
-function sendLEDs(devices, colors) {
-	for (const [ip, config] of devices.entries()) {
-		const leds = colors.get(ip) ?? []
+	if (!rleds.isConnected()) return
+	for (const [address, config] of devices.entries()) {
+		const leds = colors.get(address) ?? []
 		const data = new Uint8Array(config.num_leds * 5)
 		for (let i = 0; i < config.num_leds; i++) data.set([i, ...(leds[i] ?? [0, 0, 0, 0])], i * 5)
-		window.rleds.setLEDs(config.address, config.port, data)
+		window.rleds.setLEDs(config.ip, config.port, data)
 	}
 }
 
@@ -370,7 +389,6 @@ function fitPreview() {
 // API the dynamically-loaded example fragments (color/chase/audio.html) rely on
 Object.assign(window, {
 	drawStrips,
-	sendLEDs,
 	hslToRgb,
 	stripsCanvasSize,
 	previewCanvas,
@@ -391,8 +409,8 @@ document.getElementById("orientation-toggle").addEventListener("click", () => {
 window.mockDevices = (count = 4, num_leds = 16) => {
 	window.devices = new Map(
 		Array.from({ length: count }, (_, i) => {
-			const ip = `192.168.1.${10 + i}:4210`
-			return [ip, { address: `192.168.1.${10 + i}`, port: 4210, num_leds, hostname: `strip-${i + 1}`, pin: 18 }]
+			const address = `192.168.1.${10 + i}:4210`
+			return [address, { ip: `192.168.1.${10 + i}`, port: 4210, num_leds, hostname: `strip-${i + 1}`, pin: 18 }]
 		})
 	)
 	examplesPanel.removeAttribute("inert")
@@ -414,7 +432,6 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 
 		const html = await fetch(name + ".html").then(r => r.text())
 		const doc = new DOMParser().parseFromString(html, "text/html")
-
 		container.innerHTML = ""
 		for (const node of doc.body.childNodes) if (node.nodeName !== "SCRIPT") container.appendChild(node.cloneNode(true))
 		for (const src of doc.querySelectorAll("script")) {
@@ -439,7 +456,10 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 	const previewDialog = document.getElementById("live-preview-dialog")
 	let loaded = false
 	previewDialog.addEventListener("toggle", e => {
-		if (e.newState !== "open") return
+		if (e.newState !== "open") {
+			window.example_cleanup?.()
+			return
+		}
 		if (loaded) return window.main?.()
 		loaded = true
 		loadExample(localStorage.getItem("example") || "color")
@@ -456,85 +476,74 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 	const canvas = document.getElementById("mapping-canvas")
 	const ctx = canvas.getContext("2d")
 	let presetCanvas = new OffscreenCanvas(1, 1)
-	let presetCtx = presetCanvas.getContext("2d")
+	let presetCtx = presetCanvas.getContext("2d", {
+		willReadFrequently: true,
+	})
 	let ledOutBuffers = new Map()
 
 	function computeLEDColors() {
 		ledOutBuffers.clear()
 		if (!window.devices.size || !presetCanvas.width || !presetCanvas.height) return
 		const imageData = presetCtx.getImageData(0, 0, presetCanvas.width, presetCanvas.height)
-		for (const [ip, config] of window.devices.entries()) {
-			const quad = maps.get(ip)
+		for (const [address, config] of window.devices.entries()) {
+			const quad = maps.get(address)
 			if (!quad) continue
 			const out = new Uint8Array(config.num_leds * 5)
-			rleds.sampleStrip(
-				imageData.data,
-				[presetCanvas.width, presetCanvas.height],
-				[cols, rows],
-				quad,
-				config.num_leds,
-				0,
-				out
-			)
-			ledOutBuffers.set(ip, out)
+			try {
+				rleds.sample(
+					imageData.data,
+					[presetCanvas.width, presetCanvas.height],
+					[cols, rows],
+					quad,
+					config.num_leds,
+					0,
+					out
+				)
+			} catch {
+				/* degenerate quad mid-drag — keep the buffer dark for this frame */
+			}
+			ledOutBuffers.set(address, out)
 		}
 	}
 
-	// Mirror of sampleMatrix' internal layout: it samples `steps` LEDs as an
-	// lCols×lRows serpentine grid sized from the quad's pixel aspect ratio.
-	// lCols===1 or lRows===1 → linear strip; otherwise it zig-zags.
-	function ledLayout(quad, steps) {
-		const cellW = canvas.width / cols
-		const cellH = canvas.height / rows
-		const physW = (quad[2] - quad[0]) * cellW
-		const physH = (quad[7] - quad[1]) * cellH
-		const ar = physH > 0 ? physW / physH : 1
-		const lCols = Math.max(1, Math.round(Math.sqrt(steps * ar)))
-		const lRows = Math.ceil(steps / lCols)
-		return [lCols, lRows]
-	}
-
+	// Dots along the polygon's centerline — the exact points rleds.sample reads:
+	// from the midpoint of the start edge (TL-TR) to the midpoint of the end
+	// edge (BL-BR), one dot per LED.
 	function drawSampleDots() {
 		const cellW = canvas.width / cols
 		const cellH = canvas.height / rows
+		const deviceEntries = [...window.devices.entries()]
 		ctx.lineWidth = 0.5
-		for (const [ip, config] of window.devices.entries()) {
-			const quad = maps.get(ip)
-			const out = ledOutBuffers.get(ip)
-			if (!quad || !out) continue
+		deviceEntries.forEach(([address, config], idx) => {
+			const quad = maps.get(address)
+			const out = ledOutBuffers.get(address)
+			if (!quad || !out) return
+			const entry_hue = deviceHue(idx, deviceEntries.length)
 			const [x0, y0, x1, y1, x2, y2, x3, y3] = quad
-			const [lCols, lRows] = ledLayout(quad, config.num_leds)
+			const tx = (x0 + x1) / 2,
+				ty = (y0 + y1) / 2
+			const bx = (x3 + x2) / 2,
+				by = (y3 + y2) / 2
 			for (let i = 0; i < config.num_leds; i++) {
-				let lr = Math.floor(i / lCols)
-				let lc = i % lCols
-				if (lr % 2 === 1) lc = lCols - 1 - lc
-				const u = (lc + 0.5) / lCols
-				const v = (lr + 0.5) / lRows
-				const tx = (1 - u) * x0 + u * x1,
-					ty = (1 - u) * y0 + u * y1
-				const bx = (1 - u) * x3 + u * x2,
-					by = (1 - u) * y3 + u * y2
-				const gx = (1 - v) * tx + v * bx,
-					gy = (1 - v) * ty + v * by
-				const px = gx * cellW,
-					py = gy * cellH
+				const v = (i + 0.5) / config.num_leds
+				const px = ((1 - v) * tx + v * bx) * cellW
+				const py = ((1 - v) * ty + v * by) * cellH
 				const r = out[i * 5 + 1],
 					g = out[i * 5 + 2],
 					b = out[i * 5 + 3]
 				ctx.fillStyle = `rgb(${r},${g},${b})`
-				ctx.strokeStyle = r + g + b < 200 ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.45)"
+				ctx.strokeStyle = `hsl(${entry_hue},80%,70%)`
 				ctx.beginPath()
 				ctx.arc(px, py, 3, 0, Math.PI * 2)
 				ctx.fill()
 				ctx.stroke()
 			}
-		}
+		})
 	}
 	const deviceListEl = document.getElementById("map-device-list")
-	// rows are built once per device set; render() only refreshes the bits that
-	// actually change per frame (selected highlight + serpentine/linear badge),
-	// so the DOM isn't torn down and rebuilt on every drag/animation tick.
-	const deviceRows = new Map() // ip -> { el, badge }
+	// rows are built once per device set; renderMapping() only refreshes the
+	// selected highlight, so the DOM isn't torn down on every drag/animation tick.
+	const deviceRows = new Map() // address -> row element
 	let builtOrder = []
 
 	function buildDeviceList() {
@@ -542,50 +551,41 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		const n = entries.length
 		deviceListEl.innerHTML = ""
 		deviceRows.clear()
-		entries.forEach(([ip, config], idx) => {
-			const hue = (idx / n) * 360
+		entries.forEach(([address, config], idx) => {
+			const entry_hue = deviceHue(idx, n)
 			const div = document.createElement("div")
 			div.className =
 				"flex align-center nowrap text-overflow gap-s pd-s pointer" + (idx > 0 ? " border-top-primary-light" : "")
 			div.innerHTML =
-				`<span class="square" style="background:hsl(${hue},80%,65%)"></span>` +
-				`<span>${config.hostname || ip}</span>` +
-				`<span class="text-xs"></span>` +
+				`<span class="square" style="background:hsl(${entry_hue},80%,65%)"></span>` +
+				`<span>${config.hostname || address}</span>` +
 				`<span class="text-xs color-medium">${config.num_leds} leds</span>`
 			div.addEventListener("click", () => {
-				selected = ip
-				render()
+				selected = address
+				renderMapping()
 			})
 			deviceListEl.appendChild(div)
-			deviceRows.set(ip, { el: div, badge: div.children[2] })
+			deviceRows.set(address, div)
 		})
-		builtOrder = entries.map(([ip]) => ip)
+		builtOrder = entries.map(([address]) => address)
 	}
 
 	function updateDeviceList() {
-		const ips = [...window.devices.keys()]
-		const sameSet = ips.length === builtOrder.length && ips.every((ip, i) => ip === builtOrder[i])
+		const addresses = [...window.devices.keys()]
+		const sameSet = addresses.length === builtOrder.length && addresses.every((address, i) => address === builtOrder[i])
 		if (!sameSet) buildDeviceList()
-		for (const [ip, { el, badge }] of deviceRows) {
-			const config = window.devices.get(ip)
-			if (!config) continue
-			const quad = maps.get(ip)
-			const [lCols, lRows] = quad ? ledLayout(quad, config.num_leds) : [1, 1]
-			const serpentine = lCols > 1 && lRows > 1
-			el.classList.toggle("selected", ip === selected)
-			const text = `${lCols}×${lRows} ${serpentine ? "serpentine" : "linear"}`
-			if (badge.textContent !== text) badge.textContent = text
-			const color = serpentine ? colorError : "inherit"
-			if (badge.style.color !== color) badge.style.color = color
-		}
+		for (const [address, el] of deviceRows) el.classList.toggle("selected", address === selected)
 	}
 
 	const colsInput = document.getElementById("map-cols")
 	const rowsInput = document.getElementById("map-rows")
 	const resetBtn = document.getElementById("map-reset")
+	const resetBtnV = document.getElementById("map-reset-v")
 	const presetSelect = document.getElementById("map-preset")
 	const snippetEl = document.getElementById("map-snippet")
 	const copyBtn = document.getElementById("map-copy")
+	const usageEl = document.getElementById("usage-snippet")
+	const usageCopyBtn = document.getElementById("usage-copy")
 
 	let cols = parseInt(localStorage.getItem("map-cols") ?? "10")
 	let rows = parseInt(localStorage.getItem("map-rows") ?? "10")
@@ -629,12 +629,25 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		const entries = [...window.devices.entries()]
 		const n = entries.length || 1
 		maps = new Map()
-		entries.forEach(([ip], i) => {
-			const x0 = (i / n) * cols
-			const x1 = ((i + 1) / n) * cols
-			maps.set(ip, [x0, 0, x1, 0, x1, rows, x0, rows])
+		entries.forEach(([address], i) => {
+			const x0 = Math.floor((i / n) * cols)
+			const x1 = Math.floor(((i + 1) / n) * cols)
+			maps.set(address, [x0, rows, x1, rows, x1, 0, x0, 0])
 		})
-		persist()
+		persistMapping()
+	}
+
+	function defaultMapsV() {
+		const entries = [...window.devices.entries()]
+		const n = entries.length || 1
+		maps = new Map()
+		entries.forEach(([address], i) => {
+			const y0 = Math.floor((i / n) * rows)
+			const y1 = Math.floor(((i + 1) / n) * rows)
+			// p0,p1 = start (left edge), p2,p3 = end (right edge) → strip goes →
+			maps.set(address, [0, y0, 0, y1, cols, y1, cols, y0])
+		})
+		persistMapping()
 	}
 
 	// give a default quad to any device that doesn't have one yet (e.g. just
@@ -643,32 +656,80 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		const entries = [...window.devices.entries()]
 		const n = entries.length || 1
 		let added = false
-		entries.forEach(([ip], i) => {
-			if (maps.has(ip)) return
+		entries.forEach(([address], i) => {
+			if (maps.has(address)) return
 			const x0 = (i / n) * cols
 			const x1 = ((i + 1) / n) * cols
-			maps.set(ip, [x0, 0, x1, 0, x1, rows, x0, rows])
+			maps.set(address, [x0, 0, x1, 0, x1, rows, x0, rows])
 			added = true
 		})
-		if (added) persist()
+		if (added) persistMapping()
 	}
 
+	// Self-contained mapping: everything a sketch needs to drive the devices —
+	// ip/port to send to, LED count, and the polygon itself. Kept as an array
+	// so the visual order is preserved. Naming rule: `ip` is the bare IP;
+	// `address` would be the combined "ip:port" form.
 	function exportSnippet() {
-		const devices = {}
-		for (const [ip, config] of window.devices.entries()) {
-			const q = maps.get(ip)
-			if (q) devices[config.hostname || ip] = q
+		const devices = []
+		for (const [key, config] of window.devices.entries()) {
+			const quad = maps.get(key)
+			if (!quad) continue
+			devices.push({
+				ip: config.ip,
+				port: config.port,
+				quad,
+			})
 		}
-		const obj = { grid: [cols, rows], devices }
-		return JSON.stringify(obj, null, 2)
+		// collapse numeric arrays (grid, quad) to one line each — with the default
+		// pretty-print every quad would take 8 lines and drown the panel.
+		return JSON.stringify({ grid: [cols, rows], devices }, null, 2).replace(/\[[\s\d.,]+\]/g, m =>
+			m.replace(/\s+/g, "").replace(/,/g, ", ")
+		)
 	}
 
-	function persist() {
+	// Complete starter for the user's sketch: the mapping above plus the
+	// render-loop glue that samples a canvas frame onto every device.
+	function usageSnippet() {
+		return `import rleds from "@reactive-leds/client"
+
+const mapping = ${exportSnippet()}
+
+await rleds.begin("ws://localhost:8000")
+
+// connect (ping + config) to each device: unreachable ones are dropped, the
+// LED count comes from the live config, and each device gets its own
+// reusable output buffer (no per-frame allocations)
+mapping.devices = (
+	await Promise.all(
+		mapping.devices.map(async d => {
+			const device = await rleds.connect(d.ip, d.port)
+			if (!device) return null
+			return { ...d, leds: device.config.num_leds, send: device.send, data: new Uint8Array(device.config.num_leds * 5) }
+		})
+	)
+).filter(Boolean)
+
+const ctx = canvas.getContext("2d", { willReadFrequently: true })
+
+// call this after each frame you draw on your canvas
+function sendFrame() {
+	const { width, height } = ctx.canvas
+	const pixels = ctx.getImageData(0, 0, width, height).data
+	for (const d of mapping.devices) {
+		rleds.sample(pixels, [width, height], mapping.grid, d.quad, d.leds, 0, d.data)
+		d.send(d.data)
+	}
+}`
+	}
+
+	function persistMapping() {
 		const entries = [...window.devices.entries()]
-		window.mappings = entries.map(([ip]) => maps.get(ip) ?? null)
+		window.mappings = entries.map(([address]) => maps.get(address) ?? null)
 		window.gridSize = [cols, rows]
 		localStorage.setItem("mappings", JSON.stringify([...maps.entries()]))
 		if (snippetEl) snippetEl.textContent = exportSnippet()
+		if (usageEl) usageEl.textContent = usageSnippet()
 	}
 
 	function isInsideQuad(px, py, quad) {
@@ -716,8 +777,8 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		for (let i = 0; i < 4; i++) {
 			const dx = quad[i * 2] - cx,
 				dy = quad[i * 2 + 1] - cy
-			out[i * 2] = Math.round(cx - dy)
-			out[i * 2 + 1] = Math.round(cy + dx)
+			out[i * 2] = Math.round(cx + dy)
+			out[i * 2 + 1] = Math.round(cy - dx)
 		}
 		// shift to keep within grid bounds
 		const minX = Math.min(out[0], out[2], out[4], out[6])
@@ -751,49 +812,46 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		if (preset === "col-row") return [Math.round(u * 255), Math.round(v * 255), 0]
 		if (preset === "cols") return [Math.round(u * 255), 0, Math.round((1 - u) * 255)]
 		if (preset === "rows") return [0, Math.round(v * 255), Math.round((1 - v) * 255)]
-		if (preset === "circle") {
-			const [cx, cy] = circleCenter()
-			return Math.hypot(i + 0.5 - cx, j + 0.5 - cy) < 2.5 ? [30, 30, 30] : [255, 255, 255]
-		}
-		return null
 	}
 
-	function drawPreset() {
-		presetCtx.clearRect(0, 0, presetCanvas.width, presetCanvas.height)
+	function drawMappingPreset() {
 		if (preset === "circle") {
-			presetCtx.fillStyle = colorLight
+			presetCtx.fillStyle = `hsl(${hue} 100% 20%)`
 			presetCtx.fillRect(0, 0, presetCanvas.width, presetCanvas.height)
+
 			const cw = presetCanvas.width / cols,
-				ch = presetCanvas.height / rows
-			const [cx, cy] = circleCenter()
+				ch = presetCanvas.height / rows,
+				[cx, cy] = circleCenter()
+
 			presetCtx.beginPath()
 			presetCtx.arc(cx * cw, cy * ch, 2.5 * Math.min(cw, ch), 0, Math.PI * 2)
-			presetCtx.fillStyle = colorDark
+			presetCtx.fillStyle = `hsl(${(hue + 180) % 360} 100% 50%)`
 			presetCtx.fill()
+
 			return
 		}
+
 		const cw = presetCanvas.width / cols
 		const ch = presetCanvas.height / rows
+
 		for (let i = 0; i < cols; i++) {
 			for (let j = 0; j < rows; j++) {
-				const color = presetColor(i, j)
-				if (!color) continue
-				const [r, g, b] = color
 				const x = Math.round(i * cw),
-					y = Math.round(j * ch)
-				const w = Math.round((i + 1) * cw) - x,
+					y = Math.round(j * ch),
+					w = Math.round((i + 1) * cw) - x,
 					h = Math.round((j + 1) * ch) - y
-				presetCtx.fillStyle = `rgb(${r},${g},${b})`
+
+				presetCtx.fillStyle = "rgb(" + presetColor(i, j).join(", ") + ")"
 				presetCtx.fillRect(x, y, w, h)
 			}
 		}
 	}
 
-	function updateAnim() {
+	function updateMappingAnim() {
 		if (preset === "circle" && dialog.open && !animRaf) {
 			const loop = () => {
 				animTime += 0.012
-				render()
+				renderMapping()
 				animRaf = preset === "circle" && dialog.open ? requestAnimationFrame(loop) : null
 			}
 			animRaf = requestAnimationFrame(loop)
@@ -803,11 +861,11 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		}
 	}
 
-	function render() {
+	function renderMapping() {
 		const entries = [...window.devices.entries()]
 		const n = entries.length
 
-		drawPreset()
+		drawMappingPreset()
 		ctx.clearRect(0, 0, canvas.width, canvas.height)
 		ctx.drawImage(presetCanvas, 0, 0)
 
@@ -815,22 +873,23 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		const cellW = canvas.width / cols
 		const cellH = canvas.height / rows
 		ctx.lineWidth = 1
+		ctx.strokeStyle = `hsl(${hue} 5% 14%)`
 		for (let i = 0; i <= cols; i++) {
 			const x = Math.round(i * cellW) + 0.5
-			ctx.strokeStyle = i === 0 || i === cols ? colorMedium : `hsl(${hue} 5% 14%)`
 			ctx.beginPath()
 			ctx.moveTo(x, 0)
 			ctx.lineTo(x, canvas.height)
 			ctx.stroke()
 		}
+
 		for (let j = 0; j <= rows; j++) {
 			const y = Math.round(j * cellH) + 0.5
-			ctx.strokeStyle = j === 0 || j === rows ? colorMedium : `hsl(${hue} 5% 14%)`
 			ctx.beginPath()
 			ctx.moveTo(0, y)
 			ctx.lineTo(canvas.width, y)
 			ctx.stroke()
 		}
+
 		// cell coordinates
 		ctx.fillStyle = colorMedium
 		ctx.font = `${Math.max(8, Math.min(10, cellW * 0.3))}px "Space Mono", monospace`
@@ -845,22 +904,22 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		}
 
 		// quad fills + outlines + labels
-		entries.forEach(([ip, config], idx) => {
-			const quad = maps.get(ip)
+		entries.forEach(([address, config], idx) => {
+			const quad = maps.get(address)
 			if (!quad) return
-			const hue = (idx / n) * 360
-			const isSel = ip === selected
+			const entry_hue = deviceHue(idx, n)
+			const isSel = address === selected
 			const pts = []
 			for (let i = 0; i < 4; i++) pts.push(ctp(quad[i * 2], quad[i * 2 + 1]))
 
-			const col = `hsl(${hue},80%,65%)`
+			const col = `hsl(${entry_hue},40%,50%)`
 
 			// fill + outline
 			ctx.beginPath()
 			ctx.moveTo(...pts[0])
 			for (let i = 1; i < 4; i++) ctx.lineTo(...pts[i])
 			ctx.closePath()
-			ctx.fillStyle = `hsla(${hue},80%,55%,${isSel ? 0.2 : 0.1})`
+			ctx.fillStyle = `hsla(${entry_hue},80%,55%,${isSel ? 0.4 : 0.1})`
 			ctx.fill()
 			ctx.strokeStyle = col
 			ctx.lineWidth = isSel ? 2 : 1
@@ -874,33 +933,29 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 				emy = (pts[2][1] + pts[3][1]) / 2
 			const fullLen = Math.hypot(emx - smx, emy - smy)
 
-			// label centered: LED layout badge above the hostname
-			ctx.textAlign = "center"
+			// label + arrow
 			ctx.textBaseline = "middle"
-			const oy = cy + 10
-			const hostY = oy - (fullLen > 30 ? 10 : 0)
-
-			const [lCols, lRows] = ledLayout(quad, config.num_leds)
-			const serpentine = lCols > 1 && lRows > 1
-			ctx.font = `9px "Space Mono", monospace`
-			ctx.fillStyle = serpentine ? colorError : `hsl(${hue},55%,72%)`
-			ctx.fillText(`${lCols}×${lRows} ${serpentine ? "serpentine" : "linear"}`, cx, hostY - 13)
+			const hasArrow = fullLen > 30
+			const ux = hasArrow ? (emx - smx) / fullLen : 0
+			const uy = hasArrow ? (emy - smy) / fullLen : 0
+			const isHorizontal = Math.abs(ux) > Math.abs(uy)
 
 			ctx.font = `11px "Space Mono", monospace`
 			ctx.fillStyle = col
-			ctx.fillText(config.hostname || ip, cx, hostY)
+			ctx.textAlign = "center"
+			ctx.fillText(config.hostname || address, cx, cy)
 
-			// arrow centered, fixed small size
-			if (fullLen > 30) {
-				const ux = (emx - smx) / fullLen,
-					uy = (emy - smy) / fullLen
+			if (hasArrow) {
 				const half = 14
-				const tx = cx + ux * half,
-					ty = oy + uy * half + 14
-				const bx = cx - ux * half,
-					by = oy - uy * half + 14
 				const hw = 4,
 					hs = 8
+				// vertical: arrow below label; horizontal: arrow beside label at same y
+				const ax = isHorizontal ? cx + half + 18 : cx
+				const ay = isHorizontal ? cy : cy + 22
+				const tx = ax + ux * half,
+					ty = ay + uy * half
+				const bx = ax - ux * half,
+					by = ay - uy * half
 				ctx.strokeStyle = col
 				ctx.lineWidth = 1.5
 				ctx.beginPath()
@@ -919,11 +974,11 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 
 		// corner handles + rotate handle (selected strip only)
 		if (selected) {
-			const selIdx = entries.findIndex(([ip]) => ip === selected)
+			const selIdx = entries.findIndex(([address]) => address === selected)
 			const quad = maps.get(selected)
 			if (quad && selIdx >= 0) {
-				const hue = (selIdx / n) * 360
-				const col = `hsl(${hue},80%,65%)`
+				const entry_hue = deviceHue(selIdx, n)
+				const col = `hsl(${entry_hue},100%,50%)`
 				for (let i = 0; i < 4; i++) {
 					const [px, py] = ctp(quad[i * 2], quad[i * 2 + 1])
 					ctx.fillStyle = col
@@ -945,12 +1000,11 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 			}
 		}
 		computeLEDColors()
-		drawSampleDots()
-		renderPreview()
+		renderMappingPreview()
 		updateDeviceList()
 	}
 
-	function renderPreview() {
+	function renderMappingPreview() {
 		if (!window.devices.size) return
 		const count = window.devices.size
 		const host = previewCanvas.parentElement
@@ -966,16 +1020,16 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		previewCanvas.height = Math.min(availH, STRIP_PAD * 2 + count * (rowSize + STRIP_GAP) - STRIP_GAP)
 
 		const colors = new Map()
-		for (const [ip, config] of window.devices.entries()) {
-			const out = ledOutBuffers.get(ip)
+		for (const [address, config] of window.devices.entries()) {
+			const out = ledOutBuffers.get(address)
 			if (!out) {
-				colors.set(ip, [])
+				colors.set(address, [])
 				continue
 			}
 			const leds = []
 			for (let i = 0; i < config.num_leds; i++)
 				leds.push([out[i * 5 + 1], out[i * 5 + 2], out[i * 5 + 3], out[i * 5 + 4]])
-			colors.set(ip, leds)
+			colors.set(address, leds)
 		}
 
 		previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height)
@@ -991,8 +1045,8 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 				const [rx, ry] = rotateHandlePos(quad)
 				if (Math.abs(px - rx) <= 7 && Math.abs(py - ry) <= 7) {
 					maps.set(selected, rotateQuad(quad))
-					persist()
-					render()
+					persistMapping()
+					renderMapping()
 					return
 				}
 				const c = nearCorner(px, py, quad)
@@ -1002,18 +1056,18 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 				}
 			}
 		}
-		for (const [ip] of window.devices.entries()) {
-			const quad = maps.get(ip)
+		for (const [address] of window.devices.entries()) {
+			const quad = maps.get(address)
 			if (quad && isInsideQuad(px, py, quad)) {
-				selected = ip
+				selected = address
 				dragState = { corner: -1, startPX: px, startPY: py, initMap: [...quad] }
-				render()
+				renderMapping()
 				return
 			}
 		}
 		selected = null
 		dragState = null
-		render()
+		renderMapping()
 	})
 
 	canvas.addEventListener("mousemove", e => {
@@ -1076,8 +1130,8 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 			quad[7] = base + 1
 		}
 		maps.set(selected, quad)
-		persist()
-		render()
+		persistMapping()
+		renderMapping()
 	})
 
 	canvas.addEventListener("mouseleave", () => {
@@ -1087,39 +1141,56 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		dragState = null
 	})
 
-	colsInput.addEventListener("change", () => {
+	function applyGrid() {
 		cols = Math.max(1, parseInt(colsInput.value) || 10)
-		localStorage.setItem("map-cols", cols)
-		persist()
-		render()
-	})
-	rowsInput.addEventListener("change", () => {
 		rows = Math.max(1, parseInt(rowsInput.value) || 10)
+		localStorage.setItem("map-cols", cols)
 		localStorage.setItem("map-rows", rows)
-		persist()
-		render()
+	}
+
+	colsInput.addEventListener("input", () => {
+		applyGrid()
+		persistMapping()
+		renderMapping()
+	})
+	rowsInput.addEventListener("input", () => {
+		applyGrid()
+		persistMapping()
+		renderMapping()
 	})
 
 	resetBtn.addEventListener("click", () => {
+		applyGrid()
 		defaultMaps()
-		render()
+		renderMapping()
+	})
+
+	resetBtnV.addEventListener("click", () => {
+		applyGrid()
+		defaultMapsV()
+		renderMapping()
 	})
 
 	presetSelect.addEventListener("change", () => {
 		preset = presetSelect.value
 		localStorage.setItem("map-preset", preset)
-		updateAnim()
-		render()
+		updateMappingAnim()
+		renderMapping()
 	})
 
-	copyBtn.addEventListener("click", () => {
-		navigator.clipboard.writeText(exportSnippet()).then(() => {
-			copyBtn.textContent = "Copied!"
-			setTimeout(() => {
-				copyBtn.textContent = "Copy"
-			}, 1500)
+	function wireCopy(btn, getText) {
+		btn.addEventListener("click", () => {
+			navigator.clipboard.writeText(getText()).then(() => {
+				btn.textContent = "Copied!"
+				setTimeout(() => {
+					btn.textContent = "Copy"
+				}, 1500)
+			})
 		})
-	})
+	}
+
+	wireCopy(copyBtn, exportSnippet)
+	if (usageCopyBtn) wireCopy(usageCopyBtn, usageSnippet)
 
 	function resizeMapping() {
 		if (!dialog.open) return
@@ -1127,7 +1198,7 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		// reserve room for the strip preview below, then give the rest to the
 		// background canvas, which keeps the window's aspect ratio (letterboxed).
 		// the reservation is capped so a long device list can't squeeze the
-		// canvas away — renderPreview() shrinks the rows to fit that area.
+		// canvas away — renderMappingPreview() shrinks the rows to fit that area.
 		const count = Math.max(window.devices.size, 1)
 		const fullPreviewH = STRIP_PAD * 2 + count * (STRIP_CELL + STRIP_GAP) - STRIP_GAP
 		const previewH = Math.min(fullPreviewH, Math.round(wrap.clientHeight * 0.4))
@@ -1144,8 +1215,8 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		h = Math.round(h)
 		canvas.width = presetCanvas.width = w
 		canvas.height = presetCanvas.height = h
-		persist()
-		render()
+		persistMapping()
+		renderMapping()
 	}
 
 	dialog.addEventListener("toggle", e => {
@@ -1157,7 +1228,7 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		requestAnimationFrame(() => {
 			ensureMaps()
 			resizeMapping()
-			updateAnim()
+			updateMappingAnim()
 		})
 	})
 
@@ -1166,7 +1237,7 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 	window.addEventListener("devices-changed", () => {
 		if (!dialog.open) return
 		ensureMaps()
-		render()
+		renderMapping()
 	})
 
 	window.addEventListener("resize", resizeMapping)
