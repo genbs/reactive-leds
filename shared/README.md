@@ -32,7 +32,7 @@ Every packet starts with two bytes:
 | `SET_LEDS`    | 3     | request only       | Update LED colors (no response)                                                                    |
 | `RESET_WIFI`  | 4     | request/response   | Clear saved WiFi credentials (device replies OK, then reboots)                                     |
 | `GET_VERSION` | 5     | request/response   | Read firmware version (from `PROJECT_VER` / `git describe`)                                       |
-| `GET_STATUS`  | 6     | request/response   | Read device status (uptime, free heap, WiFi RSSI)                                                  |
+| `GET_STATUS`  | 6     | request/response   | Read device status (uptime, free heap, WiFi RSSI, WiFi STA MAC)                                    |
 
 ### Example (PING)
 
@@ -55,7 +55,7 @@ The same pattern applies to every request/response type: send `[id, type, ...dat
 | `SET_LEDS`    | 7–82 B (2 + N×5, N = 1..num_leds, 16 by default) | — (no response)            |
 | `RESET_WIFI`  | 2 B (fixed)                          | 3 B (fixed)                             |
 | `GET_VERSION` | 2 B (fixed)                          | 2–34 B (header + version string 0–32 B) |
-| `GET_STATUS`  | 2 B (fixed)                          | 11 B (fixed)                            |
+| `GET_STATUS`  | 2 B (fixed)                          | 11 B legacy / 17 B with MAC             |
 
 ### SET_LEDS format
 
@@ -132,9 +132,9 @@ The protocol itself is not covered by a license — the byte layout above is suf
 
 ## Versioning
 
-The protocol grows by addition, never by modification: a new behavior is a new `PacketType`. An older firmware simply ignores types it does not know, so a newer client does not crash it — it degrades gracefully. `GET_VERSION` and `GET_STATUS` were added this way, without breaking a single line of what came before.
+The protocol grows by addition: a new behavior is a new `PacketType`, and existing responses may only grow by appending optional trailing fields. An older firmware simply ignores types it does not know, so a newer client does not crash it — it degrades gracefully. `GET_VERSION` and `GET_STATUS` were added this way, without breaking a single line of what came before.
 
-The golden rule: do not change the byte layout of an existing `PacketType` without updating every package that uses it (firmware, CLI, client).
+The golden rule: do not reorder or reinterpret existing bytes without updating every package that uses them (firmware, CLI, client).
 
 ## Links
 
