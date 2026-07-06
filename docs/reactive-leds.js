@@ -26,7 +26,11 @@ function bufferToStatus(buffer) {
   const uptime = (buffer[0] << 24 | buffer[1] << 16 | buffer[2] << 8 | buffer[3]) >>> 0;
   const heap = (buffer[4] << 24 | buffer[5] << 16 | buffer[6] << 8 | buffer[7]) >>> 0;
   const rssi = buffer[8] << 24 >> 24;
-  return { uptime, heap, rssi };
+  const status = { uptime, heap, rssi };
+  if (buffer.length >= 15) {
+    status.mac = Array.from(buffer.subarray(9, 15), (byte) => byte.toString(16).padStart(2, "0").toUpperCase()).join(":");
+  }
+  return status;
 }
 function addressToBuffer(ip, port) {
   const buffer = new Uint8Array(6);

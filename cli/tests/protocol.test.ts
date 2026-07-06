@@ -227,16 +227,17 @@ describe("Protocol", () => {
 			const promise = proto.getStatus("10.0.0.1", 4210)
 			await new Promise(resolve => setImmediate(resolve))
 
-			// [reqId, GET_STATUS, uptime(4), heap(4), rssi(1)]
+			// [reqId, GET_STATUS, uptime(4), heap(4), rssi(1), mac(6)]
 			respondWith([
 				lastRequestId(), PacketType.GET_STATUS,
 				0, 0, 0, 100,  // uptime = 100
 				0, 0x01, 0, 0, // heap = 65536
 				-42 & 0xff,     // rssi = -42
+				0xa0, 0x85, 0xe3, 0xe0, 0x9f, 0x54,
 			])
 
 			const status = await promise
-			expect(status).toEqual({ uptime: 100, heap: 65536, rssi: -42 })
+			expect(status).toEqual({ uptime: 100, heap: 65536, rssi: -42, mac: "A0:85:E3:E0:9F:54" })
 		})
 
 		test("returns null on timeout", async () => {

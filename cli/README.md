@@ -42,7 +42,7 @@ rleds <command>
 - `leds <host> [port] <leds_package>` - send LED updates. The package is a comma-separated list of values in groups of 5: `<led_index>,<r>,<g>,<b>,<w>` (w = white/brightness). Multiple LEDs can be chained: `0,255,0,0,0,1,0,128,128,0`. Each value between 0 and 255. Requires an explicit `host`.
 - `bt-scan` - scan devices over Bluetooth.
 - `bt-credential [indexOrHost] [ssid]` - send WiFi credentials over Bluetooth. If `indexOrHost` is omitted, runs in interactive mode: shows the list of found devices and asks which to select (by numeric index or name). If `ssid` is omitted, it is prompted (password is always prompted, hidden). If `indexOrHost` is a number, it is used as an index into the `bt-scan` list (1-based).
-- `proxy [host] [port] [device_port]` - start the WebSocket proxy between browser clients and the firmware. Scans the LAN every 10 seconds and shows discovered devices in realtime — IP and hostname.
+- `proxy [host] [port] [device_port]` - start the WebSocket proxy between browser clients and the firmware. Scans the LAN every 10 seconds and shows discovered devices in realtime — IP, hostname, and firmware-reported MAC when available.
 - `rainbow [seconds] [speed] [host] [port]` - scroll a rainbow across the strip. If `host` is omitted, the effect is sent to every discovered device.
 - `color [r] [g] [b] [w] [host] [port]` - set all LEDs to a solid color. If `r g b` are omitted, a random color is used. If `host` is omitted, targets every discovered device.
 - `off [host] [port]` - turn off all LEDs. If `host` is omitted, applies to every discovered device. Convenience alias for `color 0 0 0 0`.
@@ -82,7 +82,7 @@ The proxy scans the LAN every 10 seconds and updates the device list in realtime
 $ rleds proxy
 Proxy: ws://0.0.0.0:8000  devices: 1
 
-  esp32-X (192.168.X.X:4210)
+  esp32-X (192.168.X.X:4210) AA:BB:CC:DD:EE:FF
 ```
 
 ## Troubleshooting

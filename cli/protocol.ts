@@ -154,7 +154,7 @@ class Protocol {
 		const response = await this.sendSync(ip, port, PacketType.GET_STATUS, null, Protocol.GET_STATUS_TIMEOUT)
 		if (!response || response.length < 11) return null
 
-		return bufferToStatus(response.slice(2))
+		return bufferToStatus(response.subarray(2))
 	}
 
 	/**

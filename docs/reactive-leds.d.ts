@@ -26,11 +26,12 @@ export type IP = string | [
 	number,
 	number
 ];
-/** Device status: uptime, free heap, WiFi RSSI. Serialized as: [uptime(4), heap(4), rssi(1)] */
+/** Device status. Serialized as: [uptime(4), heap(4), rssi(1), mac?(6)] */
 export type Status = {
 	uptime: number;
 	heap: number;
 	rssi: number;
+	mac?: string;
 };
 /**
  * Canvas-to-LED sampling.

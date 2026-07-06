@@ -74,6 +74,23 @@ describe("Status", () => {
 		expect(status.uptime).toBe(1234)
 		expect(status.heap).toBe(65536)
 		expect(status.rssi).toBe(-42)
+		expect(status.mac).toBeUndefined()
+	})
+
+	test("bufferToStatus with MAC", () => {
+		const buffer = new Uint8Array([
+			0, 0, 0, 100,
+			0, 0x01, 0, 0,
+			-42 & 0xff,
+			0xa0, 0x85, 0xe3, 0xe0, 0x9f, 0x54,
+		])
+
+		expect(bufferToStatus(buffer)).toEqual({
+			uptime: 100,
+			heap: 65536,
+			rssi: -42,
+			mac: "A0:85:E3:E0:9F:54",
+		})
 	})
 
 	test("bufferToStatus with zero values", () => {
@@ -96,9 +113,9 @@ describe("Status", () => {
 
 	test("statusToBuffer round-trips through bufferToStatus (incl. negative RSSI)", () => {
 		// RSSI is always negative in practice — the int8 sign handling is the risky bit.
-		const status = { uptime: 987654, heap: 1_500_000, rssi: -73 }
+		const status = { uptime: 987654, heap: 1_500_000, rssi: -73, mac: "A0:85:E3:E0:9F:54" }
 		const buffer = statusToBuffer(status)
-		expect(buffer.length).toBe(9)
+		expect(buffer.length).toBe(15)
 		expect(buffer[8]).toBe(-73 & 0xff) // 0xB7
 		expect(bufferToStatus(buffer)).toEqual(status)
 	})
@@ -228,5 +245,4 @@ describe("PacketType", () => {
 		expect(PacketType.GET_STATUS).toBe(6)
 	})
 })
-
 

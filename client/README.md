@@ -81,7 +81,7 @@ if (device) {
 
 ```ts
 const status = await leds.getStatus("192.168.X.Y")
-// { uptime: 3600, heap: 180000, rssi: -62 }
+// { uptime: 3600, heap: 180000, rssi: -62, mac: "A0:85:E3:E0:9F:54" }
 ```
 
 ### LED control

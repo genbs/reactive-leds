@@ -196,9 +196,9 @@ echo -n -e '\x01\x00' | nc -u -w1 192.168.x.x 4210 | xxd
 # GET_CONFIG (type 1): read pin, num_leds, port, hostname
 echo -n -e '\x01\x01' | nc -u -w1 192.168.x.x 4210 | xxd
 
-# GET_STATUS (type 6): uptime, free heap, WiFi RSSI
+# GET_STATUS (type 6): uptime, free heap, WiFi RSSI, WiFi STA MAC
 echo -n -e '\x01\x06' | nc -u -w1 192.168.x.x 4210 | xxd
-# response: 11 bytes → id, type, uptime (4 B BE), heap (4 B BE), rssi (1 B, int8)
+# response: 17 bytes → id, type, uptime (4 B BE), heap (4 B BE), rssi (1 B, int8), mac (6 B)
 
 # SET_LEDS (type 3): turn LED 1 red — fire-and-forget, no response
 echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210

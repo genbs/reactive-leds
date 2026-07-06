@@ -278,8 +278,11 @@ function runBroadcastScan(port: number, timeoutMs = BROADCAST_SCAN_TIMEOUT): Pro
 
 			const devices = await Promise.all(
 				[...ips].sort().map(async ip => {
-					const config = await proto.getConfig(ip, port).catch(() => null)
-					return { ip, mac: UNKNOWN_MAC, port, config }
+					const [config, status] = await Promise.all([
+						proto.getConfig(ip, port).catch(() => null),
+						proto.getStatus(ip, port).catch(() => null),
+					])
+					return { ip, mac: status?.mac ?? UNKNOWN_MAC, port, config }
 				})
 			)
 			resolve(devices)

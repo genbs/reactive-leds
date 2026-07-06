@@ -35,7 +35,7 @@ function req(type: PacketType, data: number[] = []): Uint8Array {
 }
 
 const CONFIG: Config = { hostname: "esp-1", port: 4210, pin: 18, num_leds: 16 }
-const STATUS: Status = { uptime: 12345, heap: 200000, rssi: -67 }
+const STATUS: Status = { uptime: 12345, heap: 200000, rssi: -67, mac: "A0:85:E3:E0:9F:54" }
 
 beforeEach(() => {
 	jest.clearAllMocks()

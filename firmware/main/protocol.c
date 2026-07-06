@@ -260,9 +260,9 @@ static void protocol_get_version(const udp_packet* request)
 }
 
 /**
- * Reply with device status: uptime (4 bytes), free heap (4 bytes), RSSI (1 byte).
- * Wire format: [packet_id, GET_STATUS, uptime(32-bit big-endian), heap(32-bit big-endian), rssi(int8)]
- * Total payload: 9 bytes.
+ * Reply with device status: uptime (4 bytes), free heap (4 bytes), RSSI (1 byte), WiFi STA MAC (6 bytes).
+ * Wire format: [packet_id, GET_STATUS, uptime(32-bit big-endian), heap(32-bit big-endian), rssi(int8), mac(6)]
+ * Total response: 17 bytes.
  */
 static void protocol_get_status(const udp_packet* request)
 {
@@ -276,6 +276,8 @@ static void protocol_get_status(const udp_packet* request)
     if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
         rssi = ap_info.rssi;
     }
+    uint8_t mac[6] = {0};
+    esp_wifi_get_mac(ESP_IF_WIFI_STA, mac);
 
     udp_packet response;
     response.source_addr = request->source_addr;
@@ -290,7 +292,8 @@ static void protocol_get_status(const udp_packet* request)
     response.data[8] = (free_heap >> 8) & 0xFF;
     response.data[9] = free_heap & 0xFF;
     response.data[10] = *(uint8_t*)&rssi; // write int8 as raw byte
-    response.len = 11;
+    memcpy(&response.data[11], mac, sizeof(mac));
+    response.len = 17;
 
     udp_con_send(&response);
 }

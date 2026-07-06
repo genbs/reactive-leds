@@ -32,7 +32,7 @@ Ogni pacchetto inizia con due byte:
 | `SET_LEDS`    | 3      | solo richiesta     | Aggiorna i colori dei LED (nessuna risposta)                                                     |
 | `RESET_WIFI`  | 4      | richiesta/risposta | Cancella le credenziali WiFi salvate (il device risponde OK, poi si riavvia)                     |
 | `GET_VERSION` | 5      | richiesta/risposta | Legge la versione firmware (da `PROJECT_VER` / `git describe`)                                   |
-| `GET_STATUS`  | 6      | richiesta/risposta | Legge lo stato del device (uptime, heap libero, RSSI WiFi)                                       |
+| `GET_STATUS`  | 6      | richiesta/risposta | Legge lo stato del device (uptime, heap libero, RSSI WiFi, MAC WiFi STA)                         |
 
 ### Esempio (PING)
 
@@ -55,7 +55,7 @@ Lo stesso pattern vale per ogni tipo richiesta/risposta: invia `[id, type, ...da
 | `SET_LEDS`    | 7–82 B (2 + N×5, N = 1..num_leds, 16 di default) | — (nessuna risposta)      |
 | `RESET_WIFI`  | 2 B (fissa)                        | 3 B (fissa)                             |
 | `GET_VERSION` | 2 B (fissa)                        | 2–34 B (header + version string 0–32 B) |
-| `GET_STATUS`  | 2 B (fissa)                        | 11 B (fissa)                            |
+| `GET_STATUS`  | 2 B (fissa)                        | 11 B legacy / 17 B con MAC              |
 
 ### Formato SET_LEDS
 
@@ -132,9 +132,9 @@ Il protocollo in sé non è coperto da licenza — il byte layout sopra è suffi
 
 ## Versionamento
 
-Il protocollo cresce per aggiunta, mai per modifica: un comportamento nuovo è un `PacketType` nuovo. Un firmware vecchio semplicemente ignora i tipi che non conosce, così un client più recente non lo manda in crash — degrada con grazia. `GET_VERSION` e `GET_STATUS` sono nati così, senza rompere una riga di quello che c'era prima.
+Il protocollo cresce per aggiunta: un comportamento nuovo è un `PacketType` nuovo, e le risposte esistenti possono crescere solo aggiungendo campi opzionali in coda. Un firmware vecchio semplicemente ignora i tipi che non conosce, così un client più recente non lo manda in crash — degrada con grazia. `GET_VERSION` e `GET_STATUS` sono nati così, senza rompere una riga di quello che c'era prima.
 
-La regola d'oro: non cambiare il byte layout di un `PacketType` esistente senza aggiornare tutti i pacchetti che lo usano (firmware, CLI, client).
+La regola d'oro: non riordinare o reinterpretare byte esistenti senza aggiornare tutti i pacchetti che li usano (firmware, CLI, client).
 
 ## Link
 

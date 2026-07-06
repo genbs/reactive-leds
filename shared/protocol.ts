@@ -70,7 +70,7 @@ export function bufferToConfig(buffer: Uint8Array): Config {
 		pin: buffer[0],
 		num_leds: buffer[1],
 		port: (buffer[2] << 8) | buffer[3],
-		hostname: decodeBuffer(buffer.slice(4)).substring(0, 32),
+		hostname: decodeBuffer(buffer.subarray(4)).substring(0, 32),
 	}
 }
 
@@ -86,11 +86,12 @@ export function configToBuffer(config: Config): Uint8Array {
 	return packet
 }
 
-/** Device status: uptime, free heap, WiFi RSSI. Serialized as: [uptime(4), heap(4), rssi(1)] */
+/** Device status. Serialized as: [uptime(4), heap(4), rssi(1), mac?(6)] */
 export type Status = {
 	uptime: number // seconds since boot
 	heap: number // free heap bytes
 	rssi: number // WiFi RSSI in dBm (signed)
+	mac?: string // WiFi STA MAC, e.g. "AA:BB:CC:DD:EE:FF"
 }
 
 /** Convert a status buffer to a Status object */
@@ -104,12 +105,16 @@ export function bufferToStatus(buffer: Uint8Array): Status {
 		((buffer[4] << 24) | (buffer[5] << 16) | (buffer[6] << 8) | buffer[7]) >>> 0
 	const rssi = buffer[8] << 24 >> 24 // sign-extend int8
 
-	return { uptime, heap, rssi }
+	const status: Status = { uptime, heap, rssi }
+	if (buffer.length >= 15) {
+		status.mac = Array.from(buffer.subarray(9, 15), byte => byte.toString(16).padStart(2, "0").toUpperCase()).join(":")
+	}
+	return status
 }
 
-/** Convert a Status object to its 9-byte wire payload: [uptime(4 BE), heap(4 BE), rssi(1, int8)] */
+/** Convert a Status object to its wire payload: [uptime(4 BE), heap(4 BE), rssi(1, int8), mac?(6)] */
 export function statusToBuffer(status: Status): Uint8Array {
-	const buffer = new Uint8Array(9)
+	const buffer = new Uint8Array(status.mac ? 15 : 9)
 	buffer[0] = (status.uptime >>> 24) & 0xff
 	buffer[1] = (status.uptime >>> 16) & 0xff
 	buffer[2] = (status.uptime >>> 8) & 0xff
@@ -119,6 +124,16 @@ export function statusToBuffer(status: Status): Uint8Array {
 	buffer[6] = (status.heap >>> 8) & 0xff
 	buffer[7] = status.heap & 0xff
 	buffer[8] = status.rssi & 0xff // int8 written as a raw byte
+	if (status.mac) {
+		const parts = status.mac.split(":")
+		if (parts.length !== 6) throw new Error(`Invalid MAC: "${status.mac}"`)
+		for (let i = 0; i < 6; i++) {
+			if (!/^[0-9a-f]{1,2}$/i.test(parts[i])) throw new Error(`Invalid MAC: "${status.mac}"`)
+			const byte = Number.parseInt(parts[i], 16)
+			if (Number.isNaN(byte) || byte < 0 || byte > 255) throw new Error(`Invalid MAC: "${status.mac}"`)
+			buffer[9 + i] = byte
+		}
+	}
 	return buffer
 }
 
@@ -131,19 +146,21 @@ export function addressToBuffer(ip: IP, port: number): AddressBuffer {
 		if (parts.length !== 4) {
 			throw new Error(`Invalid IP: "${ip}"`)
 		}
-		const octets = parts.map(Number)
-		if (octets.some(o => isNaN(o) || o < 0 || o > 255)) {
-			throw new Error(`Invalid IP: "${ip}"`)
+		for (let i = 0; i < 4; i++) {
+			const octet = Number(parts[i])
+			if (isNaN(octet) || octet < 0 || octet > 255) {
+				throw new Error(`Invalid IP: "${ip}"`)
+			}
+			buffer[i] = octet
 		}
-		buffer[0] = octets[0]
-		buffer[1] = octets[1]
-		buffer[2] = octets[2]
-		buffer[3] = octets[3]
 	} else {
 		if (ip.length < 4) {
 			throw new Error(`IP array too short: ${ip.length} elements`)
 		}
-		buffer.set(ip.slice(0, 4), 0)
+		buffer[0] = ip[0]
+		buffer[1] = ip[1]
+		buffer[2] = ip[2]
+		buffer[3] = ip[3]
 	}
 
 	buffer[4] = (port >> 8) & 0xff

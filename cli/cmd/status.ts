@@ -34,7 +34,8 @@ export const statusCommand: Command = {
 			const uptimeStr = formatUptime(status.uptime)
 			const heapStr = formatHeap(status.heap)
 			const rssiStr = status.rssi === 0 ? "N/A" : `${status.rssi} dBm`
-			console.log(`${t.ip}:${t.port}  ${green("up")} ${uptimeStr}  heap ${heapStr}  rssi ${rssiStr}`)
+			const macStr = status.mac ? `  mac ${status.mac}` : ""
+			console.log(`${t.ip}:${t.port}  ${green("up")} ${uptimeStr}  heap ${heapStr}  rssi ${rssiStr}${macStr}`)
 		}
 
 		return anyOk
