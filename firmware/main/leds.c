@@ -25,6 +25,7 @@ static int s_tx_idx = 0;
 static int s_pending_idx = 1;
 static rmt_channel_handle_t s_led_chan = NULL;
 static rmt_encoder_handle_t s_led_encoder = NULL;
+static leds_stats_t s_stats = {0};
 
 
 bool leds_begin()
@@ -46,6 +47,7 @@ bool leds_begin()
     memset(s_led_buffers[1], 0, buffer_size);
     s_tx_idx = 0;
     s_pending_idx = 1;
+    s_stats = (leds_stats_t){0};
 
     
     // Configure RMT (credits: https://github.com/espressif/esp-idf/blob/master/examples/peripherals/rmt/led_strip/main/led_strip_example_main.c)
@@ -114,11 +116,10 @@ void leds_show()
         return;
     }
 
-    // Wait for the previous TX to finish before recycling its buffer.
-    // With ~200 us TX time and 16 ms between calls this returns instantly.
-    // On timeout, skip this frame instead of panic-rebooting: a dropped frame
-    // is invisible, a reboot mid-performance is not.
-    if (rmt_tx_wait_all_done(s_led_chan, pdMS_TO_TICKS(100)) != ESP_OK) {
+    // Realtime policy: if the previous TX is still busy, drop this frame
+    // instead of displaying it late.
+    if (rmt_tx_wait_all_done(s_led_chan, pdMS_TO_TICKS(1)) != ESP_OK) {
+        s_stats.dropped++;
         return;
     }
 
@@ -131,6 +132,12 @@ void leds_show()
 
     // Non-blocking: returns immediately, RMT runs in hardware via DMA.
     ESP_ERROR_CHECK(rmt_transmit(s_led_chan, s_led_encoder, s_led_buffers[s_tx_idx], config.num_leds * 4, &s_tx_config));
+    s_stats.shown++;
+}
+
+leds_stats_t leds_stats()
+{
+    return s_stats;
 }
 
 

@@ -29,19 +29,15 @@ Configuration is in [`sdkconfig.defaults`](./sdkconfig.defaults).
 ESP-IDF combines it with its own defaults to generate `sdkconfig` at build time:
 
 - `CONFIG_BT_BLE_42_FEATURES_SUPPORTED=y` — required by the BLE provisioning GATT server.
-- `CONFIG_LWIP_UDP_RECVMBOX_SIZE=6` — small UDP receive mailbox by design. Under overload the kernel drops new arrivals (drop-tail) instead of accumulating stale frames; delay is bounded to ~12 ms with a 2 ms poll. See "Design choices" for the rationale.
-- `CONFIG_LWIP_TCPIP_TASK_PRIO=1` — low TCP/IP priority so the protocol task (priority 5) can preempt it under load.
+- `CONFIG_LWIP_UDP_RECVMBOX_SIZE=6` — small UDP receive mailbox by design. Under overload the kernel drops new arrivals (drop-tail) instead of accumulating an unbounded backlog. See "Design choices" for the rationale.
+- `CONFIG_LWIP_LOCAL_HOSTNAME="esp32-X"` — initial hostname used before a saved runtime config overrides it.
 - `CONFIG_FREERTOS_HZ=1000` — 1 ms granularity for `vTaskDelay`. Load-bearing for the 2 ms protocol poll: at the 100 Hz default, `pdMS_TO_TICKS(2)` would round down to 0 ticks and busy-spin.
-- `CONFIG_RMT_ISR_IRAM_SAFE=y` — keeps the RMT interrupt in IRAM, so LED signal timing is not disturbed by flash accesses (cache misses). This matters for clean WS2812 waveforms.
-- `CONFIG_GDMA_ISR_IRAM_SAFE=y` — the LED strip drives RMT via DMA, so the GDMA interrupt must also stay in IRAM. Pairs with `CONFIG_RMT_ISR_IRAM_SAFE` to keep a transfer safe even if a flash-cache-disable window (e.g. an NVS write) overlaps it.
+- `CONFIG_RMT_ENCODER_FUNC_IN_IRAM=y`, `CONFIG_RMT_ISR_IRAM_SAFE=y`, `CONFIG_GDMA_ISR_IRAM_SAFE=y` — keep the RMT encoder, RMT interrupt and GDMA interrupt IRAM-safe. This keeps a transfer safe even if a flash-cache-disable window (e.g. an NVS write) overlaps it.
 - `CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y`, `CONFIG_FREERTOS_TIMER_TASK_AFFINITY_CPU0=y` — pin the WiFi/lwIP stack to core 0, leaving core 1 for the protocol/render task (`xTaskCreatePinnedToCore(..., 1)` in `main.c`). Keeps the realtime path isolated from the network stack.
 - `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y`, `CONFIG_COMPILER_OPTIMIZATION_PERF=y`, `CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y`, `CONFIG_ESP32S3_DATA_CACHE_64KB=y` — performance tuning (max clock, `-O2`, larger I-cache and D-cache) for the realtime path.
-- `CONFIG_LOG_DEFAULT_LEVEL_INFO=y` — default runtime log level is INFO. Only one-shot INFO events (boot, WiFi connect, provisioning, config writes) are printed at runtime.
-- `CONFIG_LOG_MAXIMUM_LEVEL_INFO=y` — compile-time log ceiling. Every per-packet/per-frame log (`SET_LEDS`, `PING`, …) is `ESP_LOGV` (verbose); with the maximum level capped at INFO, the compiler strips those calls entirely from the binary — the hot loop pays nothing, not even a branch. Raise both to VERBOSE (menuconfig → Log output) for per-packet debug traces.
 - Custom partition table (see [`partitions.csv`](./partitions.csv)).
-- Device defaults (`CONFIG_LED_PIN=18`, `CONFIG_NUM_LEDS=16`, `CONFIG_PORT=4210`, `CONFIG_LWIP_LOCAL_HOSTNAME="esp32-X"`).
 
-To change device-specific values, edit `sdkconfig.defaults` directly.
+Device-specific defaults (`LED_PIN=18`, `NUM_LEDS=16`, `PORT=4210`) live in [`main/Kconfig.projbuild`](./main/Kconfig.projbuild). Change them with `idf.py menuconfig` before building, or update each flashed device at runtime with `rleds config`.
 
 ### Device configuration
 
@@ -60,7 +56,7 @@ By default ESP-IDF derives it from `git describe --tags --long --dirty`, so just
 
 ### One build, many devices
 
-You only need to build once. The defaults in `sdkconfig.defaults` (`pin=18`, `num_leds=16`, `port=4210`) are a starting point — after flashing you can change any of them at runtime via `rleds config <host> <port> <key> <value>` without recompiling. The device reboots and picks up the new config from NVS.
+You only need to build once. The Kconfig defaults (`pin=18`, `num_leds=16`, `port=4210`) are a starting point — after flashing you can change any of them at runtime via `rleds config <host> <port> <key> <value>` without recompiling. The device reboots and picks up the new config from NVS.
 
 This means you can flash the same binary on all your devices and configure each one individually from the CLI.
 
@@ -109,7 +105,7 @@ The WS2812 protocol requires nanosecond-precise timing. Instead of generating th
 **UDP instead of TCP**
 LED updates travel over UDP. The goal is minimum latency: TCP's delivery guarantees introduce buffers and retransmissions that are counterproductive in a realtime context. A dropped frame is always better than a late frame.
 
-Under sustained load, the small UDP mailbox (`CONFIG_LWIP_UDP_RECVMBOX_SIZE = 6`) bounds delay: when the queue is full the kernel drops new arrivals (drop-tail), so the firmware processes packets in arrival order with a maximum delay of ~12 ms from the present (6 slots × 2 ms poll). Tested empirically, this feels smoother than draining the queue and showing only the last frame (intermediate frames would be lost and animations appear choppy).
+Under sustained load, the small UDP mailbox (`CONFIG_LWIP_UDP_RECVMBOX_SIZE = 6`) limits queued work: when the queue is full the kernel drops new arrivals (drop-tail), so the firmware keeps processing packets in arrival order instead of building a long backlog. Tested empirically, this feels smoother than draining the queue and showing only the last frame (intermediate frames would be lost and animations appear choppy).
 
 **WiFi tuned for a stationary device**
 The device never moves, so 802.11k/v roaming is disabled (`rm_enabled = 0`, `btm_enabled = 0` in `wifi.c`) and association uses `WIFI_FAST_SCAN`. The periodic background channel scans that roaming triggers briefly interrupt UDP reception — visible as a stutter in the animation. Disabling them removed the periodic hiccups; the residual random stutter is an intrinsic WiFi limit, not something further config tweaks fix.
@@ -196,9 +192,12 @@ echo -n -e '\x01\x00' | nc -u -w1 192.168.x.x 4210 | xxd
 # GET_CONFIG (type 1): read pin, num_leds, port, hostname
 echo -n -e '\x01\x01' | nc -u -w1 192.168.x.x 4210 | xxd
 
-# GET_STATUS (type 6): uptime, free heap, WiFi RSSI, WiFi STA MAC
+# GET_INFO (type 5): IP, port, MAC, firmware version, hostname
+echo -n -e '\x01\x05' | nc -u -w1 192.168.x.x 4210 | xxd
+
+# GET_STATUS (type 6): uptime, heap/RSSI, memory and frame metrics
 echo -n -e '\x01\x06' | nc -u -w1 192.168.x.x 4210 | xxd
-# response: 17 bytes → id, type, uptime (4 B BE), heap (4 B BE), rssi (1 B, int8), mac (6 B)
+# response: 11 bytes base, 43 bytes when extended metrics are present
 
 # SET_LEDS (type 3): turn LED 1 red — fire-and-forget, no response
 echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210

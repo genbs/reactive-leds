@@ -1,4 +1,4 @@
-import { Config, PacketStatus, PacketType } from "@reactive-leds/shared"
+import { Config, DeviceInfo, PacketStatus, PacketType } from "@reactive-leds/shared"
 import dgram from "dgram"
 import fs from "fs"
 import os from "os"
@@ -6,7 +6,7 @@ import path from "path"
 
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { debug, fail, green, ok, validateHost, validatePort } from "../utils"
+import { debug, fail, green, ok, validateDevicePort, validateHost } from "../utils"
 
 ////////////////////// Commands
 
@@ -14,7 +14,7 @@ export const scanCommand: Command = {
 	name: "scan",
 	description: "Scan for available devices over Wi-Fi via UDP broadcast (results cached for 5 minutes).",
 	args: [
-		{ name: "port", type: Number, required: false, default: 4210, validator: validatePort },
+		{ name: "port", type: Number, required: false, default: 4210, validator: validateDevicePort },
 		{ name: "timeout", type: Number, required: false, default: 1500 },
 	],
 	execute: async (port: number, timeout: number) => {
@@ -34,7 +34,7 @@ export const pingCommand: Command = {
 	description: "Ping a device over Wi-Fi. If <host> is omitted, every device discovered on the network is pinged.",
 	args: [
 		{ name: "host", required: false, validator: validateHost },
-		{ name: "port", type: Number, required: false, default: 4210, validator: validatePort },
+		{ name: "port", type: Number, required: false, default: 4210, validator: validateDevicePort },
 	],
 	execute: async (host: string | undefined, port: number) => {
 		const targets = await resolveTargets(host, port)
@@ -53,7 +53,7 @@ export const resetWifiCommand: Command = {
 	description: "Reset the Wi-Fi credentials on a device. If <host> is omitted, every discovered device is reset.",
 	args: [
 		{ name: "host", required: false, validator: validateHost },
-		{ name: "port", type: Number, required: false, default: 4210, validator: validatePort },
+		{ name: "port", type: Number, required: false, default: 4210, validator: validateDevicePort },
 	],
 	execute: async (host: string | undefined, port: number) => {
 		const targets = await resolveTargets(host, port)
@@ -71,9 +71,8 @@ export const resetWifiCommand: Command = {
 
 export type ScanResult = {
 	ip: string
-	/** Device MAC when the firmware exposes one. Never use ARP as identity. */
-	mac: string
 	port: number
+	info: DeviceInfo | null
 	/** Device configuration as returned by GET_CONFIG, or `null` if the device
 	 *  was reachable but didn't respond to the config query in time. Cached so
 	 *  consumers (color, rainbow, …) don't have to re-fetch it before each send. */
@@ -92,16 +91,17 @@ const CACHE_MAX_MINUTES = 5
 const BROADCAST_ADDRESS = "255.255.255.255"
 const BROADCAST_SCAN_TIMEOUT = 1200
 const BROADCAST_SCAN_ROUNDS = 3
-const UNKNOWN_MAC = "unknown"
 
 /** Pretty one-line representation of a device. Hostname (from config) is
  *  shown first when available — it's the physical label the user wrote on
  *  the case's tape and is much more memorable than the IP. */
 export function formatDevice(d: ScanResult, showPort: boolean = true): string {
 	const addr = d.ip + (showPort ? `:${d.port}` : "")
-	const head = d.config?.hostname ? `${d.config.hostname} (${addr})` : addr
-	if (!d.mac || d.mac === UNKNOWN_MAC) return green(head)
-	return `${green(head)} ${d.mac}`
+	const hostname = d.info?.hostname || d.config?.hostname
+	const mac = d.info?.mac
+	const head = hostname ? `${hostname} (${addr})` : addr
+	if (!mac) return green(head)
+	return `${green(head)} ${mac}`
 }
 
 /** Delete the on-disk scan cache. Used by `clear-cache` and after SET_CONFIG. */
@@ -220,8 +220,8 @@ function readCache(maxMinutes: number): ScanResult[] | null {
 		if (!Array.isArray(data) || data.length === 0) return null
 		// pre-rename cache files carry `address` instead of `ip` — treat them as stale
 		if (data.some(d => !d.ip)) return null
-		// pre-broadcast cache files used ARP MACs, which are not reliable device IDs.
-		if (data.some(d => d.mac && d.mac !== UNKNOWN_MAC)) return null
+		// pre-GET_INFO cache files may carry ARP/status MACs or no info; refresh them.
+		if (data.some(d => !("info" in d))) return null
 
 		// Bump mtime to "now" on every hit: the cache TTL becomes "time since last
 		// access" instead of "time since written", so calling scan every minute keeps
@@ -278,11 +278,11 @@ function runBroadcastScan(port: number, timeoutMs = BROADCAST_SCAN_TIMEOUT): Pro
 
 			const devices = await Promise.all(
 				[...ips].sort().map(async ip => {
-					const [config, status] = await Promise.all([
+					const [config, info] = await Promise.all([
 						proto.getConfig(ip, port).catch(() => null),
-						proto.getStatus(ip, port).catch(() => null),
+						proto.getInfo(ip, port).catch(() => null),
 					])
-					return { ip, mac: status?.mac ?? UNKNOWN_MAC, port, config }
+					return { ip, port: info?.port ?? port, info, config }
 				})
 			)
 			resolve(devices)

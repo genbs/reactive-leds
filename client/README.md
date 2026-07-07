@@ -80,8 +80,13 @@ if (device) {
 ### Device status
 
 ```ts
+const info = await leds.getInfo("192.168.X.Y")
+// { ip: "192.168.X.Y", port: 4210, mac: "A0:85:E3:E0:9F:54", version: "v0.1.0", hostname: "esp32-7" }
+
 const status = await leds.getStatus("192.168.X.Y")
-// { uptime: 3600, heap: 180000, rssi: -62, mac: "A0:85:E3:E0:9F:54" }
+// { uptime: 3600, heap: 180000, rssi: -62 }
+// Newer firmware may also include memory and frame counters:
+// { internalHeap, largestHeapBlock, minHeap, framesReceived, framesShown, framesDropped, udpPacketsRead, protocolLoopMaxGapMs }
 ```
 
 ### LED control
@@ -145,7 +150,7 @@ See [`cli/README.md`](../cli/README.md) for the full provisioning flow.
 
 ## Going beyond the API
 
-The client exposes the most common operations. For the packet types the API doesn't wrap (e.g. `SET_CONFIG`, `RESET_WIFI`, `GET_VERSION`) there are `sendRaw` and `sendRawSync`, which accept any `PacketType`:
+The client exposes the most common operations. For the packet types the API doesn't wrap (e.g. `SET_CONFIG`, `RESET_WIFI`) there are `sendRaw` and `sendRawSync`, which accept any `PacketType`:
 
 ```ts
 import leds, { PacketType } from "@reactive-leds/client"

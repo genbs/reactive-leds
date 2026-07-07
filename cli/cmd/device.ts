@@ -1,7 +1,7 @@
 import { availableConfigKeys } from "@reactive-leds/shared"
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { fail, ok, validateHost, validatePort } from "../utils"
+import { fail, ok, validateDevicePort, validateHost } from "../utils"
 import { clearScanCache, resolveTargets } from "./wifi"
 
 export const configCommand: Command = {
@@ -14,7 +14,7 @@ export const configCommand: Command = {
 
 	args: [
 		{ required: true, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, validator: validatePort, default: 4210 },
+		{ required: false, name: "port", type: Number, validator: validateDevicePort, default: 4210 },
 		{ required: false, name: "key", type: String, validator: validateConfigKey },
 		{ required: false, name: "value", type: String, validator: (value, args) => validateConfigValue(args[2], value) },
 	],
@@ -29,7 +29,7 @@ export const configCommand: Command = {
 		}
 		const config = target.config
 		if (typeof key !== "undefined" && typeof value !== "undefined") {
-			const result = await proto.setConfig(target.ip, target.port, { ...config, [key]: value })
+			const result = await proto.setConfig(target.ip, target.port, { ...config, [key]: configValue(key, value) })
 			if (!result) {
 				console.log(fail("Failed to update config"))
 				return false
@@ -55,7 +55,7 @@ export const ledsCommand: Command = {
 	examples: ["leds 192.168.1.100 4210 0,255,0,128,0,1,0,255,128,0"],
 	args: [
 		{ required: true, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, validator: validatePort, default: 4210 },
+		{ required: false, name: "port", type: Number, validator: validateDevicePort, default: 4210 },
 		{
 			required: true,
 			name: "leds_package",
@@ -91,17 +91,25 @@ function validateConfigValue(key: string, value: string): boolean | string {
 			if (value.length > 32) return `Invalid value for key "${key}". Length must be less than 32 characters.`
 			return true
 		case "port":
-			if (!validatePort(value)) return `Invalid value for key "${key}". Value must be a number.`
+			if (!validateDevicePort(value)) return `Invalid value for key "${key}". Value must be an integer between 1024 and 65535.`
 			return true
-		case "pin":
+		case "pin": {
+			const n = Number(value)
+			if (!Number.isInteger(n) || n < 0 || n > 49) return `Invalid value for key "${key}". Value must be an integer between 0 and 49.`
+			return true
+		}
 		case "num_leds": {
 			const n = Number(value)
-			if (isNaN(n)) return `Invalid value for key "${key}". Value must be a number.`
+			if (!Number.isInteger(n) || n < 1 || n > 255) return `Invalid value for key "${key}". Value must be an integer between 1 and 255.`
 			return true
 		}
 	}
 
 	return true
+}
+
+function configValue(key: string, value: string): string | number {
+	return key === "hostname" ? value : Number(value)
 }
 
 function validateLedsPackage(ledsPackage: string): boolean | string {

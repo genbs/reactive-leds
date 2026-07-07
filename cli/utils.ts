@@ -27,12 +27,13 @@ export function validateIP(ip: string) {
 }
 
 export function validatePort(port: string): boolean {
-	const portNumber = parseInt(port)
-	if (isNaN(portNumber) || portNumber < 0 || portNumber > 65535) {
-		return false
-	}
+	const portNumber = Number(port)
+	return Number.isInteger(portNumber) && portNumber >= 0 && portNumber <= 65535
+}
 
-	return true
+export function validateDevicePort(port: string): boolean {
+	const portNumber = Number(port)
+	return Number.isInteger(portNumber) && portNumber >= 1024 && portNumber <= 65535
 }
 
 /**

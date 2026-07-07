@@ -1,9 +1,10 @@
 import {
 	bufferToConfig,
+	bufferToDeviceInfo,
 	bufferToStatus,
 	Config,
 	configToBuffer,
-	decodeBuffer,
+	DeviceInfo,
 	EMPTY_PACKET_ID,
 	Packet,
 	PacketID,
@@ -22,7 +23,7 @@ class Protocol {
 	static PING_TIMEOUT = 1000
 	static GET_CONFIG_TIMEOUT = 3000
 	static SET_CONFIG_TIMEOUT = 3000
-	static GET_VERSION_TIMEOUT = 1000
+	static GET_INFO_TIMEOUT = 1000
 	static GET_STATUS_TIMEOUT = 2000
 
 	private socket?: dgram.Socket
@@ -123,6 +124,14 @@ class Protocol {
 	}
 
 	/**
+	 * SET_LEDS with an explicit packet id. Used by the benchmark command so the
+	 * firmware can count sequence gaps; normal fire-and-forget sends keep id 0.
+	 */
+	setLEDsFrame(ip: string, port: number, packetID: PacketID, data: Uint8Array): Promise<boolean> {
+		return this.sendPacket(ip, port, packetID, PacketType.SET_LEDS, data)
+	}
+
+	/**
 	 * Resets all the Wi-Fi credentials of the device.
 	 *
 	 * @returns
@@ -135,20 +144,20 @@ class Protocol {
 	}
 
 	/**
-	 * Get the firmware version string from the device.
+	 * Get device identity/info.
 	 *
-	 * @returns version string, or null if no response (offline or firmware too old to support GET_VERSION)
+	 * @returns device info, or null if no response
 	 */
-	async getVersion(ip: string, port: number): Promise<string | null> {
-		const response = await this.sendSync(ip, port, PacketType.GET_VERSION, null, Protocol.GET_VERSION_TIMEOUT)
-		if (!response || response.length < 2) return null
-		return decodeBuffer(response.slice(2))
+	async getInfo(ip: string, port: number): Promise<DeviceInfo | null> {
+		const response = await this.sendSync(ip, port, PacketType.GET_INFO, null, Protocol.GET_INFO_TIMEOUT)
+		if (!response || response.length < 16) return null
+		return bufferToDeviceInfo(response.subarray(2))
 	}
 
 	/**
-	 * Get device status: uptime, free heap, WiFi RSSI.
+	 * Get device status: uptime, heap, WiFi RSSI and optional metrics.
 	 *
-	 * @returns (Promise) null if no response, otherwise {uptime, heap, rssi}
+	 * @returns (Promise) null if no response, otherwise the parsed device status
 	 */
 	async getStatus(ip: string, port: number): Promise<Status | null> {
 		const response = await this.sendSync(ip, port, PacketType.GET_STATUS, null, Protocol.GET_STATUS_TIMEOUT)
@@ -163,10 +172,14 @@ class Protocol {
 	 * @param data any
 	 */
 	private send(ip: string, port: number, type: PacketType, data: Uint8Array): Promise<void> {
+		return this.sendPacket(ip, port, EMPTY_PACKET_ID, type, data).then(() => undefined)
+	}
+
+	private sendPacket(ip: string, port: number, packetID: PacketID, type: PacketType, data: Uint8Array): Promise<boolean> {
 		this.ensureSocket()
 
 		const message = new Uint8Array(1 + 1 + data.length)
-		message[0] = EMPTY_PACKET_ID
+		message[0] = packetID
 		message[1] = type
 		message.set(data, 2)
 
@@ -178,7 +191,7 @@ class Protocol {
 		return new Promise(resolve => {
 			this.socket!.send(message, 0, message.length, port, ip, err => {
 				if (err) debug("Request (not sync)", err)
-				resolve()
+				resolve(!err)
 			})
 		})
 	}

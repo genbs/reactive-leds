@@ -1,6 +1,6 @@
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { debug, ok, validateByte, validateHost, validatePort } from "../utils"
+import { debug, ok, validateByte, validateDevicePort, validateHost } from "../utils"
 import { resolveTargets } from "./wifi"
 
 const randomByte = () => Math.floor(Math.random() * 256)
@@ -16,7 +16,7 @@ export const colorCommand: Command = {
 		{ required: false, name: "b", type: Number, validator: validateByte },
 		{ required: false, name: "w", type: Number, validator: validateByte },
 		{ required: false, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, default: 4210, validator: validatePort },
+		{ required: false, name: "port", type: Number, default: 4210, validator: validateDevicePort },
 	],
 	execute: async (r: number | undefined, g: number | undefined, b: number | undefined, w: number, host: string | undefined, port: number) => {
 		if (r === undefined) { r = randomByte(); g = randomByte(); b = randomByte() }

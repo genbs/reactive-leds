@@ -1,6 +1,6 @@
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { ok, validateHost, validatePort } from "../utils"
+import { ok, validateDevicePort, validateHost } from "../utils"
 import { resolveTargets } from "./wifi"
 
 export const offCommand: Command = {
@@ -9,7 +9,7 @@ export const offCommand: Command = {
 	examples: ["off", "off 192.168.1.10"],
 	args: [
 		{ required: false, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, default: 4210, validator: validatePort },
+		{ required: false, name: "port", type: Number, default: 4210, validator: validateDevicePort },
 	],
 	execute: async (host: string | undefined, port: number) => {
 		const targets = await resolveTargets(host, port)

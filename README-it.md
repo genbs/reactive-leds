@@ -73,7 +73,7 @@ Questo è un piccolo monorepo. Ogni area principale ha la propria cartella e il 
 - [JST](https://it.aliexpress.com/item/1005005362711029.html) ([alternativa](https://it.aliexpress.com/item/1005004615616698.html)) seleziona la variante a 3 pin (VCC, GND, DATA)
 - Resistenza da 330 Ω in serie sulla linea dati LED
 
-Questi sono i materiali che ho usato, ma il progetto è adattabile a strisce e componenti simili. Assicurati solo di configurare correttamente il firmware per la tua striscia (ordine dei colori, numero di segmenti, ecc).
+Questi sono i materiali che ho usato, ma il progetto è adattabile a strisce e componenti simili. Assicurati solo di configurare correttamente il firmware per la tua striscia (ordine dei colori, numero di segmenti, ecc). I moduli ESP32-S3 con PSRAM vanno bene, ma la PSRAM non è necessaria per questo use case: il path realtime dei LED usa piccoli buffer in RAM interna.
 
 ## Stampa 3D
 
@@ -89,6 +89,23 @@ Per il profilo ho stampato 5 pezzi in PLA, ciascuno lungo 20 cm. Per la barra di
 - **Ordine dei colori**: la sequenza di byte RGB/WRGB dipende dall'IC della striscia. Il firmware è configurato per la striscia indicata nei Materiali. Strisce diverse potrebbero richiedere un ordine diverso (vedi `firmware/main/leds.c`).
 - **WiFi sleep disabilitato**: la modalità risparmio energetico della radio WiFi è disabilitata esplicitamente per evitare picchi di latenza e perdita di pacchetti durante gli aggiornamenti real-time.
 - **Credenziali WiFi in chiaro via BLE**: durante il provisioning le credenziali vengono inviate senza cifratura. Per un progetto personale la semplicità ha priorità, ma tienilo a mente se usi reti sensibili.
+
+## Diagnostica realtime
+
+Il firmware espone contatori runtime tramite `rleds status`, e la CLI include un piccolo comando di benchmark:
+
+```sh
+rleds benchmark 192.168.1.113 60 120
+```
+
+I campi più utili sono:
+
+- `set-leds`: frame LED validi ricevuti dal device divisi per i frame tentati dall'host.
+- `arrival-gaps`: tempi tra pacchetti `SET_LEDS` ricevuti. A 60 fps la maggior parte dovrebbe stare nel bucket `≤20ms`.
+- `seq-lost`: pacchetti che non sono arrivati al firmware, misurati usando l'id sequenziale del benchmark.
+- `rmt-drop-rate`: frame scartati perché il trasferimento RMT precedente era ancora occupato. A frame rate normali dovrebbe restare a `0.000%`.
+
+Su macOS, lo streaming realtime via WiFi può avere stutter a causa di AWDL (la rete peer-to-peer usata da AirDrop/Handoff/AirPlay). Una firma tipica è: molti gap `>100ms`, molti gap `≤5ms` subito dopo, e `seq-lost 0`: i pacchetti non sono stati persi, sono stati trattenuti e rilasciati a raffica lato sender. Per un test pulito usa Ethernet oppure disabilita temporaneamente AWDL con `sudo ifconfig awdl0 down`.
 
 ## Alimentazione e sicurezza
 

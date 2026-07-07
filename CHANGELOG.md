@@ -5,7 +5,7 @@
 First public release.
 
 ### shared
-- Binary UDP protocol: PING, GET_CONFIG, SET_CONFIG, SET_LEDS, RESET_WIFI, GET_VERSION, GET_STATUS
+- Binary UDP protocol: PING, GET_CONFIG, SET_CONFIG, SET_LEDS, RESET_WIFI, GET_INFO, GET_STATUS
 - TypeScript types and serialization helpers for all packet types
 - MIT license
 
@@ -14,7 +14,7 @@ First public release.
 - Non-blocking UDP loop (6 ms poll, drop-tail on overload)
 - WiFi provisioning via BLE (GATT, no pairing required)
 - Runtime config via SET_CONFIG (pin, num_leds, port, hostname)
-- GET_VERSION and GET_STATUS commands
+- GET_INFO and GET_STATUS commands
 - `sdkconfig.defaults` for reproducible builds
 - GPL-3.0 license
 

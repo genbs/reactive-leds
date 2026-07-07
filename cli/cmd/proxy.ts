@@ -1,22 +1,25 @@
-import { bufferToConfig, configToBuffer, encodeBuffer, PacketType, PacketTypeMap, statusToBuffer } from "@reactive-leds/shared"
+import { bufferToConfig, configToBuffer, deviceInfoToBuffer, PacketType, PacketTypeMap, statusToBuffer } from "@reactive-leds/shared"
 import { WebSocketServer } from "ws"
+import { AwdlMode, startAwdlGuard, validateAwdlMode } from "../awdl"
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { debug, validateHost, validatePort } from "../utils"
-import { formatDevice, scan } from "./wifi"
+import { debug, validateDevicePort, validateHost, validatePort } from "../utils"
+import { formatDevice, scan, ScanResult } from "./wifi"
 
 const SCAN_INTERVAL = 10_000
 
 export const proxyCommand: Command = {
 	name: "proxy",
 	description:
-		"Start the WebSocket proxy between browser clients and the firmware.\nScans the LAN every 10 seconds and shows discovered devices, updating live in the terminal.",
+		"Start the WebSocket proxy between browser clients and the firmware.\nScans the LAN every 10 seconds and shows discovered devices, updating live in the terminal.\nOn macOS it offers to disable AWDL (AirDrop/AirPlay) for the session, since it causes micro-lag when streaming over WiFi; awdl can be \"ask\" (default), \"off\" or \"keep\".",
+	examples: ["proxy", "proxy 0.0.0.0 8000 4210 off"],
 	args: [
 		{ required: false, name: "host", type: String, default: "0.0.0.0", validator: validateHost },
 		{ required: false, name: "port", type: Number, default: 8000, validator: validatePort },
-		{ required: false, name: "device_port", type: Number, default: 4210, validator: validatePort },
+		{ required: false, name: "device_port", type: Number, default: 4210, validator: validateDevicePort },
+		{ required: false, name: "awdl", type: String, default: "ask", validator: validateAwdlMode },
 	],
-	execute: async (host: string, port: number, devicePort: number) => proxy(host, port, devicePort),
+	execute: async (host: string, port: number, devicePort: number, awdl: string) => proxy(host, port, devicePort, awdl as AwdlMode),
 }
 
 /**
@@ -29,17 +32,42 @@ export const proxyCommand: Command = {
  * Exported so the dispatch can be unit-tested independently of the server.
  */
 export async function handleProxyMessage(payload: Uint8Array): Promise<Uint8Array | null> {
-	const requestId = payload[0]
+	const requestId = payload[0] ?? 0
+	const status = (ok: boolean) => new Uint8Array([requestId, ok ? 1 : 0])
+
+	if (payload.length < 8) {
+		console.warn(`Invalid proxy payload: ${payload.length} bytes`)
+		return status(false)
+	}
+
 	const ip = payload[1] + "." + payload[2] + "." + payload[3] + "." + payload[4]
 	const port = (payload[5] << 8) | payload[6]
 	const packetType = payload[7] as PacketType
-	const packet = payload.slice(8)
+	const packet = payload.subarray(8)
 
 	debug("proxy", `IP: ${ip}, Port: ${port}, Packet type: ${PacketTypeMap[packetType]}`)
 
+	if (!validateDevicePort(String(port))) {
+		console.warn(`Invalid proxy target port: ${port}`)
+		return status(false)
+	}
+
+	if (!(packetType in PacketTypeMap)) {
+		console.warn(`Unhandled packet type: ${packetType}`)
+		return status(false)
+	}
+
+	if (packetType === PacketType.SET_LEDS && (packet.length < 5 || packet.length % 5 !== 0)) {
+		console.warn(`Invalid SET_LEDS payload: ${packet.length} bytes`)
+		return null
+	}
+	if (packetType === PacketType.SET_CONFIG && packet.length < 4) {
+		console.warn(`Invalid SET_CONFIG payload: ${packet.length} bytes`)
+		return status(false)
+	}
+
 	// A fresh buffer per response — never share a module-level Uint8Array across
 	// concurrent in-flight messages.
-	const status = (ok: boolean) => new Uint8Array([requestId, ok ? 1 : 0])
 	const withPayload = (buf: Uint8Array) => {
 		const response = new Uint8Array(1 + buf.length)
 		response[0] = requestId
@@ -63,9 +91,9 @@ export async function handleProxyMessage(payload: Uint8Array): Promise<Uint8Arra
 			proto.setLEDs(ip, port, packet)
 			return null // fire-and-forget
 
-		case PacketType.GET_VERSION: {
-			const version = await proto.getVersion(ip, port)
-			return version ? withPayload(encodeBuffer(version)) : status(false)
+		case PacketType.GET_INFO: {
+			const info = await proto.getInfo(ip, port)
+			return info ? withPayload(deviceInfoToBuffer(info)) : status(false)
 		}
 
 		case PacketType.GET_STATUS: {
@@ -75,16 +103,15 @@ export async function handleProxyMessage(payload: Uint8Array): Promise<Uint8Arra
 
 		case PacketType.RESET_WIFI:
 			return status(await proto.resetWifi(ip, port))
-
-		default: {
-			console.warn(`Unhandled packet type: ${packetType}`)
-			return status(false)
-		}
 	}
 }
 
 
-export function proxy(host = "0.0.0.0", port = 8000, devicePort = 4210) {
+export async function proxy(host = "0.0.0.0", port = 8000, devicePort = 4210, awdl: AwdlMode = "ask") {
+	// Before taking over the terminal: the guard may prompt for confirmation
+	// and for the sudo password.
+	const awdlGuard = await startAwdlGuard(awdl)
+
 	return new Promise<void>(resolve => {
 		const wss = new WebSocketServer({ port, host, perMessageDeflate: false })
 
@@ -102,24 +129,34 @@ export function proxy(host = "0.0.0.0", port = 8000, devicePort = 4210) {
 		})
 
 		let scanTimer: ReturnType<typeof setInterval>
+		let rendering = false
 		async function render(initial = false) {
-			if (initial) process.stdout.write(`\x1b[H  Proxy: ws://${host}:${port}  ● scanning...\x1b[J`)
+			if (rendering) return
+			rendering = true
 
-			const devices = await scan(devicePort, { useCache: false, verbose: false })
-			const count = devices.length
+			try {
+				if (initial) process.stdout.write(`\x1b[H  Proxy: ws://${host}:${port}  ● scanning...\x1b[J`)
 
-			const lines = [
-				`  Proxy: ws://${host}:${port}  devices: ${count}   `,
-				"",
-				...devices.map(d => "  " + formatDevice(d))
-			]
+				const devices = await scan(devicePort, { useCache: false, verbose: false })
+				const statuses = await Promise.all(devices.map(d => proto.getStatus(d.ip, d.port).catch(() => null)))
+				const count = devices.length
 
-			process.stdout.write(`\x1b[H${lines.join("\n")}\x1b[J`)
+				const lines = [
+					`  Proxy: ws://${host}:${port}  devices: ${count}${awdlGuard ? "  awdl: off" : ""}   `,
+					"",
+					...devices.map((d, i) => "  " + formatProxyDevice(d, statuses[i]?.rssi))
+				]
+
+				process.stdout.write(`\x1b[H${lines.join("\n")}\x1b[J`)
+			} finally {
+				rendering = false
+			}
 		}
 
 		function shutdown() {
 			clearInterval(scanTimer)
 			process.stdout.write("\nShutting down proxy server...\n")
+			awdlGuard?.stop()
 			resolve()
 			wss.close(() => process.stdout.write("Proxy server closed\n"))
 		}
@@ -132,4 +169,9 @@ export function proxy(host = "0.0.0.0", port = 8000, devicePort = 4210) {
 			scanTimer = setInterval(render, SCAN_INTERVAL)
 		})
 	})
+}
+
+function formatProxyDevice(device: ScanResult, rssi?: number): string {
+	const rssiStr = rssi !== undefined && rssi !== 0 ? `  rssi ${rssi} dBm` : ""
+	return formatDevice(device) + rssiStr
 }

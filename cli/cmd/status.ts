@@ -1,6 +1,6 @@
 import type { Command } from "../cmd"
 import proto from "../protocol"
-import { fail, green, validateHost, validatePort } from "../utils"
+import { fail, green, validateDevicePort, validateHost } from "../utils"
 import { resolveTargets } from "./wifi"
 
 export const statusCommand: Command = {
@@ -12,7 +12,7 @@ export const statusCommand: Command = {
 
 	args: [
 		{ required: false, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, validator: validatePort, default: 4210 },
+		{ required: false, name: "port", type: Number, validator: validateDevicePort, default: 4210 },
 	],
 
 	execute: async (host?: string, port?: number) => {
@@ -34,8 +34,22 @@ export const statusCommand: Command = {
 			const uptimeStr = formatUptime(status.uptime)
 			const heapStr = formatHeap(status.heap)
 			const rssiStr = status.rssi === 0 ? "N/A" : `${status.rssi} dBm`
-			const macStr = status.mac ? `  mac ${status.mac}` : ""
-			console.log(`${t.ip}:${t.port}  ${green("up")} ${uptimeStr}  heap ${heapStr}  rssi ${rssiStr}${macStr}`)
+			console.log(`${t.ip}:${t.port}  ${green("up")} ${uptimeStr}  heap ${heapStr}  rssi ${rssiStr}`)
+			if (status.internalHeap !== undefined) {
+				console.log(`  mem internal ${formatHeap(status.internalHeap)}  largest ${formatHeap(status.largestHeapBlock ?? 0)}  min ${formatHeap(status.minHeap ?? 0)}`)
+			}
+			if (status.framesReceived !== undefined) {
+				console.log(`  frames recv ${status.framesReceived}  shown ${status.framesShown ?? 0}  dropped ${status.framesDropped ?? 0}`)
+			}
+			if (status.udpPacketsRead !== undefined) {
+				console.log(`  net udp-read ${status.udpPacketsRead}  loop-max-gap ${status.protocolLoopMaxGapMs ?? 0}ms`)
+			}
+			if (status.arrivalGapHist !== undefined) {
+				const maxGap = status.arrivalGapMaxMs ?? 0
+				const maxGapAge = maxGap > 0 ? ` (${formatUptime(status.arrivalGapMaxAgeS ?? 0)} ago)` : ""
+				console.log(`  gaps ${formatGapHist(status.arrivalGapHist)}  max ${maxGap}ms${maxGapAge}`)
+				console.log(`  link seq-lost ${status.seqLost ?? 0}  seq-reordered ${status.seqReordered ?? 0}  beacon-timeouts ${status.beaconTimeouts ?? 0}  disconnects ${status.wifiDisconnects ?? 0}`)
+			}
 		}
 
 		return anyOk
@@ -58,4 +72,9 @@ function formatHeap(bytes: number): string {
 		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 	}
 	return `${Math.round(bytes / 1024)} KB`
+}
+
+function formatGapHist(hist: number[]): string {
+	const labels = ["≤5ms", "≤10", "≤20", "≤50", "≤100", ">100"]
+	return hist.map((count, i) => `${labels[i]} ${count}`).join("  ")
 }

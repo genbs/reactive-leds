@@ -38,15 +38,16 @@ rleds <comando>
 - `scan [port] [timeout_ms]` - scopre dispositivi nella LAN tramite UDP broadcast. Ogni risultato include anche l'hostname del device (dalla sua config), così puoi associare l'IP all'etichetta che hai messo sul case. Il risultato è cacheato su disco (`/tmp/reactive-leds-scan.json` su macOS/Linux) per velocizzare i comandi successivi (invalidato dopo 5 minuti).
 - `ping [host] [port]` - verifica se un dispositivo è online. Se `host` è omesso, pinga tutti i device scoperti in rete.
 - `reset-wifi [host] [port]` - cancella le credenziali Wi-Fi. Se `host` è omesso, applica a tutti i device scoperti.
-- `config <host> [port] [key] [value]` - legge o aggiorna la configurazione del dispositivo. In lettura stampa chiavi e valori correnti. In scrittura riavvia il device (~5 s offline prima del recovery). Richiede `host` esplicito. Chiavi supportate: `hostname` (stringa, max 32 caratteri), `pin` (numero, GPIO del LED), `num_leds` (numero), `port` (numero, porta UDP).
+- `config <host> [port] [key] [value]` - legge o aggiorna la configurazione del dispositivo. In lettura stampa chiavi e valori correnti. In scrittura riavvia il device (~5 s offline prima del recovery). Richiede `host` esplicito. Chiavi supportate: `hostname` (stringa, max 32 caratteri), `pin` (GPIO `0..49`), `num_leds` (`1..255`), `port` (porta UDP `1024..65535`).
 - `leds <host> [port] <leds_package>` - invia aggiornamenti LED. Il pacchetto è una lista di valori separati da virgole in gruppi di 5: `<led_index>,<r>,<g>,<b>,<w>` (w = bianco/luminosità). Si possono controllare più LED concatenando gruppi: `0,255,0,0,0,1,0,128,128,0`. Ogni valore tra 0 e 255. Richiede `host` esplicito.
 - `bt-scan` - scansione dispositivi via Bluetooth.
 - `bt-credential [indexOrHost] [ssid]` - invia credenziali Wi-Fi via Bluetooth. Se `indexOrHost` è omesso, parte in modalità interattiva: mostra la lista dei dispositivi trovati e chiede quale selezionare (per indice numerico o nome). Se `ssid` è omesso, lo chiede al prompt (la password viene chiesta sempre, nascosta). Se `indexOrHost` è un numero, viene usato come indice della lista `bt-scan` (1-based).
-- `proxy [host] [port] [device_port]` - avvia il proxy WebSocket tra client browser e firmware. Scansiona la LAN ogni 10 secondi e mostra i device trovati in tempo reale — IP, hostname e MAC riportato dal firmware quando disponibile.
+- `proxy [host] [port] [device_port] [awdl]` - avvia il proxy WebSocket tra client browser e firmware. `port` è la porta locale del WebSocket; `device_port` è la porta UDP del firmware (`1024..65535`). Scansiona la LAN ogni 10 secondi e mostra i device trovati in tempo reale — IP, hostname, MAC riportato dal firmware e RSSI live quando disponibili. Su macOS, `awdl` controlla l'interfaccia AirDrop/AirPlay che causa micro-lag durante lo streaming (vedi Troubleshooting): `ask` (default: propone di disattivarla per la sessione), `off` (disattiva senza chiedere), `keep` (non la tocca).
+- `benchmark [host] [fps] [duration] [port]` - invia frame LED temporizzati e stampa contatori di consegna, jitter e drop. Se `host` è omesso, testa tutti i device scoperti. Default: `fps=60`, `duration=30`, `port=4210`.
 - `rainbow [seconds] [speed] [host] [port]` - effetto arcobaleno che scorre sulla strip. Se `host` è omesso, l'effetto va su tutti i device scoperti.
 - `color [r] [g] [b] [w] [host] [port]` - imposta un colore solido su tutti i LED. Se `r g b` sono omessi usa un colore casuale. Se `host` è omesso applica a tutti i device scoperti.
 - `off [host] [port]` - spegne tutti i LED. Se `host` è omesso applica a tutti i device scoperti. Alias di comodo per `color 0 0 0 0`.
-- `status [host] [port]` - legge lo stato del device (uptime, heap libero, RSSI WiFi). Se `host` è omesso, interroga tutti i device scoperti.
+- `status [host] [port]` - legge lo stato del device (uptime, heap, RSSI WiFi e metriche opzionali memoria/frame). Se `host` è omesso, interroga tutti i device scoperti.
 - `version [host] [port]` - legge la versione firmware (da `PROJECT_VER` / `git describe`). Se `host` è omesso, interroga tutti i device scoperti.
 - `clear-cache` - elimina la cache dello scan su disco (`/tmp/reactive-leds-scan.json`). Utile quando hai aggiunto/spostato un device, cambiato rete Wi-Fi, o vuoi semplicemente forzare una nuova discovery al prossimo comando. `config` con scrittura pulisce automaticamente la cache (visto che riavvia il device).
 
@@ -60,6 +61,7 @@ rleds leds 192.168.1.10 4210 0,255,0,0,0
 rleds bt-scan
 rleds bt-credential
 rleds proxy
+rleds benchmark 192.168.1.10 60 120
 rleds rainbow 10 1 192.168.1.10
 rleds color
 rleds color 255 0 0
@@ -82,7 +84,7 @@ Il proxy scansiona la LAN ogni 10 secondi e aggiorna la lista dei device in temp
 $ rleds proxy
 Proxy: ws://0.0.0.0:8000  devices: 1
 
-  esp32-X (192.168.X.X:4210) AA:BB:CC:DD:EE:FF
+  esp32-X (192.168.X.X:4210) AA:BB:CC:DD:EE:FF  rssi -55 dBm
 ```
 
 ## Troubleshooting
@@ -94,6 +96,14 @@ Sintomo: `rleds ping <ip>` riporta `offline` (con `DEBUG=1`: `send EHOSTUNREACH`
 Causa: la privacy **Rete locale** di macOS (Impostazioni di Sistema → Privacy e Sicurezza → Rete locale). Il controllo si applica solo ai binari di terze parti — i tool Apple come `nc` sono esenti, ed è per questo che continuano a funzionare. Node (e quindi `rleds`) viene bloccato, e il permesso è attribuito all'**app terminale** da cui lo lanci (iTerm, Terminal, …), quindi `node` non compare mai nella lista.
 
 Soluzione: attiva il toggle del tuo terminale in Privacy e Sicurezza → Rete locale. Se è già attivo (lo stato può corrompersi dopo un update di macOS), spegnilo e riaccendilo, poi riavvia completamente il terminale (Cmd+Q).
+
+### macOS: micro-lag periodici durante lo streaming via WiFi (AWDL)
+
+Sintomo: le animazioni LED scattano brevemente ogni pochi secondi anche con segnale forte e consegna ~100% dei pacchetti. `rleds benchmark <host>` mostra gap di arrivo a raffiche (bucket `arrival-gaps` >50ms popolati) con `seq-lost 0` — i frame arrivano in ritardo, non si perdono.
+
+Causa: **AWDL** (Apple Wireless Direct Link), l'interfaccia nascosta dietro AirDrop/AirPlay/Handoff. Ogni pochi secondi macOS sposta la radio WiFi su un altro canale per cercare dispositivi Apple vicini, trattenendo il traffico in uscita per 50-200ms. Misurato su questo progetto: disattivarla riduce i gap >100ms di ~90%.
+
+Soluzione: `rleds benchmark` e `rleds rainbow` avvisano quando AWDL è attiva; `rleds proxy` la rileva e propone di disattivarla per la sessione (chiede la password via `sudo`, la rispegne se macOS la riattiva, e la ripristina all'uscita). Alternative: collegare il Mac via Ethernet (la migliore), oppure spegnere AirDrop/Ricezione AirPlay/Handoff nelle Impostazioni di Sistema. Toggle manuale: `sudo ifconfig awdl0 down` (non sopravvive a sleep/riavvio).
 
 ## Flusso Provisioning BLE
 

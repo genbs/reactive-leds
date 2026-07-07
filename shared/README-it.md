@@ -31,8 +31,8 @@ Ogni pacchetto inizia con due byte:
 | `SET_CONFIG`  | 2      | richiesta/risposta | Scrive la configurazione del dispositivo (il device si riavvia in caso di successo — vedi sotto) |
 | `SET_LEDS`    | 3      | solo richiesta     | Aggiorna i colori dei LED (nessuna risposta)                                                     |
 | `RESET_WIFI`  | 4      | richiesta/risposta | Cancella le credenziali WiFi salvate (il device risponde OK, poi si riavvia)                     |
-| `GET_VERSION` | 5      | richiesta/risposta | Legge la versione firmware (da `PROJECT_VER` / `git describe`)                                   |
-| `GET_STATUS`  | 6      | richiesta/risposta | Legge lo stato del device (uptime, heap libero, RSSI WiFi, MAC WiFi STA)                         |
+| `GET_INFO`    | 5      | richiesta/risposta | Legge identita del device (IP, porta, MAC, hostname, versione firmware)                          |
+| `GET_STATUS`  | 6      | richiesta/risposta | Legge stato runtime (uptime, heap, RSSI WiFi, memoria e metriche frame)                          |
 
 ### Esempio (PING)
 
@@ -54,8 +54,8 @@ Lo stesso pattern vale per ogni tipo richiesta/risposta: invia `[id, type, ...da
 | `SET_CONFIG`  | 6–38 B (header + hostname 0–32 B)  | 3 B (`id, type, status`)                |
 | `SET_LEDS`    | 7–82 B (2 + N×5, N = 1..num_leds, 16 di default) | — (nessuna risposta)      |
 | `RESET_WIFI`  | 2 B (fissa)                        | 3 B (fissa)                             |
-| `GET_VERSION` | 2 B (fissa)                        | 2–34 B (header + version string 0–32 B) |
-| `GET_STATUS`  | 2 B (fissa)                        | 11 B legacy / 17 B con MAC              |
+| `GET_INFO`    | 2 B (fissa)                        | 16–78 B (identita + versione/hostname 0–32 B ciascuno) |
+| `GET_STATUS`  | 2 B (fissa)                        | 11 B base / 43 B con metriche           |
 
 ### Formato SET_LEDS
 
@@ -132,7 +132,7 @@ Il protocollo in sé non è coperto da licenza — il byte layout sopra è suffi
 
 ## Versionamento
 
-Il protocollo cresce per aggiunta: un comportamento nuovo è un `PacketType` nuovo, e le risposte esistenti possono crescere solo aggiungendo campi opzionali in coda. Un firmware vecchio semplicemente ignora i tipi che non conosce, così un client più recente non lo manda in crash — degrada con grazia. `GET_VERSION` e `GET_STATUS` sono nati così, senza rompere una riga di quello che c'era prima.
+Il protocollo cresce per aggiunta: un comportamento nuovo è un `PacketType` nuovo, e le risposte esistenti possono crescere solo aggiungendo campi opzionali in coda. Prima della prima release pubblica, una pulizia incompatibile resta accettabile quando rende il protocollo piu chiaro; `GET_INFO` ha sostituito il piu limitato `GET_VERSION` per questo motivo.
 
 La regola d'oro: non riordinare o reinterpretare byte esistenti senza aggiornare tutti i pacchetti che li usano (firmware, CLI, client).
 

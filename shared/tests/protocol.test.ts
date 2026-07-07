@@ -1,4 +1,4 @@
-import { addressToBuffer, bufferToConfig, bufferToStatus, configToBuffer, decodeBuffer, encodeBuffer, PacketType, statusToBuffer } from ".."
+import { addressToBuffer, bufferToConfig, bufferToDeviceInfo, bufferToStatus, configToBuffer, decodeBuffer, deviceInfoToBuffer, encodeBuffer, PacketType, statusToBuffer } from ".."
 
 describe("Config", () => {
 	test("configToBuffer", () => {
@@ -74,23 +74,6 @@ describe("Status", () => {
 		expect(status.uptime).toBe(1234)
 		expect(status.heap).toBe(65536)
 		expect(status.rssi).toBe(-42)
-		expect(status.mac).toBeUndefined()
-	})
-
-	test("bufferToStatus with MAC", () => {
-		const buffer = new Uint8Array([
-			0, 0, 0, 100,
-			0, 0x01, 0, 0,
-			-42 & 0xff,
-			0xa0, 0x85, 0xe3, 0xe0, 0x9f, 0x54,
-		])
-
-		expect(bufferToStatus(buffer)).toEqual({
-			uptime: 100,
-			heap: 65536,
-			rssi: -42,
-			mac: "A0:85:E3:E0:9F:54",
-		})
 	})
 
 	test("bufferToStatus with zero values", () => {
@@ -113,11 +96,81 @@ describe("Status", () => {
 
 	test("statusToBuffer round-trips through bufferToStatus (incl. negative RSSI)", () => {
 		// RSSI is always negative in practice — the int8 sign handling is the risky bit.
-		const status = { uptime: 987654, heap: 1_500_000, rssi: -73, mac: "A0:85:E3:E0:9F:54" }
+		const status = { uptime: 987654, heap: 1_500_000, rssi: -73 }
 		const buffer = statusToBuffer(status)
-		expect(buffer.length).toBe(15)
+		expect(buffer.length).toBe(9)
 		expect(buffer[8]).toBe(-73 & 0xff) // 0xB7
 		expect(bufferToStatus(buffer)).toEqual(status)
+	})
+
+	test("statusToBuffer round-trips extended metrics", () => {
+		const status = {
+			uptime: 987654,
+			heap: 180_000,
+			rssi: -55,
+			internalHeap: 170_000,
+			largestHeapBlock: 120_000,
+			minHeap: 160_000,
+			framesReceived: 3_600,
+			framesShown: 3_590,
+			framesDropped: 10,
+			udpPacketsRead: 3_700,
+			protocolLoopMaxGapMs: 4,
+		}
+		const buffer = statusToBuffer(status)
+		expect(buffer.length).toBe(41)
+		expect(bufferToStatus(buffer)).toEqual(status)
+	})
+
+	test("statusToBuffer round-trips arrival debug fields", () => {
+		const status = {
+			uptime: 987654,
+			heap: 180_000,
+			rssi: -55,
+			internalHeap: 170_000,
+			largestHeapBlock: 120_000,
+			minHeap: 160_000,
+			framesReceived: 3_600,
+			framesShown: 3_590,
+			framesDropped: 10,
+			udpPacketsRead: 3_700,
+			protocolLoopMaxGapMs: 4,
+			arrivalGapHist: [10, 3000, 500, 40, 6, 2],
+			arrivalGapMaxMs: 142,
+			arrivalGapMaxAgeS: 37,
+			seqLost: 12,
+			seqReordered: 1,
+			beaconTimeouts: 2,
+			wifiDisconnects: 0,
+		}
+		const buffer = statusToBuffer(status)
+		expect(buffer.length).toBe(89)
+		expect(bufferToStatus(buffer)).toEqual(status)
+	})
+})
+
+describe("DeviceInfo", () => {
+	test("deviceInfoToBuffer round-trips through bufferToDeviceInfo", () => {
+		const info = {
+			ip: "192.168.1.123",
+			port: 4210,
+			mac: "A0:85:E3:E0:9F:54",
+			version: "v0.1.0",
+			hostname: "esp32-7",
+		}
+		const buffer = deviceInfoToBuffer(info)
+		expect(bufferToDeviceInfo(buffer)).toEqual(info)
+	})
+
+	test("bufferToDeviceInfo rejects truncated variable fields", () => {
+		const buffer = deviceInfoToBuffer({
+			ip: "192.168.1.123",
+			port: 4210,
+			mac: "A0:85:E3:E0:9F:54",
+			version: "v0.1.0",
+			hostname: "esp32-7",
+		})
+		expect(() => bufferToDeviceInfo(buffer.subarray(0, buffer.length - 1))).toThrow()
 	})
 })
 
@@ -241,8 +294,7 @@ describe("PacketType", () => {
 		expect(PacketType.SET_CONFIG).toBe(2)
 		expect(PacketType.SET_LEDS).toBe(3)
 		expect(PacketType.RESET_WIFI).toBe(4)
-		expect(PacketType.GET_VERSION).toBe(5)
+		expect(PacketType.GET_INFO).toBe(5)
 		expect(PacketType.GET_STATUS).toBe(6)
 	})
 })
-

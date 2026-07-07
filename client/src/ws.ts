@@ -106,7 +106,7 @@ export default class WS {
 	}
 
 	public send(payload: string | Blob | BufferSource) {
-		if (!this.socket) {
+		if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
 			this.settings.debug && console.log("[WS] Send error, not connected, can't send message")
 			return
 		}

@@ -1,7 +1,8 @@
 import {
 	Config,
 	configToBuffer,
-	encodeBuffer,
+	deviceInfoToBuffer,
+	DeviceInfo,
 	PacketType,
 	Status,
 	statusToBuffer,
@@ -16,7 +17,7 @@ jest.mock("../protocol", () => ({
 		setConfig: jest.fn(),
 		setLEDs: jest.fn(),
 		resetWifi: jest.fn(),
-		getVersion: jest.fn(),
+		getInfo: jest.fn(),
 		getStatus: jest.fn(),
 	},
 }))
@@ -35,7 +36,8 @@ function req(type: PacketType, data: number[] = []): Uint8Array {
 }
 
 const CONFIG: Config = { hostname: "esp-1", port: 4210, pin: 18, num_leds: 16 }
-const STATUS: Status = { uptime: 12345, heap: 200000, rssi: -67, mac: "A0:85:E3:E0:9F:54" }
+const INFO: DeviceInfo = { ip: "192.168.1.10", port: 4210, mac: "A0:85:E3:E0:9F:54", version: "v0.1.0", hostname: "esp-1" }
+const STATUS: Status = { uptime: 12345, heap: 200000, rssi: -67 }
 
 beforeEach(() => {
 	jest.clearAllMocks()
@@ -75,10 +77,10 @@ describe("handleProxyMessage", () => {
 		expect(res).toBeNull()
 	})
 
-	test("GET_VERSION → [requestId, ...version]", async () => {
-		mock.getVersion.mockResolvedValue("v0.1.0")
-		const res = await handleProxyMessage(req(PacketType.GET_VERSION))
-		expect(Array.from(res!)).toEqual([REQ_ID, ...encodeBuffer("v0.1.0")])
+	test("GET_INFO → [requestId, ...info]", async () => {
+		mock.getInfo.mockResolvedValue(INFO)
+		const res = await handleProxyMessage(req(PacketType.GET_INFO))
+		expect(Array.from(res!)).toEqual([REQ_ID, ...deviceInfoToBuffer(INFO)])
 	})
 
 	test("GET_STATUS → [requestId, ...statusBuffer]", async () => {
@@ -101,7 +103,7 @@ describe("handleProxyMessage", () => {
 		mock.ping.mockResolvedValue(true)
 		mock.getConfig.mockResolvedValue(CONFIG)
 		mock.setConfig.mockResolvedValue(true)
-		mock.getVersion.mockResolvedValue("v0")
+		mock.getInfo.mockResolvedValue(INFO)
 		mock.getStatus.mockResolvedValue(STATUS)
 		mock.resetWifi.mockResolvedValue(true)
 
@@ -126,6 +128,32 @@ describe("handleProxyMessage", () => {
 		const res = await handleProxyMessage(req(99 as PacketType))
 		expect(warn).toHaveBeenCalled()
 		expect(Array.from(res!)).toEqual([REQ_ID, 0])
+		warn.mockRestore()
+	})
+
+	test("short payload returns failure status", async () => {
+		const warn = jest.spyOn(console, "warn").mockImplementation(() => {})
+		const res = await handleProxyMessage(new Uint8Array([REQ_ID]))
+		expect(warn).toHaveBeenCalled()
+		expect(Array.from(res!)).toEqual([REQ_ID, 0])
+		warn.mockRestore()
+	})
+
+	test("invalid target port returns failure status", async () => {
+		const warn = jest.spyOn(console, "warn").mockImplementation(() => {})
+		const res = await handleProxyMessage(new Uint8Array([REQ_ID, 192, 168, 1, 10, 0, 0, PacketType.PING]))
+		expect(warn).toHaveBeenCalled()
+		expect(mock.ping).not.toHaveBeenCalled()
+		expect(Array.from(res!)).toEqual([REQ_ID, 0])
+		warn.mockRestore()
+	})
+
+	test("invalid fire-and-forget payload is dropped", async () => {
+		const warn = jest.spyOn(console, "warn").mockImplementation(() => {})
+		const res = await handleProxyMessage(req(PacketType.SET_LEDS, [0, 255]))
+		expect(warn).toHaveBeenCalled()
+		expect(mock.setLEDs).not.toHaveBeenCalled()
+		expect(res).toBeNull()
 		warn.mockRestore()
 	})
 })

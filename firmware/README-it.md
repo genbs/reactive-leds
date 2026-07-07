@@ -29,19 +29,15 @@ La configurazione è presente in [`sdkconfig.defaults`](./sdkconfig.defaults).
 ESP-IDF la combina con i propri default per generare `sdkconfig` al build time:
 
 - `CONFIG_BT_BLE_42_FEATURES_SUPPORTED=y` — richiesto dal server GATT del BLE provisioning.
-- `CONFIG_LWIP_UDP_RECVMBOX_SIZE=6` — receive mailbox UDP piccola per design. Sotto sovraccarico il kernel droppa i nuovi arrivi (drop-tail) invece di accumulare frame vecchi; il ritardo è limitato a ~12 ms con poll a 2 ms. Vedi "Scelte progettuali" per il razionale.
-- `CONFIG_LWIP_TCPIP_TASK_PRIO=1` — priorità TCP/IP bassa così il protocol task (priorità 5) può interromperla sotto carico.
+- `CONFIG_LWIP_UDP_RECVMBOX_SIZE=6` — receive mailbox UDP piccola per design. Sotto sovraccarico il kernel droppa i nuovi arrivi (drop-tail) invece di accumulare una coda non limitata. Vedi "Scelte progettuali" per il razionale.
+- `CONFIG_LWIP_LOCAL_HOSTNAME="esp32-X"` — hostname iniziale usato prima che una config runtime salvata lo sovrascriva.
 - `CONFIG_FREERTOS_HZ=1000` — granularità 1 ms per `vTaskDelay`. Necessario per il poll del protocollo a 2 ms: col default a 100 Hz, `pdMS_TO_TICKS(2)` si arrotonderebbe a 0 tick e andrebbe in busy-spin.
-- `CONFIG_RMT_ISR_IRAM_SAFE=y` — tiene l'interrupt RMT in IRAM, così il timing del segnale LED non viene disturbato dagli accessi alla flash (cache miss). Conta per avere forme d'onda WS2812 pulite.
-- `CONFIG_GDMA_ISR_IRAM_SAFE=y` — la striscia LED pilota RMT via DMA, quindi anche l'interrupt GDMA deve restare in IRAM. Va in coppia con `CONFIG_RMT_ISR_IRAM_SAFE` per tenere al sicuro un transfer anche se una finestra flash-cache-disable (es. una scrittura NVS) lo sovrappone.
+- `CONFIG_RMT_ENCODER_FUNC_IN_IRAM=y`, `CONFIG_RMT_ISR_IRAM_SAFE=y`, `CONFIG_GDMA_ISR_IRAM_SAFE=y` — tengono IRAM-safe encoder RMT, interrupt RMT e interrupt GDMA. Questo protegge un transfer anche se una finestra flash-cache-disable (es. una scrittura NVS) lo sovrappone.
 - `CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y`, `CONFIG_FREERTOS_TIMER_TASK_AFFINITY_CPU0=y` — pinnano lo stack WiFi/lwIP sul core 0, lasciando il core 1 al task protocollo/render (`xTaskCreatePinnedToCore(..., 1)` in `main.c`). Isola il percorso realtime dallo stack di rete.
 - `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y`, `CONFIG_COMPILER_OPTIMIZATION_PERF=y`, `CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y`, `CONFIG_ESP32S3_DATA_CACHE_64KB=y` — tuning di performance (clock massimo, `-O2`, I-cache e D-cache più grandi) per il percorso realtime.
-- `CONFIG_LOG_DEFAULT_LEVEL_INFO=y` — log level di default a runtime è INFO. Vengono stampati solo gli eventi INFO one-shot (boot, connessione WiFi, provisioning, scritture di config).
-- `CONFIG_LOG_MAXIMUM_LEVEL_INFO=y` — tetto del log a compile-time. Ogni log per-pacchetto/per-frame (`SET_LEDS`, `PING`, …) è `ESP_LOGV` (verbose); con il livello massimo fissato a INFO il compilatore rimuove quelle chiamate completamente dal binario — il loop caldo non paga nulla, nemmeno un branch. Alza entrambe le opzioni a VERBOSE (menuconfig → Log output) per le tracce di debug per-pacchetto.
 - Partition table custom (vedi [`partitions.csv`](./partitions.csv)).
-- Default device (`CONFIG_LED_PIN=18`, `CONFIG_NUM_LEDS=16`, `CONFIG_PORT=4210`, `CONFIG_LWIP_LOCAL_HOSTNAME="esp32-X"`).
 
-Per cambiare valori device-specifici, modifica direttamente `sdkconfig.defaults`.
+I default device-specifici (`LED_PIN=18`, `NUM_LEDS=16`, `PORT=4210`) vivono in [`main/Kconfig.projbuild`](./main/Kconfig.projbuild). Cambiali con `idf.py menuconfig` prima della build, oppure aggiorna ogni device flashato a runtime con `rleds config`.
 
 ### Configurazione del device
 
@@ -60,7 +56,7 @@ Di default ESP-IDF la deriva da `git describe --tags --long --dirty`, quindi bas
 
 ### Una build, molti dispositivi
 
-Serve compilare una sola volta. I default in `sdkconfig.defaults` (`pin=18`, `num_leds=16`, `port=4210`) sono un punto di partenza — dopo il flash puoi cambiarli tutti a runtime con `rleds config <host> <port> <chiave> <valore>` senza ricompilare. Il device si riavvia e carica la nuova config da NVS.
+Serve compilare una sola volta. I default Kconfig (`pin=18`, `num_leds=16`, `port=4210`) sono un punto di partenza — dopo il flash puoi cambiarli tutti a runtime con `rleds config <host> <port> <chiave> <valore>` senza ricompilare. Il device si riavvia e carica la nuova config da NVS.
 
 Questo significa che puoi flashare lo stesso binario su tutti i tuoi device e configurarne ognuno singolarmente dalla CLI.
 
@@ -109,7 +105,7 @@ Il protocollo WS2812 richiede una temporizzazione precisa al nanosecondo. Invece
 **UDP invece di TCP**
 Gli aggiornamenti LED viaggiano su UDP. L'obiettivo è la latenza minima: le garanzie di consegna di TCP introdurrebbero buffer e ritrasmissioni che nel contesto real-time sono controproducenti. Un frame perso è sempre meglio di un frame in ritardo.
 
-Sotto carico sostenuto, la mailbox UDP piccola (`CONFIG_LWIP_UDP_RECVMBOX_SIZE = 6`) limita il ritardo: quando la coda è piena il kernel droppa i nuovi arrivi (drop-tail), così il firmware processa i pacchetti in ordine di arrivo con un ritardo massimo di ~12 ms rispetto al presente (6 slot × 2 ms di poll). Testato empiricamente, questo si percepisce come più fluido rispetto al drenare la coda e mostrare solo l'ultimo frame (i frame intermedi verrebbero persi e le animazioni risultano scattose).
+Sotto carico sostenuto, la mailbox UDP piccola (`CONFIG_LWIP_UDP_RECVMBOX_SIZE = 6`) limita il lavoro accodato: quando la coda è piena il kernel droppa i nuovi arrivi (drop-tail), così il firmware continua a processare i pacchetti in ordine di arrivo invece di accumulare una lunga backlog. Testato empiricamente, questo si percepisce come più fluido rispetto al drenare la coda e mostrare solo l'ultimo frame (i frame intermedi verrebbero persi e le animazioni risultano scattose).
 
 **WiFi tarato per un dispositivo fisso**
 Il dispositivo non si sposta mai, quindi il roaming 802.11k/v è disabilitato (`rm_enabled = 0`, `btm_enabled = 0` in `wifi.c`) e l'associazione usa `WIFI_FAST_SCAN`. Gli scan periodici di canale in background che il roaming innesca interrompono brevemente la ricezione UDP — visibile come uno stutter nell'animazione. Disabilitarli ha eliminato i singhiozzi periodici; lo stutter casuale residuo è un limite intrinseco del WiFi, non qualcosa che ulteriori tweak di config risolvono.
@@ -196,9 +192,12 @@ echo -n -e '\x01\x00' | nc -u -w1 192.168.x.x 4210 | xxd
 # GET_CONFIG (type 1): leggi pin, num_leds, porta, hostname
 echo -n -e '\x01\x01' | nc -u -w1 192.168.x.x 4210 | xxd
 
-# GET_STATUS (type 6): uptime, heap libero, RSSI Wi-Fi, MAC WiFi STA
+# GET_INFO (type 5): IP, porta, MAC, versione firmware, hostname
+echo -n -e '\x01\x05' | nc -u -w1 192.168.x.x 4210 | xxd
+
+# GET_STATUS (type 6): uptime, heap/RSSI, memoria e metriche frame
 echo -n -e '\x01\x06' | nc -u -w1 192.168.x.x 4210 | xxd
-# risposta: 17 byte → id, type, uptime (4 B BE), heap (4 B BE), rssi (1 B, int8), mac (6 B)
+# risposta: 11 byte base, 43 byte quando sono presenti le metriche estese
 
 # SET_LEDS (type 3): accendi il LED 1 di rosso — fire-and-forget, nessuna risposta
 echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210

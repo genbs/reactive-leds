@@ -5,12 +5,10 @@
 # --- Target hardware ---
 CONFIG_IDF_TARGET="esp32s3"
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
-CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
 
 # --- Partition table (see partitions.csv) ---
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
-CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
 
 # --- Bluetooth ---
 # BLE 4.2 features required for the provisioning GATT server.
@@ -18,12 +16,10 @@ CONFIG_BT_ENABLED=y
 CONFIG_BT_BLE_42_FEATURES_SUPPORTED=y
 
 # --- lwIP / UDP ---
-# Small UDP receive mailbox (6 slots). When full the kernel drops new arrivals
-# (drop-tail), so recvfrom always returns the FRESHEST frame — minimal latency,
-# which is what a 60 fps real-time animation wants. A larger mailbox would only
-# buffer stale frames to be shown late.
+# Small UDP receive mailbox. When full, lwIP drops new arrivals (drop-tail).
+# Keeping this queue small limits backlog/staleness for realtime animation;
+# it does not guarantee that the newest frame is kept.
 CONFIG_LWIP_UDP_RECVMBOX_SIZE=6
-CONFIG_LWIP_TCPIP_TASK_PRIO=1
 CONFIG_LWIP_LOCAL_HOSTNAME="esp32-X"
 
 # --- FreeRTOS ---
@@ -31,24 +27,11 @@ CONFIG_LWIP_LOCAL_HOSTNAME="esp32-X"
 # responsiveness of the 2 ms protocol polling loop.
 CONFIG_FREERTOS_HZ=1000
 
-# --- Device configuration (overridable via menuconfig "Device configuration") ---
-CONFIG_LED_PIN=18
-CONFIG_NUM_LEDS=16
-CONFIG_PORT=4210
-
-# --- Production (performance-first) ---
-# INFO default. Safe for the realtime path: every per-packet/per-frame log
-# (protocol.c SET_LEDS, PING, etc.) is ESP_LOGV (verbose), which stays above
-# INFO and is compiled out — so the hot loop pays nothing. Only one-shot INFO
-# events (boot, WiFi connect, provisioning, config writes) are emitted.
-CONFIG_LOG_DEFAULT_LEVEL_INFO=y
-CONFIG_LOG_DEFAULT_LEVEL=3
-CONFIG_LOG_MAXIMUM_LEVEL_INFO=y
-CONFIG_LOG_MAXIMUM_LEVEL=3
-CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
-CONFIG_BOOTLOADER_LOG_LEVEL=2
-CONFIG_BOOTLOADER_COMPILER_OPTIMIZATION_PERF=y
-CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE=y
+# --- Runtime performance ---
+# App log level stays at the IDF default (INFO): safe for the realtime path,
+# since every per-packet/per-frame log (protocol.c SET_LEDS, PING, etc.) is
+# ESP_LOGV (verbose) and gets compiled out. Only one-shot INFO events (boot,
+# WiFi connect, provisioning, config writes) are emitted.
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 CONFIG_ESP32S3_DATA_CACHE_64KB=y
 CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
@@ -56,8 +39,9 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 
 # --- RMT + DMA in IRAM ---
 # The LED strip uses RMT with DMA (leds.c: flags.with_dma). Keeping the RMT and
-# GDMA ISRs IRAM-safe — and the encoder callbacks marked IRAM_ATTR — prevents a
-# crash if a flash-cache-disable window (e.g. an NVS write) overlaps a transfer.
+# GDMA paths IRAM-safe — and the encoder callbacks marked IRAM_ATTR — prevents
+# crashes if a flash-cache-disable window (e.g. an NVS write) overlaps a transfer.
+CONFIG_RMT_ENCODER_FUNC_IN_IRAM=y
 CONFIG_RMT_ISR_IRAM_SAFE=y
 CONFIG_GDMA_ISR_IRAM_SAFE=y
 

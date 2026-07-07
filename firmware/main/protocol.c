@@ -2,16 +2,99 @@
 
 #include "esp_wifi.h"
 #include "esp_app_desc.h"
+#include "esp_heap_caps.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "config.h"
 #include "storage.h"
 #include "udp_con.h"
 #include "leds.h"
+#include "wifi.h"
 #include "esp_log.h"
 #include <string.h>
 #include <arpa/inet.h>
 
 #define PROTOCOL_TAG "PROTOCOL"
+
+// Runtime counters exposed by GET_STATUS.
+static uint32_t s_led_frames_received = 0;
+static uint32_t s_udp_packets_read = 0;
+static uint32_t s_protocol_loop_max_gap_ms = 0;
+static int64_t s_protocol_loop_last_us = 0;
+
+// SET_LEDS inter-arrival counters. They describe how regularly frames reach
+// the firmware, independently from whether RMT can display them immediately.
+#define ARRIVAL_GAP_BUCKETS 6
+#define SET_LEDS_STREAM_PAUSE_MS 2000
+
+static const uint32_t k_arrival_gap_bounds_ms[ARRIVAL_GAP_BUCKETS - 1] = {
+    5, 10, 20, 50, 100
+};
+static uint32_t s_arrival_gap_hist[ARRIVAL_GAP_BUCKETS] = {0};
+static uint32_t s_arrival_gap_max_ms = 0;
+static int64_t s_arrival_gap_max_at_us = 0;
+static int64_t s_last_set_leds_us = 0;
+
+// Optional sequence tracking: the benchmark sender increments the packet id.
+// Regular senders that keep the id fixed simply produce delta == 0.
+static uint32_t s_seq_lost = 0;
+static uint32_t s_seq_reordered = 0;
+static bool s_seq_started = false;
+static uint8_t s_seq_last = 0;
+
+static int arrival_gap_bucket(uint32_t gap_ms)
+{
+    int bucket = 0;
+    while (bucket < ARRIVAL_GAP_BUCKETS - 1 && gap_ms > k_arrival_gap_bounds_ms[bucket]) {
+        bucket++;
+    }
+    return bucket;
+}
+
+static void track_set_leds_gap(int64_t now_us)
+{
+    if (s_last_set_leds_us == 0) {
+        s_last_set_leds_us = now_us;
+        return;
+    }
+
+    uint32_t gap_ms = (uint32_t)((now_us - s_last_set_leds_us) / 1000);
+    s_last_set_leds_us = now_us;
+
+    if (gap_ms > SET_LEDS_STREAM_PAUSE_MS) {
+        s_seq_started = false;
+        return;
+    }
+
+    s_arrival_gap_hist[arrival_gap_bucket(gap_ms)]++;
+    if (gap_ms > s_arrival_gap_max_ms) {
+        s_arrival_gap_max_ms = gap_ms;
+        s_arrival_gap_max_at_us = now_us;
+    }
+}
+
+static void track_set_leds_sequence(uint8_t packet_id)
+{
+    if (s_seq_started) {
+        uint8_t delta = (uint8_t)(packet_id - s_seq_last);
+        if (delta > 1 && delta < 128) {
+            s_seq_lost += delta - 1;
+        } else if (delta >= 128) {
+            s_seq_reordered++;
+            if (s_seq_lost > 0) s_seq_lost--;
+        }
+    }
+
+    s_seq_last = packet_id;
+    s_seq_started = true;
+}
+
+static void track_set_leds_metrics(uint8_t packet_id)
+{
+    int64_t now_us = esp_timer_get_time();
+    track_set_leds_gap(now_us);
+    track_set_leds_sequence(packet_id);
+}
 
 enum ProtocolMessageType
 {
@@ -20,18 +103,21 @@ enum ProtocolMessageType
     SET_CONFIG = 2,
     SET_LEDS = 3,
     RESET_WIFI = 4,
-    GET_VERSION = 5,
+    GET_INFO = 5,
     GET_STATUS = 6,
 };
 
 static bool is_protocol_packet_valid(const udp_packet* packet);
 static void protocol_process_packet(udp_packet* packet);
+static void write_u16(uint8_t* data, int offset, uint16_t value);
+static void write_u32(uint8_t* data, int offset, uint32_t value);
+static size_t write_string(uint8_t* data, int offset, const char* value, size_t max_len);
 static void protocol_ping(const udp_packet* request);
 static void protocol_get_config(const udp_packet* request);
 static void protocol_set_config(const udp_packet* request);
 static void protocol_set_leds(const udp_packet* request);
 static void protocol_reset_wifi(const udp_packet* request);
-static void protocol_get_version(const udp_packet* request);
+static void protocol_get_info(const udp_packet* request);
 static void protocol_get_status(const udp_packet* request);
 
 bool protocol_begin() {
@@ -52,8 +138,18 @@ bool protocol_begin() {
 void protocol_loop()
 {
     static udp_packet s_packet_buffer;
+    int64_t now_us = esp_timer_get_time();
+
+    if (s_protocol_loop_last_us != 0) {
+        uint32_t gap_ms = (uint32_t)((now_us - s_protocol_loop_last_us) / 1000);
+        if (gap_ms > s_protocol_loop_max_gap_ms) {
+            s_protocol_loop_max_gap_ms = gap_ms;
+        }
+    }
+    s_protocol_loop_last_us = now_us;
 
     if (udp_con_read(&s_packet_buffer)) {
+        s_udp_packets_read++;
         if (is_protocol_packet_valid(&s_packet_buffer)) {
             ESP_LOGV(PROTOCOL_TAG, "Received %d valid bytes.", s_packet_buffer.len);
             protocol_process_packet(&s_packet_buffer);
@@ -75,7 +171,7 @@ static void protocol_process_packet(udp_packet* packet)
         case SET_CONFIG:  protocol_set_config(packet); break;
         case SET_LEDS:    protocol_set_leds(packet); break;
         case RESET_WIFI:  protocol_reset_wifi(packet); break;
-        case GET_VERSION: protocol_get_version(packet); break;
+        case GET_INFO:    protocol_get_info(packet); break;
         case GET_STATUS:  protocol_get_status(packet); break;
         default:          ESP_LOGW(PROTOCOL_TAG, "Unknown message type: %d", packet->data[1]); break;
     }
@@ -194,6 +290,8 @@ static void protocol_set_leds(const udp_packet* request)
 
     ESP_LOGV(PROTOCOL_TAG, "SET_LEDS");
 
+    track_set_leds_metrics(data[0]);
+
     bool updated = false;
     for (int i = 2; i + 4 < len; i += 5) {
         uint8_t pixel_index = data[i];
@@ -205,6 +303,7 @@ static void protocol_set_leds(const udp_packet* request)
         updated = true;
     }
     if (updated) {
+        s_led_frames_received++;
         leds_show();
     }
 }
@@ -234,35 +333,42 @@ static void protocol_reset_wifi(const udp_packet* request)
 }
 
 /**
- * Reply with the firmware version string from the build (PROJECT_VER /
- * `git describe`). Same wire pattern as GET_CONFIG hostname: variable-length,
- * no terminator, length carried by udp_packet.len.
+ * Reply with device identity/info.
+ * Wire format:
+ * [packet_id, GET_INFO, ip(4), port(2), mac(6), version_len(1), version, hostname_len(1), hostname]
  */
-static void protocol_get_version(const udp_packet* request)
+static void protocol_get_info(const udp_packet* request)
 {
-    ESP_LOGV(PROTOCOL_TAG, "GET_VERSION");
+    ESP_LOGV(PROTOCOL_TAG, "GET_INFO");
 
     udp_packet response;
     response.source_addr = request->source_addr;
     response.data[0] = request->data[0];
-    response.data[1] = GET_VERSION;
+    response.data[1] = GET_INFO;
 
     const esp_app_desc_t *desc = esp_app_get_description();
-    size_t version_len = strlen(desc->version);
-    size_t max_len = (sizeof(response.data) > 2) ? (sizeof(response.data) - 2) : 0;
-    if (version_len > max_len) {
-        version_len = max_len;
-    }
-    memcpy(&response.data[2], desc->version, version_len);
-    response.len = 2 + version_len;
+    wifi_ip_bytes(&response.data[2]);
+    write_u16(response.data, 6, config.port);
+    wifi_mac_bytes(&response.data[8]);
+    int offset = 14;
+    offset += write_string(response.data, offset, desc->version, 32);
+    offset += write_string(response.data, offset, config.hostname, 32);
+    response.len = offset;
 
     udp_con_send(&response);
 }
 
 /**
- * Reply with device status: uptime (4 bytes), free heap (4 bytes), RSSI (1 byte), WiFi STA MAC (6 bytes).
- * Wire format: [packet_id, GET_STATUS, uptime(32-bit big-endian), heap(32-bit big-endian), rssi(int8), mac(6)]
- * Total response: 17 bytes.
+ * Reply with device status.
+ * Wire format:
+ * [packet_id, GET_STATUS, uptime(4), heap(4), rssi(1), ...metrics, ...counters]
+ * Metrics are appended as uint32 BE fields:
+ * internal_heap, largest_heap_block, min_heap, frames_received, frames_shown,
+ * frames_dropped, udp_packets_read, protocol_loop_max_gap_ms.
+ * Extended counters (uint32 BE) follow:
+ * arrival_gap_hist[6] (<=5, <=10, <=20, <=50, <=100, >100 ms),
+ * arrival_gap_max_ms, arrival_gap_max_age_s (seconds since it occurred),
+ * seq_lost, seq_reordered, beacon_timeouts, wifi_disconnects.
  */
 static void protocol_get_status(const udp_packet* request)
 {
@@ -270,30 +376,68 @@ static void protocol_get_status(const udp_packet* request)
 
     uint32_t uptime_s = (uint32_t)(esp_timer_get_time() / 1000000ULL);
     uint32_t free_heap = (uint32_t)esp_get_free_heap_size();
+    uint32_t internal_heap = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    uint32_t largest_heap_block = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    uint32_t min_heap = (uint32_t)esp_get_minimum_free_heap_size();
+    leds_stats_t stats = leds_stats();
 
     int8_t rssi = 0;
     wifi_ap_record_t ap_info;
     if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
         rssi = ap_info.rssi;
     }
-    uint8_t mac[6] = {0};
-    esp_wifi_get_mac(ESP_IF_WIFI_STA, mac);
-
     udp_packet response;
     response.source_addr = request->source_addr;
     response.data[0] = request->data[0];
     response.data[1] = GET_STATUS;
-    response.data[2] = (uptime_s >> 24) & 0xFF;
-    response.data[3] = (uptime_s >> 16) & 0xFF;
-    response.data[4] = (uptime_s >> 8) & 0xFF;
-    response.data[5] = uptime_s & 0xFF;
-    response.data[6] = (free_heap >> 24) & 0xFF;
-    response.data[7] = (free_heap >> 16) & 0xFF;
-    response.data[8] = (free_heap >> 8) & 0xFF;
-    response.data[9] = free_heap & 0xFF;
+    write_u32(response.data, 2, uptime_s);
+    write_u32(response.data, 6, free_heap);
     response.data[10] = *(uint8_t*)&rssi; // write int8 as raw byte
-    memcpy(&response.data[11], mac, sizeof(mac));
-    response.len = 17;
+    write_u32(response.data, 11, internal_heap);
+    write_u32(response.data, 15, largest_heap_block);
+    write_u32(response.data, 19, min_heap);
+    write_u32(response.data, 23, s_led_frames_received);
+    write_u32(response.data, 27, stats.shown);
+    write_u32(response.data, 31, stats.dropped);
+    write_u32(response.data, 35, s_udp_packets_read);
+    write_u32(response.data, 39, s_protocol_loop_max_gap_ms);
+    for (int i = 0; i < ARRIVAL_GAP_BUCKETS; i++) {
+        write_u32(response.data, 43 + i * 4, s_arrival_gap_hist[i]);
+    }
+    write_u32(response.data, 67, s_arrival_gap_max_ms);
+    uint32_t gap_age_s = 0;
+    if (s_arrival_gap_max_at_us != 0) {
+        gap_age_s = (uint32_t)((esp_timer_get_time() - s_arrival_gap_max_at_us) / 1000000LL);
+    }
+    write_u32(response.data, 71, gap_age_s);
+    write_u32(response.data, 75, s_seq_lost);
+    write_u32(response.data, 79, s_seq_reordered);
+    write_u32(response.data, 83, wifi_beacon_timeouts());
+    write_u32(response.data, 87, wifi_disconnects());
+    response.len = 91;
 
     udp_con_send(&response);
+}
+
+static void write_u16(uint8_t* data, int offset, uint16_t value)
+{
+    data[offset] = (value >> 8) & 0xFF;
+    data[offset + 1] = value & 0xFF;
+}
+
+static void write_u32(uint8_t* data, int offset, uint32_t value)
+{
+    data[offset] = (value >> 24) & 0xFF;
+    data[offset + 1] = (value >> 16) & 0xFF;
+    data[offset + 2] = (value >> 8) & 0xFF;
+    data[offset + 3] = value & 0xFF;
+}
+
+static size_t write_string(uint8_t* data, int offset, const char* value, size_t max_len)
+{
+    size_t len = strlen(value);
+    if (len > max_len) len = max_len;
+    data[offset] = len;
+    memcpy(&data[offset + 1], value, len);
+    return 1 + len;
 }

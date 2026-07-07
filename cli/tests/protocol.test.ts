@@ -1,5 +1,5 @@
 import { EventEmitter } from "events"
-import { PacketType, PacketStatus, bufferToStatus, configToBuffer, encodeBuffer } from "@reactive-leds/shared"
+import { PacketType, PacketStatus, configToBuffer, deviceInfoToBuffer, encodeBuffer } from "@reactive-leds/shared"
 
 ////////////////////// dgram mock
 
@@ -76,7 +76,7 @@ describe("Protocol", () => {
 		Protocol.PING_TIMEOUT = 50
 		Protocol.GET_CONFIG_TIMEOUT = 50
 		Protocol.SET_CONFIG_TIMEOUT = 50
-		Protocol.GET_VERSION_TIMEOUT = 50
+		Protocol.GET_INFO_TIMEOUT = 50
 		Protocol.GET_STATUS_TIMEOUT = 50
 	})
 
@@ -194,6 +194,17 @@ describe("Protocol", () => {
 			await promise
 			expect(resolved).toBe(true)
 		})
+
+		test("can send SET_LEDS with an explicit packet id", async () => {
+			const ok = await proto.setLEDsFrame("10.0.0.1", 4210, 23, new Uint8Array([0, 1, 2, 3, 4]))
+
+			expect(ok).toBe(true)
+			expect(sendCalls).toHaveLength(1)
+			const sent = sendCalls[0].message
+			expect(sent[0]).toBe(23)
+			expect(sent[1]).toBe(PacketType.SET_LEDS)
+			expect(Array.from(sent.slice(2))).toEqual([0, 1, 2, 3, 4])
+		})
 	})
 
 	describe("resetWifi", () => {
@@ -206,19 +217,25 @@ describe("Protocol", () => {
 		})
 	})
 
-	describe("getVersion", () => {
-		test("decodes the version string from the response", async () => {
-			const promise = proto.getVersion("10.0.0.1", 4210)
+	describe("getInfo", () => {
+		test("decodes device info from the response", async () => {
+			const promise = proto.getInfo("10.0.0.1", 4210)
 			await new Promise(resolve => setImmediate(resolve))
 
-			const versionBytes = encodeBuffer("v0.1.0")
-			respondWith([lastRequestId(), PacketType.GET_VERSION, ...versionBytes])
+			const info = {
+				ip: "10.0.0.1",
+				port: 4210,
+				mac: "A0:85:E3:E0:9F:54",
+				version: "v0.1.0",
+				hostname: "esp-1",
+			}
+			respondWith([lastRequestId(), PacketType.GET_INFO, ...deviceInfoToBuffer(info)])
 
-			await expect(promise).resolves.toBe("v0.1.0")
+			await expect(promise).resolves.toEqual(info)
 		})
 
 		test("returns null on timeout (older firmware that drops unknown packet types)", async () => {
-			await expect(proto.getVersion("10.0.0.99", 4210)).resolves.toBeNull()
+			await expect(proto.getInfo("10.0.0.99", 4210)).resolves.toBeNull()
 		})
 	})
 
@@ -227,17 +244,16 @@ describe("Protocol", () => {
 			const promise = proto.getStatus("10.0.0.1", 4210)
 			await new Promise(resolve => setImmediate(resolve))
 
-			// [reqId, GET_STATUS, uptime(4), heap(4), rssi(1), mac(6)]
+			// [reqId, GET_STATUS, uptime(4), heap(4), rssi(1)]
 			respondWith([
 				lastRequestId(), PacketType.GET_STATUS,
 				0, 0, 0, 100,  // uptime = 100
 				0, 0x01, 0, 0, // heap = 65536
 				-42 & 0xff,     // rssi = -42
-				0xa0, 0x85, 0xe3, 0xe0, 0x9f, 0x54,
 			])
 
 			const status = await promise
-			expect(status).toEqual({ uptime: 100, heap: 65536, rssi: -42, mac: "A0:85:E3:E0:9F:54" })
+			expect(status).toEqual({ uptime: 100, heap: 65536, rssi: -42 })
 		})
 
 		test("returns null on timeout", async () => {

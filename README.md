@@ -73,7 +73,7 @@ This is a small monorepo. Each major area has its own folder and README.
 - [JST](https://www.aliexpress.com/item/1005005362711029.html) ([alternative](https://www.aliexpress.com/item/1005004615616698.html)) — pick the 3-pin variant (VCC, GND, DATA)
 - 330 Ω resistor in series on the LED data line
 
-These are the components I used, but the project can be adapted to similar strips and hardware. Make sure to configure the firmware correctly for your strip (color order, number of segments, etc).
+These are the components I used, but the project can be adapted to similar strips and hardware. Make sure to configure the firmware correctly for your strip (color order, number of segments, etc). ESP32-S3 modules with PSRAM are fine, but PSRAM is not required for this use case: the realtime LED path uses small internal-RAM buffers.
 
 ## 3D Printing
 
@@ -89,6 +89,23 @@ For the profile I printed 5 pieces in PLA, each 20cm long. For the diffuser bar 
 - **Color order**: the RGB/WRGB byte order depends on the LED IC. The current firmware is set for the strip listed in Materials. Different strips may need a different order (see `firmware/main/leds.c`).
 - **WiFi sleep disabled**: power saving mode on the WiFi radio is explicitly disabled to avoid latency spikes and packet loss during realtime updates.
 - **WiFi credentials in plaintext over BLE**: during provisioning, credentials are sent unencrypted. For a personal project simplicity takes priority, but keep this in mind if you use sensitive networks.
+
+## Realtime Diagnostics
+
+The firmware exposes runtime counters through `rleds status`, and the CLI includes a small benchmark command:
+
+```sh
+rleds benchmark 192.168.1.113 60 120
+```
+
+The most useful fields are:
+
+- `set-leds`: valid LED frames received by the device divided by frames attempted by the host.
+- `arrival-gaps`: timing between received `SET_LEDS` packets. At 60 fps most packets should land in the `≤20ms` bucket.
+- `seq-lost`: packets that did not reach the firmware, based on the benchmark sequence id.
+- `rmt-drop-rate`: frames dropped because the previous RMT transfer was still busy. This should stay at `0.000%` at normal frame rates.
+
+On macOS, realtime streaming over WiFi can stutter because of AWDL (AirDrop/Handoff/AirPlay peer-to-peer networking). A typical signature is many `>100ms` gaps, many `≤5ms` burst gaps right after them, and `seq-lost 0`: packets were not lost, they were held back and released in bursts by the sender side. For a clean test, use Ethernet or temporarily disable AWDL with `sudo ifconfig awdl0 down`.
 
 ## Power and Safety
 

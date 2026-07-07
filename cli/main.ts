@@ -1,4 +1,5 @@
 import { Command, requiredArguments, shortUsage, usage, validate } from "./cmd"
+import { benchmarkCommand } from "./cmd/benchmark"
 import { btCredentialCommand, btScanCommand } from "./cmd/bluetooth"
 import { clearCacheCommand } from "./cmd/cache"
 import { colorCommand } from "./cmd/color"
@@ -15,6 +16,7 @@ const pkg = require("./package.json") as { version: string }
 /** Create a list of commands */
 const commands = [
 	configCommand,
+	benchmarkCommand,
 	proxyCommand,
 	scanCommand,
 	pingCommand,

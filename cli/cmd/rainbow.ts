@@ -1,6 +1,7 @@
+import { warnIfAwdlActive } from "../awdl"
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { ok, validateHost, validatePort } from "../utils"
+import { ok, validateDevicePort, validateHost } from "../utils"
 import { resolveTargets } from "./wifi"
 
 export const rainbowCommand: Command = {
@@ -12,9 +13,11 @@ export const rainbowCommand: Command = {
 		{ required: false, name: "seconds", type: Number, default: 10 },
 		{ required: false, name: "speed", type: Number, default: 1 },
 		{ required: false, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, validator: validatePort, default: 4210 },
+		{ required: false, name: "port", type: Number, validator: validateDevicePort, default: 4210 },
 	],
 	execute: async (seconds: number, speed: number, host: string | undefined, port: number) => {
+		await warnIfAwdlActive("rainbow")
+
 		const targets = await resolveTargets(host, port)
 		if (targets.length === 0) return false
 

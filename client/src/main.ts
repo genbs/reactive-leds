@@ -2,8 +2,10 @@ import {
 	AddressBuffer,
 	addressToBuffer,
 	bufferToConfig,
+	bufferToDeviceInfo,
 	bufferToStatus,
 	Config,
+	DeviceInfo,
 	IP,
 	PacketType,
 	Status,
@@ -64,7 +66,15 @@ export function getConfig(ip: IP, port = 4210): Promise<Config | null> {
 	})
 }
 
-/** Get device status: uptime (seconds), free heap (bytes), WiFi RSSI (dBm). */
+/** Get device identity: IP, port, MAC, hostname and firmware version. */
+export function getInfo(ip: IP, port = 4210): Promise<DeviceInfo | null> {
+	return sendSync(createPacket(ip, port, PacketType.GET_INFO)).then(response => {
+		if (response.length === 1 && response[0] === FALSE) return null
+		return bufferToDeviceInfo(response)
+	})
+}
+
+/** Get device status: uptime, heap, WiFi RSSI and optional metrics. */
 export function getStatus(ip: IP, port = 4210): Promise<Status | null> {
 	return sendSync(createPacket(ip, port, PacketType.GET_STATUS)).then(response => {
 		if (response.length === 1 && response[0] === FALSE) return null
@@ -107,7 +117,7 @@ export function sendRaw(ip: IP, port: number, type: PacketType, data?: Uint8Arra
 /**
  * Send a raw protocol packet and wait for the response payload as relayed by
  * the proxy: `[status]` for status-only replies (1 = OK), or the response
- * data (e.g. the version string bytes for GET_VERSION).
+ * data (e.g. the info payload bytes for GET_INFO).
  */
 export function sendRawSync(ip: IP, port: number, type: PacketType, data?: Uint8Array): Promise<Uint8Array> {
 	return sendSync(createPacket(ip, port, type, data))
@@ -119,6 +129,7 @@ const reactiveLeds = {
 	isConnected,
 	connect,
 	ping,
+	getInfo,
 	getConfig,
 	getStatus,
 	setLEDs,
