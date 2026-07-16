@@ -32,9 +32,9 @@ function createPacket(ip: IP, port: number, type: PacketType, data?: Uint8Array)
 
 	const addrLen = addressPacket.length
 	const dataLen = data ? data.length : 0
-	const totalLen = 1 + addrLen + 1 + dataLen
+	const totalLen = 2 + addrLen + 1 + dataLen
 
-	let offset = 0
+	let offset = 1 // request ID is filled by send/sendSync
 	const buffer = new Uint8Array(totalLen)
 	buffer[offset++] = WorkerRequestType.Send
 	buffer.set(addressPacket, offset)

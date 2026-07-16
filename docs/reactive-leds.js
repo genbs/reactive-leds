@@ -211,9 +211,7 @@ function nextRequestId() {
 }
 function createRequest(buffer, timeout = DEFAULT_SYNC_TIMEOUT) {
   const requestId = nextRequestId();
-  const newBuffer = new Uint8Array(1 + buffer.length);
-  newBuffer[0] = requestId;
-  newBuffer.set(buffer, 1);
+  buffer[0] = requestId;
   const request = new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       requests.delete(requestId);
@@ -221,7 +219,7 @@ function createRequest(buffer, timeout = DEFAULT_SYNC_TIMEOUT) {
     }, timeout);
     requests.set(requestId, { resolve, reject, timer });
   });
-  return [request, newBuffer, requestId];
+  return [request, buffer, requestId];
 }
 function rejectPendingRequests(message) {
   for (const [requestId, request] of requests) {
@@ -267,10 +265,10 @@ function wsconnect(serverURL, _debug = false) {
     debug = _debug;
     debug && console.log("[Proxy] Worker created");
   }
-  const buffer = new Uint8Array(1 + serverURL.length + 1);
-  buffer[0] = 0 /* Connect */;
-  encodeBuffer(serverURL, buffer, 1);
-  buffer[1 + serverURL.length] = debug ? TRUE : FALSE;
+  const buffer = new Uint8Array(2 + serverURL.length + 1);
+  buffer[1] = 0 /* Connect */;
+  encodeBuffer(serverURL, buffer, 2);
+  buffer[2 + serverURL.length] = debug ? TRUE : FALSE;
   debug && console.log(`[Proxy] try to connect to ${serverURL}`, buffer);
   return sendSync(buffer).then((response) => response[1] === TRUE).catch(() => false);
 }
@@ -304,11 +302,9 @@ async function sendSync(data, timeout = DEFAULT_SYNC_TIMEOUT) {
 }
 function send(data) {
   checkConnected();
-  const buffer = new Uint8Array(1 + data.length);
-  buffer[0] = EMPTY_REQUEST_ID;
-  buffer.set(data, 1);
-  debug && console.log(`[Proxy] send ${WorkerRequestTypeMap[buffer[1]]}`, buffer);
-  daemon.postMessage(buffer, [buffer.buffer]);
+  data[0] = EMPTY_REQUEST_ID;
+  debug && console.log(`[Proxy] send ${WorkerRequestTypeMap[data[1]]}`, data);
+  daemon.postMessage(data, [data.buffer]);
 }
 
 // src/main.ts
@@ -322,8 +318,8 @@ function createPacket(ip, port, type, data) {
   }
   const addrLen = addressPacket.length;
   const dataLen = data ? data.length : 0;
-  const totalLen = 1 + addrLen + 1 + dataLen;
-  let offset = 0;
+  const totalLen = 2 + addrLen + 1 + dataLen;
+  let offset = 1;
   const buffer = new Uint8Array(totalLen);
   buffer[offset++] = 2 /* Send */;
   buffer.set(addressPacket, offset);
