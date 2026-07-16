@@ -89,7 +89,7 @@ var WS = class {
     this.socket?.close();
   }
   send(payload) {
-    if (!this.socket) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       this.settings.debug && console.log("[WS] Send error, not connected, can't send message");
       return;
     }

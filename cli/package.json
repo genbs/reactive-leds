@@ -23,7 +23,8 @@
     "files": [
         "bin/",
         "README.md",
-        "README-it.md"
+        "README-it.md",
+        "THIRD_PARTY_NOTICES"
     ],
     "engines": {
         "node": ">=18"
@@ -39,6 +40,7 @@
     },
     "license": "GPL-3.0-only",
     "devDependencies": {
+        "@reactive-leds/shared": "file:../shared",
         "@types/jest": "^29.5.14",
         "@types/ws": "^8.0.0",
         "esbuild": "^0.25.0",

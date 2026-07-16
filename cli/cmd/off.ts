@@ -1,18 +1,17 @@
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { ok, validateDevicePort, validateHost } from "../utils"
+import { ok, validateTarget } from "../utils"
 import { resolveTargets } from "./wifi"
 
 export const offCommand: Command = {
 	name: "off",
-	description: "Turn off all LEDs. If <host> is omitted, applies to every discovered device.",
-	examples: ["off", "off 192.168.1.10"],
+	description: "Turn off LEDs. Use \"all\" or omit <target> to target every discovered device.",
+	examples: ["off", "off all", "off 192.168.1.10", "off 192.168.1.10:4211"],
 	args: [
-		{ required: false, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, default: 4210, validator: validateDevicePort },
+		{ required: false, name: "target", type: String, validator: validateTarget },
 	],
-	execute: async (host: string | undefined, port: number) => {
-		const targets = await resolveTargets(host, port)
+	execute: async (target: string | undefined) => {
+		const targets = await resolveTargets(target)
 		if (targets.length === 0) return false
 
 		// num_leds comes from the cached config (filled in by scan/resolveTargets);

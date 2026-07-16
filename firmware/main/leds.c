@@ -120,6 +120,7 @@ void leds_show()
     // instead of displaying it late.
     if (rmt_tx_wait_all_done(s_led_chan, pdMS_TO_TICKS(1)) != ESP_OK) {
         s_stats.dropped++;
+        memcpy(s_led_buffers[s_pending_idx], s_led_buffers[s_tx_idx], config.num_leds * 4);
         return;
     }
 
@@ -132,6 +133,7 @@ void leds_show()
 
     // Non-blocking: returns immediately, RMT runs in hardware via DMA.
     ESP_ERROR_CHECK(rmt_transmit(s_led_chan, s_led_encoder, s_led_buffers[s_tx_idx], config.num_leds * 4, &s_tx_config));
+    memcpy(s_led_buffers[s_pending_idx], s_led_buffers[s_tx_idx], config.num_leds * 4);
     s_stats.shown++;
 }
 

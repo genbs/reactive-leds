@@ -1,61 +1,74 @@
 import { availableConfigKeys } from "@reactive-leds/shared"
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { fail, ok, validateDevicePort, validateHost } from "../utils"
-import { clearScanCache, resolveTargets } from "./wifi"
+import { fail, ok, validateDevicePort, validateTarget } from "../utils"
+import { clearScanCache, resolveTargets, Target } from "./wifi"
+
+const ALL_TARGETS = "all"
 
 export const configCommand: Command = {
 	name: "config",
 
 	description:
-		"Get configuration of the device at <host>:<port>.\nIf <key> and <value> are provided, set the configuration.",
+		"Get configuration of <target>. Use \"all\" to target every discovered device.\nIf <key> and <value> are provided, set the configuration.",
 
-	examples: ["config 192.168.1.1 4210", "config 192.168.1.1 4210 hostname my-device"],
+	examples: ["config 192.168.1.1", "config 192.168.1.1:4211", "config all", "config 192.168.1.1 hostname my-device"],
 
 	args: [
-		{ required: true, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, validator: validateDevicePort, default: 4210 },
+		{ required: true, name: "target", type: String, validator: validateTarget },
 		{ required: false, name: "key", type: String, validator: validateConfigKey },
-		{ required: false, name: "value", type: String, validator: (value, args) => validateConfigValue(args[2], value) },
+		{ required: false, name: "value", type: String, validator: (value, args) => validateConfigValue(args[1], value) },
 	],
 
-	execute: async (host: string, port: number, key?: string, value?: string) => {
-		// resolveTargets resolves a hostname (accepted by the validator) to a real IP.
-		const targets = await resolveTargets(host, port)
-		const target = targets[0]
-		if (!target || !target.config) {
-			console.log(fail(`Failed to get config for ${host}:${port}`))
+	execute: async (targetArg: string, key?: string, value?: string) => {
+		const targets = await resolveTargets(targetArg)
+		if (targets.length === 0) {
+			console.log(fail(`Failed to get config for ${targetArg}`))
 			return false
 		}
-		const config = target.config
+
 		if (typeof key !== "undefined" && typeof value !== "undefined") {
-			const result = await proto.setConfig(target.ip, target.port, { ...config, [key]: configValue(key, value) })
-			if (!result) {
-				console.log(fail("Failed to update config"))
+			if (targetArg.toLowerCase().split(":")[0] === ALL_TARGETS && key === "hostname") {
+				console.log(fail("Refusing to set the same hostname on all devices"))
 				return false
 			}
-			// The cached scan now holds a stale config for this device (and the
-			// device is rebooting on a possibly different port). Clear the cache so
-			// the next multi-target command does a fresh scan.
-			clearScanCache()
-			// SET_CONFIG auto-reboots the device; refetching would fail. We trust
-			// the firmware response and report success without re-reading.
-			console.log(`Config updated: ${key} = ${value}. Device is rebooting (~5s offline).`)
-			return
+
+			let anyOk = false
+			for (const target of targets) {
+				if (!target.config) {
+					console.log(`${targetLabel(target)}: ${fail("failed to read config")}`)
+					continue
+				}
+
+				const result = await proto.setConfig(target.ip, target.port, { ...target.config, [key]: configValue(key, value) })
+				console.log(`${targetLabel(target)}: ${result ? ok(`updated ${key} = ${value}; rebooting`) : fail("failed")}`)
+				anyOk ||= result
+			}
+
+			if (anyOk) clearScanCache()
+			return anyOk
 		}
 
-		console.log(`Config:\n\t- pin: ${config.pin}\n\t- Num LEDs: ${config.num_leds}\n\t- Port: ${config.port}\n\t- Hostname: ${config.hostname}`)
+		let anyOk = false
+		for (const target of targets) {
+			if (!target.config) {
+				console.log(`${targetLabel(target)}: ${fail("failed to read config")}`)
+				continue
+			}
+			anyOk = true
+			console.log(`${targetLabel(target)}:\n\t- pin: ${target.config.pin}\n\t- Num LEDs: ${target.config.num_leds}\n\t- Port: ${target.config.port}\n\t- Hostname: ${target.config.hostname}`)
+		}
+		return anyOk
 	},
 }
 
 export const ledsCommand: Command = {
 	name: "leds",
 	description:
-		"Set the LEDs on the device at <host>:<port>.\nThe <led_package> argument must be a comma-separated list of values in the format <led_index>,<r>,<g>,<b>,<brightness/whiteness>.",
-	examples: ["leds 192.168.1.100 4210 0,255,0,128,0,1,0,255,128,0"],
+		"Set LEDs on <target>. Use \"all\" to target every discovered device.\nThe <led_package> argument must be a comma-separated list of values in the format <led_index>,<r>,<g>,<b>,<brightness/whiteness>.",
+	examples: ["leds 192.168.1.100 0,255,0,128,0,1,0,255,128,0", "leds all 0,255,0,128,0", "leds all:4211 0,255,0,128,0"],
 	args: [
-		{ required: true, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, validator: validateDevicePort, default: 4210 },
+		{ required: true, name: "target", type: String, validator: validateTarget },
 		{
 			required: true,
 			name: "leds_package",
@@ -63,20 +76,23 @@ export const ledsCommand: Command = {
 			validator: validateLedsPackage,
 		},
 	],
-	execute: async (host: string, port: number, ledsPackage: string) => {
-		// Resolve so a hostname (accepted by validateHost) becomes a real IP.
-		const targets = await resolveTargets(host, port)
+	execute: async (targetArg: string, ledsPackage: string) => {
+		const targets = await resolveTargets(targetArg)
 		if (targets.length === 0) {
-			console.log(fail(`Device ${host} not found`))
+			console.log(fail(`Device ${targetArg} not found`))
 			return false
 		}
-		const target = targets[0]
 
 		const data = new Uint8Array(ledsPackage.split(",").map(Number)) // validated
-		// Await so the kernel transmits before process exit.
-		await proto.setLEDs(target.ip, target.port, data)
-		console.log(ok("LEDs request sent"))
+		for (const target of targets) {
+			await proto.setLEDs(target.ip, target.port, data)
+			console.log(`${targetLabel(target)}: ${ok("LEDs request sent")}`)
+		}
 	},
+}
+
+function targetLabel(target: Target): string {
+	return target.config?.hostname ? `${target.config.hostname} (${target.ip}:${target.port})` : `${target.ip}:${target.port}`
 }
 
 ////////////////////// Validators
@@ -95,7 +111,8 @@ function validateConfigValue(key: string, value: string): boolean | string {
 			return true
 		case "pin": {
 			const n = Number(value)
-			if (!Number.isInteger(n) || n < 0 || n > 49) return `Invalid value for key "${key}". Value must be an integer between 0 and 49.`
+			if (!Number.isInteger(n) || n < 0 || n > 48 || (n >= 22 && n <= 25))
+				return `Invalid value for key "${key}". Use an output GPIO in 0..21 or 26..48.`
 			return true
 		}
 		case "num_leds": {

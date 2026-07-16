@@ -55,7 +55,7 @@ export function begin(serverURL: string, debug = false): Promise<boolean> {
 export function ping(ip: IP, port = 4210): Promise<boolean> {
 	return sendSync(createPacket(ip, port, PacketType.PING)).then(
 		response => response.length === 1 && response[0] === TRUE
-	)
+	).catch(() => false)
 }
 
 /** Get the configuration of the device. */
@@ -63,7 +63,7 @@ export function getConfig(ip: IP, port = 4210): Promise<Config | null> {
 	return sendSync(createPacket(ip, port, PacketType.GET_CONFIG)).then(response => {
 		if (response.length === 1 && response[0] === FALSE) return null
 		return bufferToConfig(response)
-	})
+	}).catch(() => null)
 }
 
 /** Get device identity: IP, port, MAC, hostname and firmware version. */
@@ -71,7 +71,7 @@ export function getInfo(ip: IP, port = 4210): Promise<DeviceInfo | null> {
 	return sendSync(createPacket(ip, port, PacketType.GET_INFO)).then(response => {
 		if (response.length === 1 && response[0] === FALSE) return null
 		return bufferToDeviceInfo(response)
-	})
+	}).catch(() => null)
 }
 
 /** Get device status: uptime, heap, WiFi RSSI and optional metrics. */
@@ -79,7 +79,7 @@ export function getStatus(ip: IP, port = 4210): Promise<Status | null> {
 	return sendSync(createPacket(ip, port, PacketType.GET_STATUS)).then(response => {
 		if (response.length === 1 && response[0] === FALSE) return null
 		return bufferToStatus(response)
-	})
+	}).catch(() => null)
 }
 
 /** Send LED colors to the device — fire-and-forget, no response expected. */

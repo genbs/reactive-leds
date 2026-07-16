@@ -54,8 +54,8 @@ Lo stesso pattern vale per ogni tipo richiesta/risposta: invia `[id, type, ...da
 | `SET_CONFIG`  | 6–38 B (header + hostname 0–32 B)  | 3 B (`id, type, status`)                |
 | `SET_LEDS`    | 7–82 B (2 + N×5, N = 1..num_leds, 16 di default) | — (nessuna risposta)      |
 | `RESET_WIFI`  | 2 B (fissa)                        | 3 B (fissa)                             |
-| `GET_INFO`    | 2 B (fissa)                        | 16–78 B (identita + versione/hostname 0–32 B ciascuno) |
-| `GET_STATUS`  | 2 B (fissa)                        | 11 B base / 43 B con metriche           |
+| `GET_INFO`    | 2 B (fissa)                        | 16–80 B (identità + versione/hostname 0–32 B ciascuno) |
+| `GET_STATUS`  | 2 B (fissa)                        | 11 B base / 43 B con metriche / 91 B con contatori benchmark |
 
 ### Formato SET_LEDS
 
@@ -132,7 +132,7 @@ Il protocollo in sé non è coperto da licenza — il byte layout sopra è suffi
 
 ## Versionamento
 
-Il protocollo cresce per aggiunta: un comportamento nuovo è un `PacketType` nuovo, e le risposte esistenti possono crescere solo aggiungendo campi opzionali in coda. Prima della prima release pubblica, una pulizia incompatibile resta accettabile quando rende il protocollo piu chiaro; `GET_INFO` ha sostituito il piu limitato `GET_VERSION` per questo motivo.
+Il protocollo cresce per aggiunta: un comportamento nuovo è un `PacketType` nuovo, e le risposte esistenti possono crescere solo aggiungendo campi opzionali in coda. Prima della prima release pubblica, una pulizia incompatibile resta accettabile quando rende il protocollo più chiaro; `GET_INFO` ha sostituito il più limitato `GET_VERSION` per questo motivo.
 
 La regola d'oro: non riordinare o reinterpretare byte esistenti senza aggiornare tutti i pacchetti che li usano (firmware, CLI, client).
 

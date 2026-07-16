@@ -32,7 +32,7 @@ class MockSocket extends EventEmitter {
 		// Real dgram emits 'listening' once bound; tests don't depend on it but
 		// we expose a no-op so the protocol setup completes.
 	}
-	close() {}
+	close() { }
 	unref() {
 		return this
 	}
@@ -48,9 +48,10 @@ jest.mock("dgram", () => ({
 ////////////////////// Helpers
 
 /** Fire a synthetic UDP response back into the mocked socket. */
-function respondWith(bytes: number[]) {
+function respondWith(bytes: number[], source?: { address: string; port: number }) {
 	if (!activeSocket) throw new Error("No active socket — call a protocol method first")
-	activeSocket.emit("message", Buffer.from(bytes))
+	const sent = sendCalls[sendCalls.length - 1]
+	activeSocket.emit("message", Buffer.from(bytes), source ?? { address: sent.address, port: sent.port })
 }
 
 /** Read the request ID from the most recently captured send. */
@@ -72,12 +73,6 @@ describe("Protocol", () => {
 		sendCalls.length = 0
 		activeSocket = null
 		proto = new Protocol()
-		// Tighten timeouts so failure-paths don't slow the test suite.
-		Protocol.PING_TIMEOUT = 50
-		Protocol.GET_CONFIG_TIMEOUT = 50
-		Protocol.SET_CONFIG_TIMEOUT = 50
-		Protocol.GET_INFO_TIMEOUT = 50
-		Protocol.GET_STATUS_TIMEOUT = 50
 	})
 
 	describe("ping", () => {
@@ -108,6 +103,20 @@ describe("Protocol", () => {
 			respondWith([(lastRequestId() + 1) % 255, PacketType.PING, PacketStatus.OK])
 			await expect(promise).resolves.toBe(false)
 		})
+
+		test("ignores responses from a different UDP peer", async () => {
+			const promise = proto.ping("192.168.1.10", 4210)
+			await new Promise(resolve => setImmediate(resolve))
+
+			let settled = false
+			promise.finally(() => { settled = true })
+			respondWith([lastRequestId(), PacketType.PING, PacketStatus.OK], { address: "192.168.1.11", port: 4210 })
+			await new Promise(resolve => setImmediate(resolve))
+			expect(settled).toBe(false)
+
+			respondWith([lastRequestId(), PacketType.PING, PacketStatus.OK])
+			await expect(promise).resolves.toBe(true)
+		})
 	})
 
 	describe("getConfig", () => {
@@ -130,6 +139,13 @@ describe("Protocol", () => {
 
 		test("returns null on timeout", async () => {
 			await expect(proto.getConfig("10.0.0.99", 4210)).resolves.toBeNull()
+		})
+
+		test("returns null for a truncated response", async () => {
+			const promise = proto.getConfig("10.0.0.1", 4210)
+			await new Promise(resolve => setImmediate(resolve))
+			respondWith([lastRequestId(), PacketType.GET_CONFIG])
+			await expect(promise).resolves.toBeNull()
 		})
 	})
 
@@ -196,7 +212,7 @@ describe("Protocol", () => {
 		})
 
 		test("can send SET_LEDS with an explicit packet id", async () => {
-			const ok = await proto.setLEDsFrame("10.0.0.1", 4210, 23, new Uint8Array([0, 1, 2, 3, 4]))
+			const ok = await proto.setLEDs("10.0.0.1", 4210, new Uint8Array([0, 1, 2, 3, 4]), 23)
 
 			expect(ok).toBe(true)
 			expect(sendCalls).toHaveLength(1)
@@ -261,8 +277,8 @@ describe("Protocol", () => {
 		})
 	})
 
-	describe("request ID cycling", () => {
-		test("cycles request IDs through 1..255 (0 is reserved)", async () => {
+	describe("request ID allocation", () => {
+		test("does not reuse IDs while all 255 slots are pending", async () => {
 			// Fire 257 pings without responses; collect the request IDs from sendCalls.
 			const promises = Array.from({ length: 257 }, (_, i) => proto.ping(`10.0.0.${i % 250 + 1}`, 4210))
 
@@ -270,9 +286,9 @@ describe("Protocol", () => {
 			await new Promise(resolve => setImmediate(resolve))
 
 			const ids = sendCalls.map(c => c.message[0])
+			expect(ids).toHaveLength(255)
 			expect(ids.every(id => id >= 1 && id <= 255)).toBe(true)
-			// After wrapping past 255 we should see id 1 again.
-			expect(new Set(ids).size).toBeLessThan(257)
+			expect(new Set(ids).size).toBe(255)
 
 			// Let all timeouts fire so jest doesn't hold open handles.
 			await Promise.all(promises)

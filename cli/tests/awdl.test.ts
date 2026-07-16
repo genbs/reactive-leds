@@ -1,4 +1,4 @@
-import { parseAwdlActive, validateAwdlMode } from "../awdl"
+import { parseAwdlActive } from "../awdl"
 
 describe("awdl", () => {
 	test("parseAwdlActive detects an active interface", () => {
@@ -19,14 +19,4 @@ describe("awdl", () => {
 		expect(parseAwdlActive(output)).toBe(false)
 	})
 
-	test("validateAwdlMode accepts the three modes", () => {
-		expect(validateAwdlMode("ask")).toBe(true)
-		expect(validateAwdlMode("off")).toBe(true)
-		expect(validateAwdlMode("keep")).toBe(true)
-	})
-
-	test("validateAwdlMode rejects anything else", () => {
-		expect(validateAwdlMode("on")).not.toBe(true)
-		expect(validateAwdlMode("")).not.toBe(true)
-	})
 })

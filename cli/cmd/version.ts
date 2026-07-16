@@ -1,19 +1,18 @@
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { fail, validateDevicePort, validateHost } from "../utils"
+import { fail, validateTarget } from "../utils"
 import { resolveTargets } from "./wifi"
 
 export const versionCommand: Command = {
 	name: "version",
 	description:
-		"Get the firmware version of a device. If <host> is omitted, every device discovered on the network is queried.",
-	examples: ["version", "version 192.168.1.10", "version 192.168.1.10 4210"],
+		"Get firmware version. Use \"all\" or omit <target> to query every discovered device.",
+	examples: ["version", "version all", "version 192.168.1.10", "version 192.168.1.10:4211"],
 	args: [
-		{ required: false, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, validator: validateDevicePort, default: 4210 },
+		{ required: false, name: "target", type: String, validator: validateTarget },
 	],
-	execute: async (host: string | undefined, port: number) => {
-		const targets = await resolveTargets(host, port)
+	execute: async (target: string | undefined) => {
+		const targets = await resolveTargets(target)
 		if (targets.length === 0) return false
 
 		for (const target of targets) {

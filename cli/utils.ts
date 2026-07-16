@@ -49,6 +49,16 @@ export function validateHost(value: string): boolean | string {
 	return `"${value}" is not a valid IPv4 or hostname`
 }
 
+export function validateTarget(value: string): boolean | string {
+	if (!value) return false
+	const [host, port, extra] = value.split(":")
+	if (extra !== undefined) return `"${value}" is not a valid target`
+	if (port !== undefined && !validateDevicePort(port)) return `"${port}" is not a valid device port`
+	if (host.toLowerCase() === "all") return true
+	if (/^\d+$/.test(host)) return `"${value}" is not a valid target; use "all" for all devices or an IP/hostname`
+	return validateHost(host)
+}
+
 ////////////////////// ANSI helpers
 
 // Honor the NO_COLOR convention (https://no-color.org) and skip escapes when

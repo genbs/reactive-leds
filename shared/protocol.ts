@@ -48,6 +48,7 @@ export type IP = string | [number, number, number, number]
 export type AddressBuffer = Uint8Array
 
 export const EMPTY_PACKET_ID = 0
+export const DEFAULT_SYNC_TIMEOUT = 1000
 
 /** Label for the packet types */
 export const PacketTypeMap = {
@@ -162,10 +163,10 @@ export type Status = {
 	framesDropped?: number // frames dropped because RMT was busy
 	udpPacketsRead?: number // UDP packets read by the firmware socket
 	protocolLoopMaxGapMs?: number // max observed gap between protocol_loop calls
-	arrivalGapHist?: number[] // SET_LEDS inter-arrival histogram: ≤5, ≤10, ≤20, ≤50, ≤100, >100 ms
-	arrivalGapMaxMs?: number // largest SET_LEDS inter-arrival gap (gaps >2s count as stream pauses, not stalls)
+	arrivalGapHist?: number[] // benchmark SET_LEDS inter-arrival histogram: ≤5, ≤10, ≤20, ≤50, ≤100, >100 ms
+	arrivalGapMaxMs?: number // largest benchmark SET_LEDS inter-arrival gap (gaps >2s count as stream pauses, not stalls)
 	arrivalGapMaxAgeS?: number // seconds since that largest gap occurred
-	seqLost?: number // SET_LEDS sequence gaps: packets lost in flight (needs a sender that rolls the id byte)
+	seqLost?: number // benchmark SET_LEDS sequence gaps; id 0 is untracked
 	seqReordered?: number // SET_LEDS packets that arrived out of order
 	beaconTimeouts?: number // WiFi beacon-timeout events since boot
 	wifiDisconnects?: number // WiFi disconnect events since boot

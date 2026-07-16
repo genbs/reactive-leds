@@ -1,24 +1,23 @@
 import { warnIfAwdlActive } from "../awdl"
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { ok, validateDevicePort, validateHost } from "../utils"
+import { ok, validateTarget } from "../utils"
 import { resolveTargets } from "./wifi"
 
 export const rainbowCommand: Command = {
 	name: "rainbow",
 	description:
-		"Run a rainbow effect for <seconds>. If <host> is omitted the effect is sent to every device discovered on the network.",
-	examples: ["rainbow", "rainbow 10", "rainbow 10 192.168.1.100"],
+		"Run a rainbow effect on <target>. Use \"all\" or omit <target> to target every discovered device.",
+	examples: ["rainbow", "rainbow all 10", "rainbow 192.168.1.100 10", "rainbow 192.168.1.100:4211 10 1"],
 	args: [
+		{ required: false, name: "target", type: String, validator: validateTarget },
 		{ required: false, name: "seconds", type: Number, default: 10 },
 		{ required: false, name: "speed", type: Number, default: 1 },
-		{ required: false, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, validator: validateDevicePort, default: 4210 },
 	],
-	execute: async (seconds: number, speed: number, host: string | undefined, port: number) => {
+	execute: async (target: string | undefined, seconds: number, speed: number) => {
 		await warnIfAwdlActive("rainbow")
 
-		const targets = await resolveTargets(host, port)
+		const targets = await resolveTargets(target)
 		if (targets.length === 0) return false
 
 		console.log(`Target devices: ${targets.map(t => `${t.ip}:${t.port}`).join(", ")}`)

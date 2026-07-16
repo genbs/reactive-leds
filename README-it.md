@@ -1,8 +1,10 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/logo-white.svg">
-  <source media="(prefers-color-scheme: light)" srcset="docs/logo-black.svg">
-  <img alt="rleds logo" src="docs/logo-white.svg" width="180">
-</picture>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-black.svg">
+    <img alt="rleds logo" src="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-white.svg" width="180">
+  </picture>
+</p>
 
 [![Test shared](https://github.com/genbs/reactive-leds/actions/workflows/test-shared.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/test-shared.yml)
 [![Test cli](https://github.com/genbs/reactive-leds/actions/workflows/test-cli.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/test-cli.yml)
@@ -16,9 +18,9 @@ Language: [English](./README.md) | [Italiano](./README-it.md)
 
 ## Introduzione
 
-Questo progetto racconta la mia esperienza personale nella costruzione di un tubo LED stampato in 3D, controllabile via WiFi in real-time.
+Questo progetto racconta la mia esperienza personale nella costruzione di un tubo LED stampato in 3D, controllabile via WiFi.
 
-Nasce da un'esigenza personale, avevo bisogno di luci per le mie performance di live coding e da sviluppatore software e possessore di una stampante 3D mi sono divertito a creare un sistema che mi permettesse di controllare delle luci attraverso il browser con latenza minima.
+Nasce da un'esigenza personale, avevo bisogno di luci per le mie performance di live coding e da sviluppatore software e possessore di una stampante 3D mi sono divertito a creare un sistema che mi permettesse di controllare delle luci attraverso il browser con latenza minima ad un costo contenuto.
 
 Il firmware e i modelli 3D sono progettati sull'hardware che ho usato. Possono essere presi come punto di partenza e adattati alla propria configurazione.
 
@@ -82,6 +84,15 @@ Il case è progettato per alloggiare l'ESP32-S3 e il modulo DC-DC elencati sopra
 
 Per il profilo ho stampato 5 pezzi in PLA, ciascuno lungo 20 cm. Per la barra diffusore ho usato PETG trasparente, 4 pezzi da 25 cm.
 
+## Assemblaggio
+
+1. Stampa i pezzi del case (`case/*.stl`) e del binario LED (`tube/*.stl`), vedi [`3dprint/README-it.md`](3dprint/README-it.md) per materiali e impostazioni.
+2. Salda la resistenza da 330 Ω sulla linea dati, il più vicino possibile all'inizio della striscia LED.
+3. Collega alimentatore, modulo DC-DC, ESP32-S3 e striscia seguendo lo schema in [Cablaggio](firmware/README-it.md#cablaggio).
+4. Inserisci ESP32-S3 e modulo DC-DC nel case, chiudi con `top`/`bottom`/`tap` — incolla i `tap` per evitare che il modulo DC-DC cada.
+5. Incolla i 5 pezzi `profile` tra loro per formare il binario da 1m, monta la striscia FCOB, poi incolla i 4 pezzi `opal` come diffusore.
+6. Flasha il firmware (vedi [`firmware/README-it.md`](firmware/README-it.md)) e configura il WiFi via BLE con la [CLI](cli/README-it.md).
+
 ## Limitazioni e problemi noti
 
 - **Controllo a segmenti, non per LED**: la striscia FCOB ha 896 LED per metro ma solo 16 IC per metro. Il controllo avviene per segmento (16 segmenti/m), non per singolo LED. È una scelta consapevole: ho preferito una striscia più luminosa a scapito della risoluzione.
@@ -90,24 +101,6 @@ Per il profilo ho stampato 5 pezzi in PLA, ciascuno lungo 20 cm. Per la barra di
 - **WiFi sleep disabilitato**: la modalità risparmio energetico della radio WiFi è disabilitata esplicitamente per evitare picchi di latenza e perdita di pacchetti durante gli aggiornamenti real-time.
 - **Credenziali WiFi in chiaro via BLE**: durante il provisioning le credenziali vengono inviate senza cifratura. Per un progetto personale la semplicità ha priorità, ma tienilo a mente se usi reti sensibili.
 
-## Diagnostica realtime
-
-Il firmware espone contatori runtime tramite `rleds status`, e la CLI include un piccolo comando di benchmark:
-
-```sh
-rleds benchmark 192.168.1.113 60 120
-```
-
-I campi più utili sono:
-
-- `set-leds`: frame LED validi ricevuti dal device divisi per i frame tentati dall'host.
-- `arrival-gaps`: tempi tra pacchetti `SET_LEDS` ricevuti. A 60 fps la maggior parte dovrebbe stare nel bucket `≤20ms`.
-- `seq-lost`: pacchetti che non sono arrivati al firmware, misurati usando l'id sequenziale del benchmark.
-- `rmt-drop-rate`: frame scartati perché il trasferimento RMT precedente era ancora occupato. A frame rate normali dovrebbe restare a `0.000%`.
-
-Su macOS, lo streaming realtime via WiFi può avere stutter a causa di AWDL (la rete peer-to-peer usata da AirDrop/Handoff/AirPlay). Una firma tipica è: molti gap `>100ms`, molti gap `≤5ms` subito dopo, e `seq-lost 0`: i pacchetti non sono stati persi, sono stati trattenuti e rilasciati a raffica lato sender. Per un test pulito usa Ethernet oppure disabilita temporaneamente AWDL con `sudo ifconfig awdl0 down`.
-
 ## Alimentazione e sicurezza
 
 La striscia LED funziona a 24V. Il dimensionamento dell'alimentatore dipende dalle specifiche della striscia e dal carico reale — come riferimento, con tutti i LED accesi la striscia assorbe circa **1 A per metro**. Usa un alimentatore con margine adeguato e un cablaggio corretto.
-Metti la resistenza da 330 Ω in serie sulla linea dati tra ESP32 e striscia, il più vicino possibile alla striscia.

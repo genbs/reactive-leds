@@ -24,7 +24,7 @@ CONFIG_LWIP_LOCAL_HOSTNAME="esp32-X"
 
 # --- FreeRTOS ---
 # 1000 Hz tick (default 100 Hz) gives vTaskDelay 1 ms granularity, improving
-# responsiveness of the 2 ms protocol polling loop.
+# responsiveness of the 1 ms protocol polling loop.
 CONFIG_FREERTOS_HZ=1000
 
 # --- Runtime performance ---

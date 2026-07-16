@@ -9,7 +9,7 @@ export declare enum PacketType {
 	SET_CONFIG = 2,
 	SET_LEDS = 3,
 	RESET_WIFI = 4,
-	GET_VERSION = 5,
+	GET_INFO = 5,
 	GET_STATUS = 6
 }
 /** Serialized as: [pin, num_leds, port_h, port_l, hostname...] */
@@ -26,12 +26,34 @@ export type IP = string | [
 	number,
 	number
 ];
-/** Device status. Serialized as: [uptime(4), heap(4), rssi(1), mac?(6)] */
+/** Device identity. Serialized as: [ip(4), port(2), mac(6), version_len(1), version, hostname_len(1), hostname] */
+export type DeviceInfo = {
+	ip: string;
+	port: number;
+	mac: string;
+	version: string;
+	hostname: string;
+};
+/** Device status. Serialized as: [uptime(4), heap(4), rssi(1), metrics?(32), debug?(48)] */
 export type Status = {
 	uptime: number;
 	heap: number;
 	rssi: number;
-	mac?: string;
+	internalHeap?: number;
+	largestHeapBlock?: number;
+	minHeap?: number;
+	framesReceived?: number;
+	framesShown?: number;
+	framesDropped?: number;
+	udpPacketsRead?: number;
+	protocolLoopMaxGapMs?: number;
+	arrivalGapHist?: number[];
+	arrivalGapMaxMs?: number;
+	arrivalGapMaxAgeS?: number;
+	seqLost?: number;
+	seqReordered?: number;
+	beaconTimeouts?: number;
+	wifiDisconnects?: number;
 };
 /**
  * Canvas-to-LED sampling.
@@ -91,7 +113,9 @@ export declare function begin(serverURL: string, debug?: boolean): Promise<boole
 export declare function ping(ip: IP, port?: number): Promise<boolean>;
 /** Get the configuration of the device. */
 export declare function getConfig(ip: IP, port?: number): Promise<Config | null>;
-/** Get device status: uptime (seconds), free heap (bytes), WiFi RSSI (dBm). */
+/** Get device identity: IP, port, MAC, hostname and firmware version. */
+export declare function getInfo(ip: IP, port?: number): Promise<DeviceInfo | null>;
+/** Get device status: uptime, heap, WiFi RSSI and optional metrics. */
 export declare function getStatus(ip: IP, port?: number): Promise<Status | null>;
 /** Send LED colors to the device — fire-and-forget, no response expected. */
 export declare function setLEDs(ip: IP, port: number | undefined, leds: Uint8Array): void;
@@ -106,7 +130,7 @@ export declare function sendRaw(ip: IP, port: number, type: PacketType, data?: U
 /**
  * Send a raw protocol packet and wait for the response payload as relayed by
  * the proxy: `[status]` for status-only replies (1 = OK), or the response
- * data (e.g. the version string bytes for GET_VERSION).
+ * data (e.g. the info payload bytes for GET_INFO).
  */
 export declare function sendRawSync(ip: IP, port: number, type: PacketType, data?: Uint8Array): Promise<Uint8Array>;
 declare const reactiveLeds: {
@@ -115,6 +139,7 @@ declare const reactiveLeds: {
 	isConnected: typeof isConnected;
 	connect: typeof connect;
 	ping: typeof ping;
+	getInfo: typeof getInfo;
 	getConfig: typeof getConfig;
 	getStatus: typeof getStatus;
 	setLEDs: typeof setLEDs;

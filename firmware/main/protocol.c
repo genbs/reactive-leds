@@ -5,6 +5,7 @@
 #include "esp_heap_caps.h"
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "driver/gpio.h"
 #include "config.h"
 #include "storage.h"
 #include "udp_con.h"
@@ -22,9 +23,15 @@ static uint32_t s_udp_packets_read = 0;
 static uint32_t s_protocol_loop_max_gap_ms = 0;
 static int64_t s_protocol_loop_last_us = 0;
 
-// SET_LEDS inter-arrival counters. They describe how regularly frames reach
-// the firmware, independently from whether RMT can display them immediately.
+// Benchmark SET_LEDS inter-arrival counters. Packet id 0 is untracked so
+// ordinary one-shot commands do not pollute the histogram. The benchmark
+// sender uses id 1 only for its start marker and streams frames as ids
+// 2..255; that split lets us tell marker from stream by id alone, with no
+// timing heuristic (see track_set_leds_metrics).
 #define ARRIVAL_GAP_BUCKETS 6
+#define SET_LEDS_BENCHMARK_START_PACKET_ID 1
+#define SET_LEDS_STREAM_FIRST_PACKET_ID 2
+#define SET_LEDS_STREAM_PACKET_COUNT 254 // ids 2..255
 #define SET_LEDS_STREAM_PAUSE_MS 2000
 
 static const uint32_t k_arrival_gap_bounds_ms[ARRIVAL_GAP_BUCKETS - 1] = {
@@ -35,8 +42,9 @@ static uint32_t s_arrival_gap_max_ms = 0;
 static int64_t s_arrival_gap_max_at_us = 0;
 static int64_t s_last_set_leds_us = 0;
 
-// Optional sequence tracking: the benchmark sender increments the packet id.
-// Regular senders that keep the id fixed simply produce delta == 0.
+// Optional benchmark tracking: packet id 0 is the fire-and-forget path used by
+// ordinary SET_LEDS senders. Benchmark streams use ids 2..255 (id 1 is the
+// start marker), so sequence deltas are computed in that 254-wide space.
 static uint32_t s_seq_lost = 0;
 static uint32_t s_seq_reordered = 0;
 static bool s_seq_started = false;
@@ -49,6 +57,14 @@ static int arrival_gap_bucket(uint32_t gap_ms)
         bucket++;
     }
     return bucket;
+}
+
+static void reset_arrival_gap_max(void)
+{
+    s_arrival_gap_max_ms = 0;
+    s_arrival_gap_max_at_us = 0;
+    // The benchmark marker is not a measured frame; the next frame starts timing.
+    s_last_set_leds_us = 0;
 }
 
 static void track_set_leds_gap(int64_t now_us)
@@ -73,15 +89,22 @@ static void track_set_leds_gap(int64_t now_us)
     }
 }
 
+// Sequence tracking over the stream id space (2..255). Deltas are computed in
+// that 254-wide ring so the 255 -> 2 wrap is a clean +1 step (no false loss),
+// and forward gaps count as loss while backward jumps count as reordering.
+// Only stream ids reach here; the marker is handled in track_set_leds_metrics.
 static void track_set_leds_sequence(uint8_t packet_id)
 {
     if (s_seq_started) {
-        uint8_t delta = (uint8_t)(packet_id - s_seq_last);
-        if (delta > 1 && delta < 128) {
+        uint8_t pos = packet_id - SET_LEDS_STREAM_FIRST_PACKET_ID;
+        uint8_t last = s_seq_last - SET_LEDS_STREAM_FIRST_PACKET_ID;
+        uint8_t delta = (uint8_t)((pos + SET_LEDS_STREAM_PACKET_COUNT - last) % SET_LEDS_STREAM_PACKET_COUNT);
+        if (delta > 1 && delta < SET_LEDS_STREAM_PACKET_COUNT / 2) {
             s_seq_lost += delta - 1;
-        } else if (delta >= 128) {
+        } else if (delta >= SET_LEDS_STREAM_PACKET_COUNT / 2) {
             s_seq_reordered++;
             if (s_seq_lost > 0) s_seq_lost--;
+            return;
         }
     }
 
@@ -92,6 +115,18 @@ static void track_set_leds_sequence(uint8_t packet_id)
 static void track_set_leds_metrics(uint8_t packet_id)
 {
     int64_t now_us = esp_timer_get_time();
+
+    // The benchmark opens each run with the marker id (streams only ever use
+    // 2..255), so this is unambiguous with no timing heuristic: reset the
+    // per-run max gap and re-arm the sequence baseline. The marker is a beacon,
+    // not a measured frame, so it is not fed to gap or sequence tracking — the
+    // first stream frame arms the baseline instead.
+    if (packet_id == SET_LEDS_BENCHMARK_START_PACKET_ID) {
+        s_seq_started = false;
+        reset_arrival_gap_max();
+        return;
+    }
+
     track_set_leds_gap(now_us);
     track_set_leds_sequence(packet_id);
 }
@@ -233,11 +268,16 @@ static void protocol_set_config(const udp_packet* request)
 
     ESP_LOGV(PROTOCOL_TAG, "SET_CONFIG");
 
-    uint8_t new_pin = data[2];
+    int new_pin = data[2];
     uint8_t new_num_leds = data[3];
     uint16_t new_port = (data[4] << 8) | data[5];
 
     size_t hostname_len_from_packet = len - 6;
+    if (!GPIO_IS_VALID_OUTPUT_GPIO(new_pin) || new_num_leds == 0 || new_port < 1024 ||
+        hostname_len_from_packet >= sizeof(config.hostname)) {
+        ESP_LOGW(PROTOCOL_TAG, "Invalid SET_CONFIG values");
+        return;
+    }
     size_t len_to_copy = (hostname_len_from_packet < sizeof(config.hostname)) ? hostname_len_from_packet : (sizeof(config.hostname) - 1);
 
     char new_hostname[sizeof(config.hostname)];
@@ -290,7 +330,10 @@ static void protocol_set_leds(const udp_packet* request)
 
     ESP_LOGV(PROTOCOL_TAG, "SET_LEDS");
 
-    track_set_leds_metrics(data[0]);
+    // Benchmark measurement
+    if (data[0] != 0) { 
+        track_set_leds_metrics(data[0]);
+    }
 
     bool updated = false;
     for (int i = 2; i + 4 < len; i += 5) {
@@ -302,6 +345,7 @@ static void protocol_set_leds(const udp_packet* request)
         leds_update(pixel_index, data[i+1] /* R */, data[i+2] /* G */, data[i+3] /* B */, data[i+4] /* W */);
         updated = true;
     }
+    
     if (updated) {
         s_led_frames_received++;
         leds_show();
@@ -312,21 +356,25 @@ static void protocol_reset_wifi(const udp_packet* request)
 {
     ESP_LOGV(PROTOCOL_TAG, "RESET_WIFI");
 
+    ESP_LOGI(PROTOCOL_TAG, "Performing WiFi reset...");
+    esp_err_t err = storage_delete("wifi", NULL);
+
     udp_packet response;
     response.source_addr = request->source_addr;
     response.data[0] = request->data[0];
     response.data[1] = RESET_WIFI;
-    response.data[2] = 1; 
+    response.data[2] = err == ESP_OK ? 1 : 0;
     response.len = 3;
     udp_con_send(&response);
 
-    // Give the UDP packet time to actually leave the chip before
-    // we wipe WiFi credentials and reboot. 500ms is generous even
-    // on congested networks.
-    vTaskDelay(pdMS_TO_TICKS(500));
+    if (err != ESP_OK) {
+        ESP_LOGE(PROTOCOL_TAG, "WiFi reset failed: %s", esp_err_to_name(err));
+        return;
+    }
 
-    ESP_LOGI(PROTOCOL_TAG, "Performing WiFi reset...");
-    storage_delete("wifi", NULL); 
+    // Give the response time to leave the chip before rebooting.
+    // 500ms is generous even on congested networks.
+    vTaskDelay(pdMS_TO_TICKS(500));
 
     ESP_LOGI(PROTOCOL_TAG, "WiFi credentials reset, restarting...");
     esp_restart();

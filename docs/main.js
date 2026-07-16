@@ -36,7 +36,6 @@ if (document.readyState === "loading") {
 
 window.rleds = rleds
 window.devices = new Map()
-window.stripOrientation = localStorage.getItem("stripOrientation") ?? "v"
 
 // i18n
 let strings = {}
@@ -79,23 +78,52 @@ document.getElementById("lang-btn").addEventListener("click", () => {
 	loadLang(document.documentElement.lang === "en" ? "it" : "en")
 })
 
+function deviceNetwork(keys) {
+	const match = keys[0]?.match(/^(\d+\.\d+\.\d+)\./)
+	return match ? match[1] : localStorage.getItem("devicesNetwork") || "default"
+}
+
+function devicesStorageKey(network = localStorage.getItem("devicesNetwork") || "default") {
+	return `devices:${network}`
+}
+
+function readStoredDevices() {
+	const raw = localStorage.getItem(devicesStorageKey()) || localStorage.getItem("devices") || "[]"
+	let stored = []
+	try {
+		stored = JSON.parse(raw)
+	} catch {
+		stored = []
+	}
+	return stored
+		.map(item => (typeof item === "string" ? [item, null] : [item.key, item.config]))
+		.filter(([key]) => typeof key === "string" && key)
+}
+
 function saveDevices() {
-	localStorage.setItem("devices", JSON.stringify([...window.devices.keys()]))
+	const entries = [...window.devices.entries()]
+	const keys = entries.map(([key]) => key)
+	const network = deviceNetwork(keys)
+	localStorage.setItem("devicesNetwork", network)
+	localStorage.setItem("devices", JSON.stringify(keys)) // legacy fallback
+	localStorage.setItem(devicesStorageKey(network), JSON.stringify(entries.map(([key, config]) => ({ key, config }))))
 }
 
 async function getDevices() {
 	// stored keys are addresses ("ip:port"); device objects carry the bare ip
-	const addresses = JSON.parse(localStorage.getItem("devices") || "[]")
+	const saved = readStoredDevices()
 	const results = await Promise.all(
-		addresses.map(async address => {
+		saved.map(async ([address, cached]) => {
 			const [ip, p] = address.split(":")
 			const port = parseInt(p || "4210")
 			const config = await rleds.getConfig(ip, port)
-			return config ? [address, { ...config, ip, port }] : null
+			if (config) return [address, { ...config, ip, port }]
+			return [address, { ...(cached || { num_leds: 16 }), ip, port, offline: true }]
 		})
 	)
-	window.devices = new Map(results.filter(Boolean))
+	window.devices = new Map(results)
 	saveDevices()
+	renderDevices()
 }
 
 async function addDevice(ip, port) {
@@ -129,52 +157,113 @@ function moveDevice(key, dir) {
 }
 
 const deviceList = document.getElementById("device-list")
-const deviceCount = document.getElementById("device-count")
+const deviceCounts = document.querySelectorAll(".device-count")
 const examplesPanel = document.getElementById("examples-panel")
+const HEARTBEAT_MS = 10000
+const HEARTBEAT_MAX_MISSES = 3
+const heartbeatMisses = new Map()
+
+function proxyConnected() {
+	try {
+		return rleds.isConnected()
+	} catch {
+		return false
+	}
+}
+
+function setDeviceCount(count) {
+	deviceCounts.forEach(el => (el.textContent = count))
+}
 
 // ping every device; drop the ones that stopped answering
 async function heartbeatDevices() {
-	if (!rleds.isConnected()) return
-
+	if (!proxyConnected()) return
 	const checks = await Promise.all(
 		[...window.devices.entries()].map(async ([key, { ip, port }]) => ({
 			key,
 			alive: await rleds.ping(ip, port),
 		}))
 	)
-	const dead = checks.filter(r => !r.alive)
-	if (dead.length === 0) return
-	dead.forEach(r => window.devices.delete(r.key))
-	saveDevices()
-	renderDevices()
+	let changed = false
+	checks.forEach(({ key, alive }) => {
+		if (alive) {
+			heartbeatMisses.delete(key)
+			const config = window.devices.get(key)
+			if (config?.offline) {
+				window.devices.set(key, { ...config, offline: false })
+				changed = true
+			}
+		} else {
+			heartbeatMisses.set(key, (heartbeatMisses.get(key) ?? 0) + 1)
+		}
+	})
+	const dead = checks.filter(r => !r.alive && heartbeatMisses.get(r.key) >= HEARTBEAT_MAX_MISSES)
+	dead.forEach(r => {
+		const config = window.devices.get(r.key)
+		if (config && !config.offline) {
+			window.devices.set(r.key, { ...config, offline: true })
+			changed = true
+		}
+		heartbeatMisses.delete(r.key)
+	})
+
+	if (changed) {
+		saveDevices()
+		renderDevices()
+	}
+
+	setTimeout(heartbeatDevices, HEARTBEAT_MS)
 }
 
 async function renderDevices() {
-	deviceList.innerHTML = ""
-	await getDevices()
+	deviceList.replaceChildren()
 	const devices = [...window.devices.entries()]
-	deviceCount.textContent = devices.length
+	setDeviceCount(devices.length)
 	examplesPanel.toggleAttribute("inert", devices.length === 0)
 
 	devices.forEach(([key, config], idx) => {
 		const div = document.createElement("div")
 		div.className = "device-item"
-		const label = config.hostname ? `${config.hostname} <span class="text-xs color-medium">${key}</span>` : key
-		div.innerHTML =
-			`<span class="color-primary">›</span>` +
-			`<span class="flex flex-col">${label}</span>` +
-			`<span class="text-xs color-medium">${config.num_leds} leds</span>` +
-			`<div class="flex gap-s">` +
-			`<div class="flex">` +
-			`<button class="small" data-action="move" data-dir="-1" ${idx === 0 ? "disabled" : ""}>↑</button>` +
-			`<button class="small" data-action="move" data-dir="1" ${idx === devices.length - 1 ? "disabled" : ""}>↓</button>` +
-			`</div>` +
-			`<button class="small" data-action="remove">✕</button>` +
-			`</div>`
-		div
-			.querySelectorAll("[data-action='move']")
-			.forEach(btn => btn.addEventListener("click", () => moveDevice(key, parseInt(btn.dataset.dir))))
-		div.querySelector("[data-action='remove']").addEventListener("click", () => removeDevice(key))
+		const arrow = document.createElement("span")
+		arrow.className = "color-primary"
+		arrow.textContent = "›"
+
+		const label = document.createElement("span")
+		label.className = "flex flex-col"
+		label.append(document.createTextNode(config.hostname || key))
+		if (config.hostname) {
+			const address = document.createElement("span")
+			address.className = "text-xs color-medium"
+			address.textContent = key
+			label.append(address)
+		}
+
+		const leds = document.createElement("span")
+		leds.className = "text-xs color-medium"
+		leds.textContent = `${config.num_leds} leds${config.offline ? " cached" : ""}`
+
+		const actions = document.createElement("div")
+		actions.className = "flex gap-s"
+		const moves = document.createElement("div")
+		moves.className = "flex"
+		const up = document.createElement("button")
+		up.className = "small"
+		up.disabled = idx === 0
+		up.textContent = "↑"
+		up.addEventListener("click", () => moveDevice(key, -1))
+		const down = document.createElement("button")
+		down.className = "small"
+		down.disabled = idx === devices.length - 1
+		down.textContent = "↓"
+		down.addEventListener("click", () => moveDevice(key, 1))
+		const remove = document.createElement("button")
+		remove.className = "small"
+		remove.textContent = "✕"
+		remove.addEventListener("click", () => removeDevice(key))
+
+		moves.append(up, down)
+		actions.append(moves, remove)
+		div.append(arrow, label, leds, actions)
 		deviceList.appendChild(div)
 	})
 
@@ -200,6 +289,11 @@ function initAddDevice(root) {
 	addBtn.addEventListener("click", async () => {
 		const [ip, p] = addInput.value.split(":")
 		const port = parseInt(p || "4210")
+
+		if (!proxyConnected()) {
+			addError.textContent = t("proxy.lost")
+			return
+		}
 
 		addInput.disabled = addBtn.disabled = true
 		addMessage.textContent = t("device.looking")
@@ -268,12 +362,11 @@ const devicesSectionList = document.getElementsByClassName("devices-section")
 			localStorage.setItem("proxyUrl", url)
 			wasConnected = true
 			Array.from(devicesSectionList).forEach(section => section.removeAttribute("inert"))
-			await renderDevices()
+			await heartbeatDevices()
 		} else {
 			if (wasConnected) widgets.forEach(w => (w.error.textContent = t("proxy.lost")))
 			Array.from(devicesSectionList).forEach(section => section.setAttribute("inert", ""))
 			examplesPanel.setAttribute("inert", "")
-			renderDevices()
 		}
 	})
 }
@@ -304,11 +397,21 @@ function drawStrips(
 	ctx,
 	devices,
 	colors,
-	orientation = window.stripOrientation ?? "v",
+	orientation = "h",
 	width = ctx.canvas.width,
 	yOffset = STRIP_PAD,
-	rowSize = STRIP_CELL
+	rowSize = STRIP_CELL,
+	send = true
 ) {
+	if (send && proxyConnected()) {
+		for (const [address, config] of devices.entries()) {
+			const leds = colors.get(address) ?? []
+			const data = new Uint8Array(config.num_leds * 5)
+			for (let i = 0; i < config.num_leds; i++) data.set([i, ...(leds[i] ?? [0, 0, 0, 0])], i * 5)
+			window.rleds.setLEDs(config.ip, config.port, data)
+		}
+	}
+
 	const entries = [...devices.entries()]
 	const n = entries.length
 	const maxLeds = Math.max(...entries.map(([, c]) => c.num_leds), 1)
@@ -348,19 +451,11 @@ function drawStrips(
 			}
 		})
 	}
-
-	if (!rleds.isConnected()) return
-	for (const [address, config] of devices.entries()) {
-		const leds = colors.get(address) ?? []
-		const data = new Uint8Array(config.num_leds * 5)
-		for (let i = 0; i < config.num_leds; i++) data.set([i, ...(leds[i] ?? [0, 0, 0, 0])], i * 5)
-		window.rleds.setLEDs(config.ip, config.port, data)
-	}
 }
 
-function stripsCanvasSize(devices, container) {
+function stripsCanvasSize(devices, container, orientation = "h") {
 	const count = Math.max(devices.size, 1)
-	if (window.stripOrientation === "h") {
+	if (orientation === "h") {
 		return {
 			width: container.clientWidth,
 			height: STRIP_PAD * 2 + count * (STRIP_CELL + STRIP_GAP) - STRIP_GAP,
@@ -376,17 +471,17 @@ function stripsCanvasSize(devices, container) {
 const previewCanvas = document.getElementById("preview-canvas")
 const previewCtx = previewCanvas?.getContext("2d")
 
-// (re)size the shared preview to the current device count / orientation and clear
+// (re)size the shared preview to the current device count and clear
 // it. Returns the context so an example can `const ctx = fitPreview()` and draw.
-function fitPreview() {
-	const size = stripsCanvasSize(window.devices, previewCanvas.parentElement)
+function fitPreview(orientation = "h") {
+	const size = stripsCanvasSize(window.devices, previewCanvas.parentElement, orientation)
 	previewCanvas.width = size.width
 	previewCanvas.height = size.height
 	previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height)
 	return previewCtx
 }
 
-// API the dynamically-loaded example fragments (color/chase/audio.html) rely on
+// API the dynamically-loaded playground fragment relies on
 Object.assign(window, {
 	drawStrips,
 	hslToRgb,
@@ -397,12 +492,6 @@ Object.assign(window, {
 	STRIP_PAD,
 	STRIP_GAP,
 	STRIP_CELL,
-})
-
-document.getElementById("orientation-toggle").addEventListener("click", () => {
-	window.stripOrientation = window.stripOrientation === "h" ? "v" : "h"
-	localStorage.setItem("stripOrientation", window.stripOrientation)
-	window.main?.()
 })
 
 // console helper: populate fake devices to preview the UI without hardware
@@ -462,7 +551,7 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		}
 		if (loaded) return window.main?.()
 		loaded = true
-		loadExample(localStorage.getItem("example") || "color")
+		loadExample("playground")
 	})
 
 	window.addEventListener("resize", () => {
@@ -549,17 +638,22 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 	function buildDeviceList() {
 		const entries = [...window.devices.entries()]
 		const n = entries.length
-		deviceListEl.innerHTML = ""
+		deviceListEl.replaceChildren()
 		deviceRows.clear()
 		entries.forEach(([address, config], idx) => {
 			const entry_hue = deviceHue(idx, n)
 			const div = document.createElement("div")
 			div.className =
 				"flex align-center nowrap text-overflow gap-s pd-s pointer" + (idx > 0 ? " border-top-primary-light" : "")
-			div.innerHTML =
-				`<span class="square" style="background:hsl(${entry_hue},80%,65%)"></span>` +
-				`<span>${config.hostname || address}</span>` +
-				`<span class="text-xs color-medium">${config.num_leds} leds</span>`
+			const swatch = document.createElement("span")
+			swatch.className = "square"
+			swatch.style.background = `hsl(${entry_hue},80%,65%)`
+			const name = document.createElement("span")
+			name.textContent = config.hostname || address
+			const leds = document.createElement("span")
+			leds.className = "text-xs color-medium"
+			leds.textContent = `${config.num_leds} leds`
+			div.append(swatch, name, leds)
 			div.addEventListener("click", () => {
 				selected = address
 				renderMapping()
@@ -1242,3 +1336,5 @@ function sendFrame() {
 
 	window.addEventListener("resize", resizeMapping)
 }
+
+getDevices()

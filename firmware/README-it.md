@@ -1,11 +1,19 @@
-# Firmware
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-black.svg">
+    <img alt="rleds logo" src="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-white.svg" width="180">
+  </picture>
+</p>
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Firmware Build](https://github.com/genbs/reactive-leds/actions/workflows/firmware-build.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/firmware-build.yml)
 
+# Firmware
+
 Language: [English](./README.md) | [Italiano](./README-it.md)
 
-Questo è il cuore del progetto: il firmware che gira sull'ESP32-S3, riceve i comandi via UDP e aggiorna i LED in tempo reale con una latenza minima.
+Questo è il cuore del progetto: il firmware che gira sull'ESP32, riceve i comandi via UDP e aggiorna i LED in tempo reale.
 
 Al primo avvio, il firmware entra in modalità provisioning BLE, dove aspetta le credenziali Wi-Fi da un client (es. la [CLI](../cli/README-it.md)). Dopo aver ricevuto le credenziali, si connette alla rete e resta in ascolto di [pacchetti UDP](#protocollo).
 
@@ -19,7 +27,7 @@ Il firmware è tarato per FCOB 24V a 16 IC con ordine byte WRGB, ma si adatta ad
 - Python 3
 - [ESP-IDF](https://github.com/espressif/esp-idf) v5.5.X — [Guida installazione](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/index.html#installation)
 
-**Driver USB (macOS/Windows)**: a seconda della dev board, l'ESP32-S3 appare via USB nativo (nessun driver, come `/dev/cu.usbmodem*`) oppure tramite un chip bridge USB-UART. Se la porta non viene riconosciuta, installa il driver del bridge della tua board: **CH340/CH9102** (WCH, appare come `/dev/cu.wchusbserial*`) o **CP210x** (Silicon Labs, appare come `/dev/cu.SLAB_USBtoUART`). Usa `ls /dev/cu.*` per vedere come si presenta la tua board. Su Linux questi driver sono di solito già nel kernel.
+**Driver USB (macOS/Windows)**: a seconda della dev board, l'ESP32 appare via USB nativo (nessun driver, come `/dev/cu.usbmodem*`) oppure tramite un chip bridge USB-UART. Se la porta non viene riconosciuta, installa il driver del bridge della tua board: **CH340/CH9102** (WCH, appare come `/dev/cu.wchusbserial*`) o **CP210x** (Silicon Labs, appare come `/dev/cu.SLAB_USBtoUART`). Usa `ls /dev/cu.*` per vedere come si presenta la tua board. Su Linux questi driver sono di solito già nel kernel.
 
 ## Configurazione e Build
 
@@ -31,7 +39,7 @@ ESP-IDF la combina con i propri default per generare `sdkconfig` al build time:
 - `CONFIG_BT_BLE_42_FEATURES_SUPPORTED=y` — richiesto dal server GATT del BLE provisioning.
 - `CONFIG_LWIP_UDP_RECVMBOX_SIZE=6` — receive mailbox UDP piccola per design. Sotto sovraccarico il kernel droppa i nuovi arrivi (drop-tail) invece di accumulare una coda non limitata. Vedi "Scelte progettuali" per il razionale.
 - `CONFIG_LWIP_LOCAL_HOSTNAME="esp32-X"` — hostname iniziale usato prima che una config runtime salvata lo sovrascriva.
-- `CONFIG_FREERTOS_HZ=1000` — granularità 1 ms per `vTaskDelay`. Necessario per il poll del protocollo a 2 ms: col default a 100 Hz, `pdMS_TO_TICKS(2)` si arrotonderebbe a 0 tick e andrebbe in busy-spin.
+- `CONFIG_FREERTOS_HZ=1000` — granularità 1 ms per `vTaskDelay`. Necessario per il poll del protocollo a 1 ms: col default a 100 Hz, `pdMS_TO_TICKS(1)` si arrotonderebbe a 0 tick.
 - `CONFIG_RMT_ENCODER_FUNC_IN_IRAM=y`, `CONFIG_RMT_ISR_IRAM_SAFE=y`, `CONFIG_GDMA_ISR_IRAM_SAFE=y` — tengono IRAM-safe encoder RMT, interrupt RMT e interrupt GDMA. Questo protegge un transfer anche se una finestra flash-cache-disable (es. una scrittura NVS) lo sovrappone.
 - `CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y`, `CONFIG_FREERTOS_TIMER_TASK_AFFINITY_CPU0=y` — pinnano lo stack WiFi/lwIP sul core 0, lasciando il core 1 al task protocollo/render (`xTaskCreatePinnedToCore(..., 1)` in `main.c`). Isola il percorso realtime dallo stack di rete.
 - `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y`, `CONFIG_COMPILER_OPTIMIZATION_PERF=y`, `CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y`, `CONFIG_ESP32S3_DATA_CACHE_64KB=y` — tuning di performance (clock massimo, `-O2`, I-cache e D-cache più grandi) per il percorso realtime.
@@ -58,19 +66,19 @@ Di default ESP-IDF la deriva da `git describe --tags --long --dirty`, quindi bas
 
 Serve compilare una sola volta. I default Kconfig (`pin=18`, `num_leds=16`, `port=4210`) sono un punto di partenza — dopo il flash puoi cambiarli tutti a runtime con `rleds config <host> <port> <chiave> <valore>` senza ricompilare. Il device si riavvia e carica la nuova config da NVS.
 
-Questo significa che puoi flashare lo stesso binario su tutti i tuoi device e configurarne ognuno singolarmente dalla CLI.
+Questo significa che puoi flashare lo stesso binario su tutti i tuoi device e configurarne ognuno singolarmente dalla [CLI](../cli/README-it.md).
 
 La cosa più importante da impostare su ogni device è l'**hostname** — identifica il device in modo univoco sulla rete ed è quello che `rleds scan` mostra. Impostalo subito dopo il primo flash:
 
 ```bash
-rleds config <host> <port> hostname esp32-1
+rleds config <host> hostname esp32-1
 ```
 
 Dopo puoi usare l'hostname al posto dell'IP in qualsiasi comando:
 
 ```bash
 rleds ping esp32-1
-rleds config esp32-1 4210 num_leds 32
+rleds config esp32-1 hostname esp32-2
 ```
 
 ### Build e flash
@@ -123,10 +131,10 @@ L'ordine dei byte è impostato in [`firmware/main/leds.c`](../firmware/main/leds
 
 ```c
 size_t index = pixel_index * 4;
-s_led_buffer[index] = w;      // adatta queste 4 righe alla tua striscia
-s_led_buffer[index + 1] = r;
-s_led_buffer[index + 2] = g;
-s_led_buffer[index + 3] = b;
+buf[index] = w;      // adatta queste 4 righe alla tua striscia
+buf[index + 1] = r;
+buf[index + 2] = g;
+buf[index + 3] = b;
 ```
 
 Ordini comuni:
@@ -140,23 +148,22 @@ Ordini comuni:
 
 Se passi a un tipo a 3 byte (senza white channel), modifica anche:
 
-- `s_led_buffer = malloc(config.num_leds * 4)` → `* 3` in `leds_begin`
+- `buffer_size = config.num_leds * 4` → `* 3` in `leds_begin` (dimensiona entrambi i buffer del double-buffering)
 - `config.num_leds * 4` → `* 3` in `leds_show`
 
 Le costanti di timing WS2812 in `rmt_new_led_strip_encoder` (T0H/T0L/T1H/T1L) funzionano per la maggior parte delle famiglie WS281x e SK68xx. IC esotici (APA102, SPI-based) richiedono un encoder completamente diverso.
 
-Rendere l'ordine dei byte e la dimensione del pixel configurabili (via Kconfig o config a runtime) è un passo naturale successivo — PR benvenute.
+Rendere l'ordine dei byte e la dimensione del pixel configurabili (via Kconfig o config a runtime) potrebbe essere un passo successivo, nel caso le PR sono benvenute.
 
 ## Cablaggio
 
 ```
-Alimentatore 24V
-  ├── (+) ──→ ingresso DC-DC XL4015 (+)
-  │            uscita DC-DC (5V) ──→ ESP32 pin 5V
-  │            GND DC-DC ─────────→ ESP32 GND
-  │
-  └── (+) ──→ striscia LED (+) 24V
-      (-)  ──→ striscia LED (-) GND (condiviso con ESP32 GND)
+[Alimentatore 24V]
+   ├── (+) 24V ───┬──→ [IN+]  Modulo XL4015  [OUT+] (5V) ──→ ESP32 (Pin 5V)
+   │              └──→ (+) Striscia LED 24V
+   │
+   └── (-) GND ───┬──→ [IN-]  Modulo XL4015  [OUT-] (GND) ─┬─→ ESP32 (Pin GND)
+                  └──→ (-) Striscia LED ───────────────────┘ (Massa Comune)
 
 ESP32 GPIO18 ──→ resistenza 330 Ω ──→ data line striscia LED
 ```
@@ -176,7 +183,7 @@ Il `partitions.csv` custom definisce cinque partizioni dimensionate per l'ESP32-
 | `ota_0`    | 1.5 MB     | Slot OTA A (riservato, non ancora usato) |
 | `ota_1`    | 1.5 MB     | Slot OTA B (riservato, non ancora usato) |
 
-**OTA non è implementato.** Oggi gli aggiornamenti richiedono flash via USB. Gli slot OTA sono riservati nella partition table così una futura implementazione OTA può atterrare senza ri-partizionare la flash — una ri-partizione cancellerebbe NVS, costringendo ogni device a ripassare per il BLE provisioning. PR per implementare OTA sono benvenute.
+**OTA non è implementato.** Oggi gli aggiornamenti richiedono flash via USB. Gli slot OTA sono riservati nella partition table così una futura implementazione OTA può atterrare senza ri-partizionare la flash — una ri-partizione cancellerebbe NVS, costringendo ogni device a ripassare per il BLE provisioning. Se qualcuno ha voglia di implementare OTA ben venga.
 
 ## Protocollo
 
@@ -197,7 +204,7 @@ echo -n -e '\x01\x05' | nc -u -w1 192.168.x.x 4210 | xxd
 
 # GET_STATUS (type 6): uptime, heap/RSSI, memoria e metriche frame
 echo -n -e '\x01\x06' | nc -u -w1 192.168.x.x 4210 | xxd
-# risposta: 11 byte base, 43 byte quando sono presenti le metriche estese
+# risposta: 11 byte base, 43 con le metriche estese, 91 con i contatori benchmark
 
 # SET_LEDS (type 3): accendi il LED 1 di rosso — fire-and-forget, nessuna risposta
 echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210
@@ -205,11 +212,11 @@ echo -n -e '\x01\x03\x01\xFF\x00\x00\x00' | nc -u -w1 192.168.x.x 4210
 
 ## Recovery
 
-**Le credenziali Wi-Fi non funzionano più (es. hai cambiato password sul router).** Power-cycle del device. Al boot tenta la rete salvata per ~20 s, fallisce, e ricade in BLE provisioning — a quel punto puoi inviare le nuove credenziali con la CLI (`rleds bt-credential`). Se il device è già acceso quando cambi la password, vale lo stesso rimedio: il reconnect task in [`main.c`](../firmware/main/main.c) continua a riprovare con le credenziali memorizzate (ora sbagliate) finché non riavvii. È intenzionale: un frame congelato durante una performance live è preferibile a un reboot improvviso.
+**Le credenziali Wi-Fi non funzionano più (es. hai cambiato password sul router).** Power-cycle del device. Al boot scansiona le reti visibili e prova ogni rete salvata trovata per un massimo di ~20s prima di passare alla successiva o ricadere in BLE provisioning. In quest'ultimo caso possiamo inviare le nuove credenziali con la CLI (`rleds bt-credential`). Se il device è già acceso quando cambi la password, vale lo stesso rimedio: il reconnect task in [`main.c`](../firmware/main/main.c) continua a riprovare con le credenziali memorizzate (ora sbagliate) finché non riavvii. È una scelta di progetto: il firmware non può distinguere una password sbagliata da un router momentaneamente irraggiungibile (riavvio, sbalzo di corrente, device un attimo fuori portata), e questo secondo caso è molto più frequente di un cambio credenziali reale.
 
 **Cancellare tutte le credenziali Wi-Fi da un device acceso.** Manda `RESET_WIFI` via UDP (`rleds reset-wifi <host> <port?>`). Il device pulisce NVS, si riavvia e riparte in modalità BLE provisioning.
 
-**`SET_CONFIG` è best-effort, non atomico.** Ogni campo (pin, num_leds, port, hostname) viene scritto su NVS separatamente. Se si verifica un errore di storage a metà sequenza, il device potrebbe riavviarsi con una config parzialmente aggiornata. Soluzione: invia di nuovo `SET_CONFIG`, oppure `RESET_WIFI` e ri-fai il provisioning.
+**`SET_CONFIG` è best-effort, non atomico.** Ogni campo (pin, num_leds, port, hostname) viene scritto su NVS separatamente. Se si verifica un errore di storage a metà sequenza, il device potrebbe riavviarsi con una config parzialmente aggiornata. Soluzione: invia di nuovo `SET_CONFIG` con i valori corretti — sovrascrive i campi sbagliati. (`RESET_WIFI` non aiuta: pulisce solo il namespace delle credenziali Wi-Fi e non tocca il namespace della config, quindi non può riparare una config parziale.)
 
 ## Link
 

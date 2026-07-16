@@ -12,7 +12,6 @@ shared/package-lock.json
 .env
 *.log*
 *.tsbuildinfo
-.idea
 .cache
 
 # ESP-IDF generates firmware/sdkconfig at build time from sdkconfig.defaults.

@@ -8,7 +8,7 @@ let connectionChangeRequestId: number | null = null // The syncronous request id
 
 let debug = false
 
-/** 
+/**
  * Handle messages from the client
  * Packet format: [requestId, type, ...message]
  * the requestId is used to send the response back to the client for syncronous requests

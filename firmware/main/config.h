@@ -9,7 +9,7 @@ typedef struct
     uint8_t pin;
     uint8_t num_leds;
     uint16_t port;
-    char hostname[32];
+    char hostname[33];
 } config_t;
 
 extern config_t config;

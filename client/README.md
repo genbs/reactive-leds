@@ -1,14 +1,24 @@
-# Client Library
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-black.svg">
+    <img alt="rleds logo" src="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-white.svg" width="180">
+  </picture>
+</p>
 
 [![Test](https://github.com/genbs/reactive-leds/actions/workflows/test-client.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/test-client.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://img.shields.io/npm/v/@reactive-leds/client)](https://www.npmjs.com/package/@reactive-leds/client)
 
+# Client Library
+
 Language: [English](./README.md) | [Italiano](./README-it.md)
 
-JavaScript client for realtime LED control over WiFi. Designed to integrate with browser-based tools for interactive visuals — live coding, installations, performances — but works from any JS runtime that supports WebSocket.
+JavaScript client for real-time LED control over WiFi. It is designed to integrate with browser-based tools for interactive visuals — live coding, installations, performances — but it works from any JS runtime that supports WebSocket.
 
-## Install
+⚠️ a local WebSocket proxy is required to talk to the devices, see [`cli/README.md`](../cli/README.md#proxy).
+
+## Installation
 
 ```bash
 npm install @reactive-leds/client
@@ -20,10 +30,16 @@ import leds from "@reactive-leds/client"
 await leds.begin("ws://localhost:8000")
 ```
 
-Or with no install at all, straight from a CDN:
+Or without installing anything, straight from a CDN:
 
 ```ts
 import leds from "https://cdn.jsdelivr.net/npm/@reactive-leds/client/build/reactive-leds.js"
+```
+
+For reproducible pages, pin a published version:
+
+```ts
+import leds from "https://cdn.jsdelivr.net/npm/@reactive-leds/client@1.0.0/build/reactive-leds.js"
 ```
 
 ## Build (from a repository checkout)
@@ -33,51 +49,42 @@ npm install
 npm run build
 ```
 
-This produces four artifacts in `build/`:
+Produces four artifacts in `build/`:
 
 - `reactive-leds.js` — ESM bundle (`import` / `<script type="module">`)
-- `reactive-leds.umd.js` — UMD bundle (`require` / AMD / `<script>` global `reactiveLeds`)
-- `reactive-leds.d.ts` — bundled type declarations (IDE autocomplete, no install needed — picked up via `types` in package.json)
+- `reactive-leds.umd.js` — UMD bundle (`require` / AMD / `<script>` with the `reactiveLeds` global)
+- `reactive-leds.d.ts` — bundled type declarations (IDE autocompletion, wired via `types` in package.json)
 - `daemon.worker.js` — module worker, loaded at runtime; keep it next to the bundle you serve
 
 ## Usage
 
-### Connect
+### Connecting
 
 As an ES module:
 
 ```ts
-import leds from "./build/reactive-leds.js"
+import leds from "<path-to-reactive-leds>"
 
 await leds.begin("ws://localhost:8000")
 ```
 
-Or as a classic script (UMD) — the API is available as the global `reactiveLeds`:
+> Running `rleds proxy` from the [cli](../cli/README.md) prints the LAN scan results at startup — you can copy the IPs into your code.
 
-```html
-<script src="./build/reactive-leds.umd.js"></script>
-<script>
-    reactiveLeds.begin("ws://localhost:8000")
-</script>
-```
+Pass `true` as the second argument to enable debug logs (`[Proxy]`, `[Worker]`, `[WS]`).
 
-> Need the device IPs? Run `rleds proxy` from the terminal — it prints the LAN scan at startup, copy the IPs into your code.
+### Connecting to a device
 
-Pass `true` as a second argument to enable debug logs (`[Proxy]`, `[Worker]`, `[WS]`).
-
-### Connect to a device
-
-`connect` combines ping + getConfig in a single call and returns a handle with `send`:
+`connect` combines ping + getConfig into a single call and returns a handle with `send`:
 
 ```ts
 const device = await leds.connect("192.168.X.Y")
 if (device) {
-    console.log(device.config.num_leds) // number of configured LEDs
-    device.send(data)                   // equivalent to setLEDs — for `data` see "LED control"
+	console.log(device.config.num_leds) // number of configured LEDs
+	device.send(data) // same as setLEDs — for `data` see "LED control"
 }
 ```
 
-### Device status
+### Device state
 
 ```ts
 const info = await leds.getInfo("192.168.X.Y")
@@ -85,7 +92,7 @@ const info = await leds.getInfo("192.168.X.Y")
 
 const status = await leds.getStatus("192.168.X.Y")
 // { uptime: 3600, heap: 180000, rssi: -62 }
-// Newer firmware may also include memory and frame counters:
+// Newer firmwares may also include memory/frame metrics:
 // { internalHeap, largestHeapBlock, minHeap, framesReceived, framesShown, framesDropped, udpPacketsRead, protocolLoopMaxGapMs }
 ```
 
@@ -95,22 +102,22 @@ Send colors to a device — fire-and-forget, no response expected:
 
 ```ts
 // [pixel_index, r, g, b, w] per LED — 5 bytes per LED
-const data = new Uint8Array([0, 255, 0, 0, 0])   // LED 0 → red
+const data = new Uint8Array([0, 255, 0, 0, 0]) // LED 0 → red
 leds.setLEDs("192.168.X.Y", 4210, data)
 ```
 
-For details on the data format see the [protocol docs](../shared/README.md#set_leds-format).
+For the format details see the [protocol](../shared/README.md#set_leds-format).
 
 ### Other calls
 
 ```ts
-await leds.ping("192.168.X.Y")       // true if the device responds
-await leds.getConfig("192.168.X.Y")  // { pin, num_leds, port, hostname }
+await leds.ping("192.168.X.Y") // true if the device responds
+await leds.getConfig("192.168.X.Y") // { pin, num_leds, port, hostname }
 ```
 
-### sample — from canvas to LEDs
+### sample — canvas to LEDs
 
-Designed for live coding: takes pixels from a canvas (or any RGBA source) and remaps them onto the strip, via bilinear interpolation of a perspective-projected polygon.
+Built for live coding: it takes the pixels of a canvas (or any RGBA source) and remaps them onto the strip, through bilinear interpolation of a polygon with perspective projection.
 
 ```ts
 // from a canvas: extract the pixels once per frame
@@ -118,44 +125,44 @@ const ctx = canvas.getContext("2d", { willReadFrequently: true })
 const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data
 
 // pixels: ImageData.data (RGBA, 4 bytes per pixel)
-// pixelsSize: source image dimensions [width, height]
+// pixelsSize: source image size [width, height]
 // grid: how the image is divided into cells [cols, rows]
-// polygon: region of the grid mapped onto LEDs — vertices [TL, TR, BR, BL]
-//          as (x0,y0, x1,y1, x2,y2, x3,y3) in grid coordinates
+// polygon: region of the grid mapped onto the LEDs — vertices [TL, TR, BR, BL]
+//          in grid coordinates as (x0,y0, x1,y1, x2,y2, x3,y3)
 // steps: number of LEDs
-// wa: white channel — fixed number, true = use source alpha, or function(r,g,b)=>w
+// wa: white channel — fixed number, true = use source alpha, or a function(r,g,b)=>w
 const ledsData = leds.sample(pixels, [canvas.width, canvas.height], grid, polygon, steps, wa)
 leds.setLEDs("192.168.X.Y", 4210, ledsData)
 ```
 
-The strip is read as a single line along the centerline of the polygon, from the start edge (TL→TR) to the end edge (BL→BR) — to run it horizontally, rotate the polygon so the start edge is on the left. The polygon's width doesn't matter: only the centerline is sampled. Skewed, rotated or perspective-distorted polygons all work.
+The strip is read as a single line along the polygon's centerline, from the start edge (TL→TR) to the end edge (BL→BR) — to run it horizontally, rotate the polygon so the start edge sits on the left. The polygon's width does not matter: only the centerline is sampled. Skewed, rotated or perspective-distorted polygons all work.
 
 > Tip: the [Mapping tool](https://genbs.github.io/reactive-leds/) on the project site draws the polygons for you and exports a ready-to-use snippet.
 
 ## Notes
 
-- Updates are sent over UDP and are designed for realtime use.
-- Under sustained overload the firmware drops new UDP arrivals at the kernel (drop-tail) to bound staleness; in normal use frames are displayed within ~10 ms of arrival.
+- Updates are sent over UDP — designed for realtime use.
+- Under sustained load the firmware drops new UDP arrivals at the kernel (drop-tail) to bound staleness. On a clean local WiFi network the firmware/RMT path is normally fast enough for 60 fps; use `rleds benchmark` to measure your own setup instead of treating a fixed latency figure as a guarantee.
 
 ## Device provisioning
 
-Before a device is reachable on the network it needs WiFi credentials. Use the CLI:
+Before it is reachable on the network, the device needs WiFi credentials. Use the CLI:
 
 ```bash
-rleds bt-scan          # find unpaired devices via Bluetooth
-rleds bt-credential    # send WiFi credentials over BLE
+rleds bt-scan          # find not-yet-configured devices over Bluetooth
+rleds bt-credential    # send the WiFi credentials over BLE
 ```
 
 See [`cli/README.md`](../cli/README.md) for the full provisioning flow.
 
-## Going beyond the API
+## Beyond the API
 
-The client exposes the most common operations. For the packet types the API doesn't wrap (e.g. `SET_CONFIG`, `RESET_WIFI`) there are `sendRaw` and `sendRawSync`, which accept any `PacketType`:
+The client exposes the most common operations. For the packet types the API does not cover (e.g. `SET_CONFIG`, `RESET_WIFI`) there are `sendRaw` and `sendRawSync`, which accept any `PacketType`:
 
 ```ts
 import leds, { PacketType } from "@reactive-leds/client"
 
-// request/response: resolves with [status] (1 = OK) or the payload bytes
+// request/response: resolves with [status] (1 = OK) or with the payload bytes
 const ok = await leds.sendRawSync("192.168.X.Y", 4210, PacketType.RESET_WIFI)
 
 // fire-and-forget, no response expected
@@ -166,4 +173,4 @@ The `connect` handle exposes them too, without repeating ip and port: `device.se
 
 ## Links
 
-- [Back to main README](../README.md)
+- [Back to the main README](../README.md)

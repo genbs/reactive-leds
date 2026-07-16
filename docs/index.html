@@ -36,7 +36,11 @@
 					"url": "https://github.com/genbs"
 				},
 				"codeRepository": "https://github.com/genbs/reactive-leds",
-				"license": "https://opensource.org/licenses/MIT"
+				"license": [
+					"https://opensource.org/licenses/MIT",
+					"https://www.gnu.org/licenses/gpl-3.0.en.html",
+					"https://creativecommons.org/publicdomain/zero/1.0/"
+				]
 			}
 		</script>
 
@@ -126,7 +130,7 @@
 					>
 				</div>
 				<div class="mg-t-s">
-					<a href="https://github.com/genbs/reactive-leds">GitHub</a> &nbsp;·&nbsp; MIT / GPL-3.0 &nbsp;·&nbsp;
+					<a href="https://github.com/genbs/reactive-leds">GitHub</a> &nbsp;·&nbsp; MIT / GPL-3.0 / CC0 &nbsp;·&nbsp;
 					<button id="lang-btn">IT</button>
 				</div>
 			</footer>
@@ -215,7 +219,7 @@
 				<div class="devices-section flex flex-col flex-1" inert>
 					<h3 class="subtitle">
 						<span data-i18n="devices.title">Devices</span>
-						<span id="device-count"></span>
+						<span class="device-count"></span>
 					</h3>
 					<div class="pd-m flex flex-col gap-m flex-1 overflow-hidden">
 						<div class="text-xs color-medium" data-i18n="devices.desc">
@@ -240,9 +244,7 @@
 			</aside>
 			<section id="examples-panel" class="overflow-auto flex flex-col flex-1" inert>
 				<nav class="top-bar" id="examples-list">
-					<button data-example="color" data-i18n="tab.color">Color</button>
-					<button data-example="chase" data-i18n="tab.chase">Chase</button>
-					<button data-example="audio" data-i18n="tab.audio">Audio</button>
+					<button data-example="playground" data-i18n="tab.playground">Playground</button>
 				</nav>
 				<section class="dialog-preview flex-1 overflow-auto flex flex-col">
 					<div id="example-container" class="flex-1"></div>
@@ -251,7 +253,6 @@
 					</div>
 				</section>
 				<footer class="examples-footer">
-					<button id="orientation-toggle" title="Toggle orientation">⇅</button>
 					<a id="example-source" target="_blank">view source</a>
 				</footer>
 			</section>
@@ -291,7 +292,7 @@
 				<div class="devices-section" inert>
 					<h3 class="subtitle">
 						<span data-i18n="devices.title">Devices</span>
-						<span id="device-count"></span>
+						<span class="device-count"></span>
 					</h3>
 					<div class="pd-m flex flex-col gap-m flex-1 overflow-hidden mh">
 						<div id="map-device-list" class="flex-1 overflow-auto"></div>

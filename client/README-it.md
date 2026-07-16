@@ -1,12 +1,22 @@
-# Libreria Client
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-black.svg">
+    <img alt="rleds logo" src="https://raw.githubusercontent.com/genbs/reactive-leds/master/docs/logo-white.svg" width="180">
+  </picture>
+</p>
 
 [![Test](https://github.com/genbs/reactive-leds/actions/workflows/test-client.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/test-client.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://img.shields.io/npm/v/@reactive-leds/client)](https://www.npmjs.com/package/@reactive-leds/client)
 
+# Libreria Client
+
 Language: [English](./README.md) | [Italiano](./README-it.md)
 
 Client JavaScript per il controllo real-time dei LED via WiFi. È pensato per integrarsi con strumenti browser-based per visual interattive — live coding, installazioni, performance — ma funziona da qualsiasi runtime JS che supporti WebSocket.
+
+⚠️ è necessario un proxy WebSocket locale per comunicare con i device, vedi [`cli/README-it.md`](../cli/README-it.md#proxy).
 
 ## Installazione
 
@@ -24,6 +34,12 @@ Oppure senza installare niente, direttamente da CDN:
 
 ```ts
 import leds from "https://cdn.jsdelivr.net/npm/@reactive-leds/client/build/reactive-leds.js"
+```
+
+Per pagine riproducibili, pinna una versione pubblicata:
+
+```ts
+import leds from "https://cdn.jsdelivr.net/npm/@reactive-leds/client@1.0.0/build/reactive-leds.js"
 ```
 
 ## Build (da un checkout del repository)
@@ -47,18 +63,9 @@ Produce quattro artefatti in `build/`:
 Come modulo ES:
 
 ```ts
-import leds from "./build/reactive-leds.js"
+import leds from "<path-to-reactive-leds>"
 
 await leds.begin("ws://localhost:8000")
-```
-
-Oppure come script classico (UMD) — l'API è disponibile nel global `reactiveLeds`:
-
-```html
-<script src="./build/reactive-leds.umd.js"></script>
-<script>
-    reactiveLeds.begin("ws://localhost:8000")
-</script>
 ```
 
 > Lanciando dalla [cli](../cli/README-it.md) `rleds proxy` dal terminale verranno stampati i risultati dello scan della LAN all'avvio, puoi copiare gli IP nel tuo codice.
@@ -85,7 +92,7 @@ const info = await leds.getInfo("192.168.X.Y")
 
 const status = await leds.getStatus("192.168.X.Y")
 // { uptime: 3600, heap: 180000, rssi: -62 }
-// I firmware piu recenti possono includere anche metriche memoria/frame:
+// I firmware più recenti possono includere anche metriche memoria/frame:
 // { internalHeap, largestHeapBlock, minHeap, framesReceived, framesShown, framesDropped, udpPacketsRead, protocolLoopMaxGapMs }
 ```
 
@@ -135,7 +142,7 @@ La striscia viene letta come una singola linea lungo la centerline del poligono,
 ## Note
 
 - Gli aggiornamenti sono inviati via UDP — pensati per uso realtime.
-- Sotto carico sostenuto il firmware droppa i nuovi arrivi UDP al kernel (drop-tail) per limitare la staleness; in uso normale i frame vengono mostrati entro ~10 ms dall'arrivo.
+- Sotto carico sostenuto il firmware droppa i nuovi arrivi UDP al kernel (drop-tail) per limitare la staleness. Su una rete WiFi locale pulita, il path firmware/RMT è normalmente abbastanza veloce per 60 fps; usa `rleds benchmark` per misurare il tuo setup invece di trattare un numero fisso di latenza come garanzia.
 
 ## Provisioning del device
 

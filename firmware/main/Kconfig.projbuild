@@ -3,9 +3,9 @@ menu "Device configuration"
     config LED_PIN
         int "GPIO for LED Strip"
         default 18
-        range 0 49
+        range 0 48
         help
-            The GPIO pin number connected to the data line of the LED strip.
+            The output GPIO connected to the LED strip (0..21 or 26..48).
 
     config NUM_LEDS
         int "Number of LEDs"

@@ -16,6 +16,7 @@
 #define TAG "MAIN"
 
 #define CHECK_CONNECTED_TIMEOUT 100 // polling interval for wifi/ble state checks
+#define WIFI_RECONNECT_POLL_MS 1000
 
 // Timeout per WiFi association attempt. 20s is generous (most associations
 // complete in 2–5s), but covers slow routers and weak RSSI. At boot it caps
@@ -86,7 +87,7 @@ bool connect_to_known_networks(wifi_credentials_t *credentials) {
             ESP_LOGW(TAG, "Failed to connect to %s", credentials->ssid);
 
         } else {
-            ESP_LOGI(TAG, "Network %s is unknown", scanned_ssid);
+            ESP_LOGV(TAG, "Network %s is unknown", scanned_ssid);
         }
     }
     
@@ -113,25 +114,22 @@ void ble_configuration_loop() {
 /**
  * Protocol loop task.
  *
- * Non-blocking recvfrom + 2 ms yield. Simple polling beats select() in
+ * Non-blocking recvfrom + 1 ms yield. Simple polling beats select() in
  * practice — lwIP's select() notification pipe adds more latency than it
  * saves on this hardware.
  */
 void app_protocol_loop(void *param) {
     while (1) {
         protocol_loop();
-        // 2 ms yield between polls. Relies on CONFIG_FREERTOS_HZ=1000 (1 tick =
-        // 1 ms): at the 100 Hz default, pdMS_TO_TICKS(2) rounds to 0 ticks and
-        // this becomes a busy-spin. Keep HZ=1000 if you change the tick rate.
-        vTaskDelay(pdMS_TO_TICKS(2));
+        // 1 ms yield between polls. Relies on CONFIG_FREERTOS_HZ=1000 (1 tick = 1 ms).
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
 
 /**
- * While connected to wifi, keep the connection alive.
- * If the connection is lost, retry the current network up to 3 times, then
- * scan for every known network in storage and try each one. Falls back to
- * BLE provisioning only if no known network is visible at boot.
+ * If the connection is lost, retry the current network a couple of times, 
+ * then on the 3rd consecutive failure scan for every known network in storage and try each one instead. 
+ * Falls back to BLE provisioning only if no known network is visible at boot.
  */
 void wifi_reconnect_task(void *param) {
     wifi_credentials_t *credentials = (wifi_credentials_t *)param;
@@ -140,40 +138,20 @@ void wifi_reconnect_task(void *param) {
     while (1) {
         if (wifi_connected()) {
             failures = 0;
-            delay(CHECK_CONNECTED_TIMEOUT);
+            delay(WIFI_RECONNECT_POLL_MS);
             continue;
         }
 
         if (++failures >= 3) {
             failures = 0;
-            int n;
-            wifi_ap_record_t *aps = wifi_scan(&n);
-            if (!aps) continue;
-
-            for (int i = 0; i < n && !wifi_connected(); i++) {
-                char ssid[33];
-                snprintf(ssid, sizeof(ssid), "%.*s", 32, aps[i].ssid);
-                if (!storage_has_key("wifi", ssid)) continue;
-
-                size_t len = sizeof(credentials->pass);
-                storage_get("wifi", ssid, credentials->pass, &len);
-                credentials->pass[sizeof(credentials->pass) - 1] = '\0';
-                snprintf(credentials->ssid, sizeof(credentials->ssid), "%s", ssid);
-                wifi_connect(credentials->ssid, credentials->pass);
-
-                uint32_t t = esp_log_timestamp();
-                while (!wifi_connected() && esp_log_timestamp() - t < WIFI_CONNECT_TIMEOUT)
-                    delay(CHECK_CONNECTED_TIMEOUT);
-            }
-            free(aps);
+            connect_to_known_networks(credentials);
+            continue;
         }
 
-        if (!wifi_connected()) {
-            wifi_connect(credentials->ssid, credentials->pass);
-            uint32_t t = esp_log_timestamp();
-            while (!wifi_connected() && esp_log_timestamp() - t < WIFI_CONNECT_TIMEOUT)
-                delay(CHECK_CONNECTED_TIMEOUT);
-        }
+        wifi_connect(credentials->ssid, credentials->pass);
+        uint32_t t = esp_log_timestamp();
+        while (!wifi_connected() && esp_log_timestamp() - t < WIFI_CONNECT_TIMEOUT)
+            delay(CHECK_CONNECTED_TIMEOUT);
     }
 }
 
@@ -185,29 +163,22 @@ void wifi_reconnect_task(void *param) {
  */
 void app_main(void)
 {
-    // init storage service
     storage_begin();
 
-    // load config from storage
     config_begin();
     config_print();
 
     // start wifi in station mode and disable sleep
     wifi_init_sta();
-
     static wifi_credentials_t credentials = {0};
     if (!connect_to_known_networks(&credentials)) {
         ESP_LOGI(TAG, "No known networks found, starting BLE");
 
         // stop wifi, when BLE receives the credentials, it will restart the device
         wifi_stop();
-
-        // start ble configuration loop
         ble_configuration_loop();
     } else {
-        // stop BLE
         ble_down();
-
         wifi_disable_sleep();
     }
     
@@ -217,17 +188,15 @@ void app_main(void)
     ESP_LOGI(TAG, "Hostname: %s", config.hostname);
     ESP_LOGI(TAG, "MAC address: %s", wifi_mac());
 
-    // Start protocol to handshake with the server and communicate with it
     if (!protocol_begin()) {   
         ESP_LOGE(TAG, "Failed to start protocol");
         esp_restart();
     }
 
-    // Keep connected to WiFi and handle reconnections — pinned to core 0 alongside the WiFi stack.
+    // WiFi reconnect housekeeping on core 0, with lwIP/timer tasks.
     xTaskCreatePinnedToCore(wifi_reconnect_task, "wifi_reconnect_task", 4096, &credentials, 1, NULL, 0);
 
-    // Protocol task on core 1, isolated from the WiFi/lwIP stack on core 0 —
-    // a clean separation of the LED render pipeline from the network stack.
+    // Realtime UDP/RMT path on core 1, isolated from network housekeeping.
     xTaskCreatePinnedToCore(app_protocol_loop, "app_protocol_loop", 4096, NULL, 5, NULL, 1);
 
     // Delete the main task

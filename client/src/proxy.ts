@@ -3,7 +3,7 @@
  * The client (browser) can send messages to the worker with these public functions.
  */
 
-import { encodeBuffer } from "@reactive-leds/shared"
+import { DEFAULT_SYNC_TIMEOUT, encodeBuffer } from "@reactive-leds/shared"
 import {
 	CONNECTION_CHANGE_REQUEST_ID,
 	EMPTY_REQUEST_ID,
@@ -36,6 +36,8 @@ function createWorker() {
 // Pending sync requests waiting for a response from the worker
 type ProxyRequest = {
 	resolve: (data: Uint8Array) => void
+	reject: (error: Error) => void
+	timer: ReturnType<typeof setTimeout>
 }
 
 let requests = new Map<number, ProxyRequest>()
@@ -45,23 +47,45 @@ let connected = false
 ////////////////////// Internal functions
 
 // @internal Create sync request to proxy. Add to client buffer a requestId before send it to worker.
-let rid = 0
-function createRequest(buffer: Uint8Array) {
-	const requestId = FIRST_REQUEST_ID + (rid++ % (255 - FIRST_REQUEST_ID)) + 1
+let rid = FIRST_REQUEST_ID - 1
+function nextRequestId() {
+	for (let i = FIRST_REQUEST_ID; i <= 255; i++) {
+		rid = rid === 255 ? FIRST_REQUEST_ID : rid + 1
+		if (!requests.has(rid)) return rid
+	}
+	throw new Error("Too many pending requests")
+}
+
+function createRequest(buffer: Uint8Array, timeout = DEFAULT_SYNC_TIMEOUT) {
+	const requestId = nextRequestId()
 
 	const newBuffer = new Uint8Array(1 + buffer.length)
 	newBuffer[0] = requestId
 	newBuffer.set(buffer, 1)
 
-	const request = new Promise<Uint8Array>(resolve => {
-		requests.set(requestId, { resolve })
+	const request = new Promise<Uint8Array>((resolve, reject) => {
+		const timer = setTimeout(() => {
+			requests.delete(requestId)
+			reject(new Error(`Request ${requestId} timed out`))
+		}, timeout)
+		requests.set(requestId, { resolve, reject, timer })
 	})
 
 	return [request, newBuffer, requestId] as const
 }
 
+function rejectPendingRequests(message: string) {
+	for (const [requestId, request] of requests) {
+		clearTimeout(request.timer)
+		request.reject(new Error(`${message} (${requestId})`))
+	}
+	requests.clear()
+}
+
 // @internal Resolve the pending sync request matching the response ID
 function handleResponse(event: MessageEvent) {
+	if (!(event.data instanceof Uint8Array)) return
+
 	const message: Uint8Array = event.data
 	const responseId = message[0]
 	const responseData = message.subarray(1) // remove the requestId from the response
@@ -75,6 +99,7 @@ function handleResponse(event: MessageEvent) {
 			// every close) — only forward actual state transitions to subscribers.
 			if (next !== connected) {
 				connected = next
+				if (!connected) rejectPendingRequests("Proxy disconnected")
 				debug && console.log(`[Proxy] Connection change event: ${connected}`)
 				connectionChangeCallbacks.forEach(callback => callback(connected))
 			}
@@ -86,6 +111,7 @@ function handleResponse(event: MessageEvent) {
 	}
 
 	requests.delete(responseId)
+	clearTimeout(request.timer)
 	request.resolve(responseData)
 }
 
@@ -118,7 +144,7 @@ export function wsconnect(serverURL: string, _debug = false): Promise<boolean> {
 	buffer[1 + serverURL.length] = debug ? TRUE : FALSE
 
 	debug && console.log(`[Proxy] try to connect to ${serverURL}`, buffer)
-	return sendSync(buffer).then((response => response[1] === TRUE))
+	return sendSync(buffer).then(response => response[1] === TRUE).catch(() => false)
 }
 
 /** Register a callback for connection state changes, returns an unsubscribe function */
@@ -141,12 +167,21 @@ export function isConnected() {
 }
 
 /** Send a message to the worker and wait for the response */
-export function sendSync(data: Uint8Array): Promise<Uint8Array> {
+export async function sendSync(data: Uint8Array, timeout = DEFAULT_SYNC_TIMEOUT): Promise<Uint8Array> {
 	checkConnected()
 
-	let [promise, buffer, requestId] = createRequest(data)
+	let [promise, buffer, requestId] = createRequest(data, timeout)
 	debug && console.log(`[Proxy] sendSync [${requestId}] ${WorkerRequestTypeMap[buffer[1] as WorkerRequestType]}`, buffer)
-	daemon!.postMessage(buffer)
+	try {
+		daemon!.postMessage(buffer)
+	} catch (err) {
+		const request = requests.get(requestId)
+		if (request) {
+			clearTimeout(request.timer)
+			requests.delete(requestId)
+		}
+		throw err
+	}
 
 	return promise
 }

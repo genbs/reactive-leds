@@ -1,0 +1,677 @@
+<div class="example-wrap">
+	<p class="example-desc" data-i18n="example.playground.desc">
+		One playground for direct colors, chase patterns, audio-reactive bars and generative math patches.
+	</p>
+	<div class="preset-bank" id="preset-bank"></div>
+	<div class="controls" id="preset-controls"></div>
+	<div class="controls">
+		<button id="p-seed" class="patch-btn" title="Re-roll randomness">⟳ seed</button>
+		<button id="p-dice" class="patch-btn" title="Randomize knobs">🎲 rand</button>
+	</div>
+</div>
+
+<style>
+	.preset-bank {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+		margin: 8px 0;
+	}
+	.preset-bank button,
+	.patch-btn {
+		font: inherit;
+		font-size: 11px;
+		padding: 4px 8px;
+		background: transparent;
+		border: 1px solid currentColor;
+		border-radius: 3px;
+		opacity: 0.55;
+		cursor: pointer;
+	}
+	.preset-bank button.active {
+		opacity: 1;
+		font-weight: bold;
+	}
+	.preset-sep {
+		width: 1px;
+		background: currentColor;
+		opacity: 0.35;
+		margin: 0 4px;
+	}
+	.patch-btn:hover {
+		opacity: 1;
+	}
+</style>
+
+<script>
+	// ---------------------------------------------------------------- helpers
+	const TAU = Math.PI * 2
+	const clamp01 = v => (v < 0 ? 0 : v > 1 ? 1 : v)
+	const frac = v => v - Math.floor(v)
+	const contrast = (v, amount = 1) => clamp01(0.5 + (v - 0.5) * amount)
+	// deterministic hash → [0,1): stateless, replayable randomness
+	const hash = n => frac(Math.sin(n * 12.9898) * 43758.5453)
+	// LEDs are not linear: gamma before quantizing
+	const gamma = v => Math.round(clamp01(v) ** 2 * 255)
+
+	// IQ cosine palette: one hue knob → endless harmonious colors
+	function pal(v, hue, brightness = 1) {
+		const u = v + hue
+		return [
+			gamma((0.5 + 0.5 * Math.cos(TAU * u)) * brightness),
+			gamma((0.5 + 0.5 * Math.cos(TAU * (u + 0.33))) * brightness),
+			gamma((0.5 + 0.5 * Math.cos(TAU * (u + 0.67))) * brightness),
+			0,
+		]
+	}
+
+	// ---------------------------------------------------------------- audio
+	let analyser = null,
+		audioData = null,
+		audioStream = null,
+		audioCtx = null
+
+	async function startAudio() {
+		if (analyser || !navigator.mediaDevices?.getUserMedia) return
+		audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+		audioCtx = new AudioContext()
+		const source = audioCtx.createMediaStreamSource(audioStream)
+		analyser = audioCtx.createAnalyser()
+		analyser.fftSize = 256
+		analyser.smoothingTimeConstant = 0.75
+		source.connect(analyser)
+		audioData = new Uint8Array(analyser.frequencyBinCount)
+	}
+
+	function stopAudio() {
+		audioStream?.getTracks().forEach(t => t.stop())
+		audioCtx?.close()
+		analyser = audioData = audioStream = audioCtx = null
+	}
+
+	function bandRange(c, n, bins) {
+		const usable = Math.floor(bins * 0.75)
+		const lo = Math.round(Math.pow(usable, c / n))
+		const hi = Math.round(Math.pow(usable, (c + 1) / n))
+		return [lo, Math.max(hi, lo + 1)]
+	}
+
+	function bandAmplitude(c, n, sensitivity) {
+		if (!analyser || !audioData) return 0
+		const [lo, hi] = bandRange(c, n, audioData.length)
+		let max = 0
+		for (let i = lo; i < hi; i++) if (audioData[i] > max) max = audioData[i]
+		return clamp01((max / 255) * sensitivity)
+	}
+
+	// ---------------------------------------------------------------- presets
+	// Each patch declares its own knobs (min/max/step/default) and a pure
+	// function (x, y, t, p, c) → [r, g, b, w]:
+	//   x, y ∈ [-1, 1] (strip index / LED index), t = seconds,
+	//   p = current knob values, c = { i, j, io, jo, seed }
+	const PRESETS = {
+		off: {
+			params: {},
+			fn() {
+				return [0, 0, 0, 0]
+			},
+		},
+
+		color: {
+			params: {
+				r: { min: 0, max: 255, step: 1, def: 0 },
+				g: { min: 0, max: 255, step: 1, def: 120 },
+				b: { min: 0, max: 255, step: 1, def: 255 },
+				w: { min: 0, max: 255, step: 1, def: 0 },
+			},
+			fn(_x, _y, _t, p) {
+				return [p.r, p.g, p.b, p.w]
+			},
+		},
+
+		chase: {
+			params: {
+				speed: { min: 1, max: 240, step: 1, def: 80 },
+				trail: { min: 0, max: 128, step: 1, def: 4 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0 },
+			},
+			fn(_x, _y, t, p, c) {
+				const active = Math.floor((t * 1000) / p.speed) % c.total
+				const dist = (active - c.linear + c.total) % c.total
+				const br = dist === 0 ? 1 : dist <= p.trail ? 1 - dist / (p.trail + 1) : 0
+				return br > 0 ? pal(c.io * 0.35, p.hue, br) : [0, 0, 0, 0]
+			},
+		},
+
+		audio: {
+			params: {
+				sensitivity: { min: 0.1, max: 2, step: 0.05, def: 0.5 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0.45 },
+			},
+			fn(_x, _y, _t, p, c) {
+				const amp = bandAmplitude(c.i, c.strips, p.sensitivity)
+				const br = c.jo <= amp ? 1 : 0
+				return br ? pal(c.io * 0.35, p.hue, 0.25 + 0.75 * amp) : [0, 0, 0, 0]
+			},
+		},
+
+		wave: {
+			params: {
+				speed: { min: 0.1, max: 3, step: 0.05, def: 1 },
+				waves: { min: 0.5, max: 8, step: 0.1, def: 3 },
+				drift: { min: 0, max: 1, step: 0.01, def: 0.15 },
+				contrast: { min: 0.5, max: 2.5, step: 0.05, def: 1 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0 },
+			},
+			fn(x, y, t, p, c) {
+				const th = c.seed * TAU + t * p.drift
+				const v = contrast(
+					0.5 + 0.5 * Math.sin((x * Math.cos(th) + y * Math.sin(th)) * p.waves - t * p.speed * 3),
+					p.contrast
+				)
+				return pal(v * 0.5, p.hue, 0.25 + 0.75 * v)
+			},
+		},
+
+		interference: {
+			params: {
+				speed: { min: 0.1, max: 3, step: 0.05, def: 1 },
+				freq: { min: 2, max: 24, step: 0.5, def: 10 },
+				orbit: { min: 0.1, max: 1, step: 0.05, def: 0.6 },
+				contrast: { min: 0.5, max: 2.5, step: 0.05, def: 1 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0.55 },
+			},
+			fn(x, y, t, p, c) {
+				const a1 = t * p.speed * 0.7 + c.seed * 9
+				const a2 = -t * p.speed * 0.9 + c.seed * 17
+				const d1 = Math.hypot(x - Math.cos(a1) * p.orbit, y - Math.sin(a1 * 1.3) * p.orbit)
+				const d2 = Math.hypot(x - Math.cos(a2 * 1.1) * p.orbit, y - Math.sin(a2) * p.orbit)
+				const v = contrast(
+					0.5 + 0.25 * (Math.sin(d1 * p.freq - t * p.speed * 4) + Math.sin(d2 * p.freq - t * p.speed * 4)),
+					p.contrast
+				)
+				return pal(v * 0.6, p.hue, v)
+			},
+		},
+
+		plasma: {
+			params: {
+				speed: { min: 0.1, max: 3, step: 0.05, def: 1 },
+				zoom: { min: 1, max: 12, step: 0.25, def: 6 },
+				warp: { min: 0, max: 2, step: 0.05, def: 1 },
+				contrast: { min: 0.5, max: 2.5, step: 0.05, def: 1 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0 },
+			},
+			fn(x, y, t, p) {
+				const tt = t * p.speed
+				const v = contrast(
+					0.5 +
+						(Math.sin(x * p.zoom + tt) +
+							Math.sin(y * p.zoom * 1.3 - tt * 1.3) +
+							Math.sin((x + y) * p.zoom * 0.8 * p.warp) +
+							Math.sin(Math.hypot(x, y) * p.zoom - tt * 2)) /
+							8,
+					p.contrast
+				)
+				return pal(v, p.hue, 0.3 + 0.7 * v)
+			},
+		},
+
+		fire: {
+			params: {
+				speed: { min: 0.2, max: 3, step: 0.05, def: 1 },
+				turbulence: { min: 3, max: 20, step: 0.5, def: 8 },
+				height: { min: 0.6, max: 2, step: 0.05, def: 1.25 },
+				contrast: { min: 0.5, max: 2.5, step: 0.05, def: 1 },
+			},
+			fn(_x, _y, t, p, c) {
+				const tt = t * p.speed
+				const flicker =
+					0.5 +
+					0.25 * Math.sin(c.jo * p.turbulence - tt * 6 + hash(c.i * 3 + c.seed) * TAU) +
+					0.25 * Math.sin(c.jo * p.turbulence * 1.6 - tt * 9 + c.i * 2)
+				const v = contrast(clamp01((1 - c.jo) * p.height * flicker), p.contrast)
+				return [gamma(v), gamma(v ** 1.8 * 0.6), gamma(v ** 4 * 0.15), 0]
+			},
+		},
+
+		rain: {
+			params: {
+				speed: { min: 0.1, max: 2, step: 0.05, def: 0.5 },
+				drops: { min: 1, max: 4, step: 1, def: 2 },
+				tail: { min: 0.02, max: 0.2, step: 0.01, def: 0.07 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0.4 },
+			},
+			fn(_x, _y, t, p, c) {
+				let v = 0
+				for (let drop = 0; drop < p.drops; drop++) {
+					const speed = p.speed * (0.6 + hash(c.i * 5 + drop * 11 + c.seed) * 0.8)
+					const head = frac(t * speed + hash(c.i + drop * 3 + c.seed * 2))
+					v = Math.max(v, Math.exp(-frac(head - (1 - c.jo)) / p.tail))
+				}
+				const [r, g, b] = pal(0.35, p.hue, v)
+				return [r, g, b, v > 0.93 ? gamma((v - 0.93) * 6) : 0]
+			},
+		},
+
+		comet: {
+			params: {
+				speed: { min: 0.05, max: 1.5, step: 0.05, def: 0.25 },
+				tail: { min: 0.02, max: 0.35, step: 0.01, def: 0.12 },
+				spread: { min: 0, max: 1, step: 0.05, def: 0.5 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0 },
+			},
+			fn(_x, _y, t, p, c) {
+				const dir = c.i % 2 ? -1 : 1
+				const head = frac(
+					t * p.speed * (1 - p.spread + hash(c.i * 7 + c.seed * 13) * p.spread * 2) + hash(c.i + c.seed)
+				)
+				const pos = dir > 0 ? c.jo : 1 - c.jo
+				const v = Math.exp(-frac(head - pos) / p.tail)
+				return pal(hash(c.i * 3.7) * 0.5, p.hue, v)
+			},
+		},
+
+		aurora: {
+			params: {
+				speed: { min: 0.05, max: 1.5, step: 0.05, def: 0.4 },
+				bands: { min: 1, max: 8, step: 0.5, def: 2 },
+				width: { min: 0.15, max: 0.8, step: 0.05, def: 0.35 },
+				contrast: { min: 0.5, max: 2.5, step: 0.05, def: 1 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0.35 },
+			},
+			fn(x, y, t, p, c) {
+				const tt = t * p.speed
+				const band = 0.35 * Math.sin(x * p.bands + tt + c.seed * 6) + 0.2 * Math.sin(x * p.bands * 2.5 - tt * 0.6)
+				const lum = contrast(Math.exp(-(((y - band) / p.width) ** 2)), p.contrast)
+				return pal(0.12 * Math.sin(x * 3 + tt * 0.5), p.hue, lum)
+			},
+		},
+
+		sparkle: {
+			params: {
+				rate: { min: 1, max: 12, step: 0.5, def: 4 },
+				density: { min: 0.02, max: 0.35, step: 0.01, def: 0.15 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0 },
+			},
+			fn(_x, _y, t, p, c) {
+				const cell = Math.floor(t * p.rate)
+				const on = hash(c.i * 131.7 + c.j * 7.13 + cell * 911.3 + c.seed * 77) < p.density
+				const v = on ? 1 - frac(t * p.rate) : 0
+				const [r, g, b] = pal(hash(cell + c.i + c.j), p.hue, v)
+				return [r, g, b, v > 0.7 ? gamma(v * 0.4) : 0]
+			},
+		},
+
+		spiral: {
+			params: {
+				speed: { min: 0.1, max: 3, step: 0.05, def: 1 },
+				arms: { min: 1, max: 8, step: 1, def: 3 },
+				twist: { min: 0, max: 16, step: 0.5, def: 6 },
+				wobble: { min: 0, max: 1, step: 0.05, def: 0.25 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0.8 },
+			},
+			fn(x, y, t, p, c) {
+				const twist = p.twist + p.wobble * Math.sin(t * p.speed + c.seed * TAU)
+				const v = 0.5 + 0.5 * Math.sin(Math.atan2(y, x) * p.arms + Math.hypot(x, y) * twist - t * p.speed * 3)
+				return pal(v * 0.4 + 0.1, p.hue, 0.2 + 0.8 * v)
+			},
+		},
+
+		metaball: {
+			params: {
+				speed: { min: 0.1, max: 3, step: 0.05, def: 1 },
+				balls: { min: 2, max: 6, step: 1, def: 3 },
+				size: { min: 0.02, max: 0.25, step: 0.01, def: 0.08 },
+				threshold: { min: 0.3, max: 1.5, step: 0.05, def: 0.8 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0.4 },
+			},
+			fn(x, y, t, p, c) {
+				const tt = t * p.speed
+				let field = 0
+				for (let m = 0; m < p.balls; m++) {
+					const bx = Math.cos(tt * (0.5 + m * 0.3) + hash(c.seed * 3 + m) * TAU) * 0.7
+					const by = Math.sin(tt * (0.7 + m * 0.2) + hash(c.seed * 7 + m) * TAU) * 0.7
+					field += p.size / ((x - bx) ** 2 + (y - by) ** 2 + 0.02)
+				}
+				const v = clamp01((field - p.threshold) * 0.9)
+				return pal(v * 0.35 + c.seed, p.hue, v)
+			},
+		},
+
+		bounce: {
+			// damped bouncing ball per strip: flight time shrinks geometrically
+			// (ratio ρ = bounce), so the whole bounce ladder has a closed form
+			params: {
+				gravity: { min: 0.3, max: 3, step: 0.05, def: 1 },
+				bounce: { min: 0.3, max: 0.92, step: 0.01, def: 0.75 },
+				size: { min: 0.04, max: 0.2, step: 0.01, def: 0.08 },
+				impact: { min: 0, max: 1, step: 0.05, def: 0.5 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0 },
+			},
+			fn(x, y, t, p, c) {
+				const cycle = (2.4 / p.gravity) * (0.85 + 0.3 * hash(c.i + c.seed))
+				const rho = p.bounce
+				const u = frac(t / cycle + hash(c.i * 3 + c.seed)) / (1 - rho)
+				const arg = 1 - u * (1 - rho)
+				let v = 0
+				let w = 0
+				if (arg > 1e-4) {
+					const n = Math.floor(Math.log(arg) / Math.log(rho))
+					const begin = (1 - rho ** n) / (1 - rho)
+					const lu = (u - begin) / rho ** n // phase inside the n-th flight
+					const h = rho ** (2 * n) * 4 * lu * (1 - lu)
+					v = Math.exp(-(((c.jo - h) / p.size) ** 2))
+					// white impact flash at the floor, while bounces are still high
+					const imp = Math.max(0, 1 - Math.min(lu, 1 - lu) / 0.07)
+					if (rho ** (2 * n) > 0.1) w = imp * Math.exp(-((c.jo / 0.05) ** 2)) * p.impact
+				}
+				const [r, g, b] = pal(hash(c.i * 3.7) * 0.4, p.hue, v)
+				return [r, g, b, gamma(w)]
+			},
+		},
+
+		collide: {
+			// two comets from opposite ends, white flash on impact, bounce back
+			params: {
+				speed: { min: 0.1, max: 1.5, step: 0.05, def: 0.4 },
+				tail: { min: 0.03, max: 0.3, step: 0.01, def: 0.1 },
+				stagger: { min: 0, max: 0.5, step: 0.02, def: 0 },
+				flash: { min: 0, max: 1, step: 0.05, def: 1 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0 },
+			},
+			fn(x, y, t, p, c) {
+				const u = frac(t * p.speed + c.io * p.stagger)
+				const pa = u < 0.5 ? u : 1 - u // comet A: 0 → ½ → 0
+				const pb = 1 - pa // comet B mirrored
+				const da = u < 0.5 ? 1 : -1
+				const ba = (pa - c.jo) * da
+				const bb = (c.jo - pb) * da
+				const vA = ba >= 0 ? Math.exp(-ba / p.tail) : Math.exp(-((ba / 0.02) ** 2))
+				const vB = bb >= 0 ? Math.exp(-bb / p.tail) : Math.exp(-((bb / 0.02) ** 2))
+				const flash = p.flash * Math.exp(-(((u - 0.5) / 0.04) ** 2)) * Math.exp(-(((c.jo - 0.5) / 0.18) ** 2))
+				const A = pal(0, p.hue, vA)
+				const B = pal(0.5, p.hue, vB)
+				return [Math.min(255, A[0] + B[0]), Math.min(255, A[1] + B[1]), Math.min(255, A[2] + B[2]), gamma(flash)]
+			},
+		},
+
+		vu: {
+			// VU meter bars on smoothed pseudo-noise with occasional kicks;
+			// green at the base, hot at the top, white peak dot
+			params: {
+				react: { min: 0.5, max: 6, step: 0.1, def: 2 },
+				range: { min: 0.4, max: 1, step: 0.02, def: 0.9 },
+				kick: { min: 0, max: 1, step: 0.05, def: 0.35 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0 },
+			},
+			fn(x, y, t, p, c) {
+				const tt = t * p.react
+				const p1 = hash(c.i * 13 + c.seed) * TAU
+				const p2 = hash(c.i * 29 + c.seed) * TAU
+				const p3 = hash(c.i * 47 + c.seed) * TAU
+				let level =
+					0.45 + 0.22 * Math.sin(tt * 1.1 + p1) + 0.16 * Math.sin(tt * 2.3 + p2) + 0.09 * Math.sin(tt * 4.7 + p3)
+				level += p.kick * Math.max(0, Math.sin(tt * 0.9 + p2 * 2)) ** 8
+				level = clamp01(level) * p.range
+				const [r, g, b] = pal(0.33 - c.jo * 0.33, p.hue, c.jo <= level ? 0.9 : 0.02)
+				return [r, g, b, Math.abs(c.jo - level) < 0.03 ? gamma(0.5) : 0]
+			},
+		},
+
+		lightning: {
+			// night storm: sudden blue-white strikes with afterglow, sometimes
+			// a double strike, jagged brightness along the bolt
+			params: {
+				rate: { min: 0.2, max: 3, step: 0.05, def: 0.8 },
+				afterglow: { min: 3, max: 20, step: 0.5, def: 8 },
+				chaos: { min: 0.1, max: 0.9, step: 0.02, def: 0.35 },
+				white: { min: 0, max: 4, step: 0.1, def: 1 },
+			},
+			fn(x, y, t, p, c) {
+				const cell = Math.floor(t * p.rate)
+				const u = frac(t * p.rate)
+				let v = 0
+				if (hash(c.i * 77.7 + cell * 131.3 + c.seed * 51) < p.chaos) {
+					v = Math.exp(-u * p.afterglow)
+					if (hash(cell * 7 + c.i) < 0.4) v = Math.max(v, 0.8 * Math.exp(-Math.abs(u - 0.15) * p.afterglow * 2))
+					v *= (0.65 + 0.35 * c.jo) * (0.8 + 0.4 * hash(c.i * 3 + c.j * 7 + cell))
+				}
+				return [gamma(v * 0.75), gamma(v * 0.8), gamma(Math.max(v, 0.03)), gamma(v * 0.7 * p.white)]
+			},
+		},
+
+		police: {
+			// emergency beacon: the two halves of the array strobe in turn
+			// with complementary colours (red/blue at hue 0)
+			params: {
+				rate: { min: 0.5, max: 4, step: 0.1, def: 1.5 },
+				duty: { min: 0.2, max: 0.8, step: 0.05, def: 0.5 },
+				strobes: { min: 2, max: 10, step: 1, def: 6 },
+				hue: { min: 0, max: 1, step: 0.01, def: 0 },
+			},
+			fn(x, y, t, p, c) {
+				const u = frac(t * p.rate)
+				const mine = c.io < 0.5 === u < 0.5
+				const v = mine && frac(u * p.strobes) < p.duty ? 1 : 0.03
+				return pal(c.io < 0.5 ? 0 : 0.6, p.hue, v)
+			},
+		},
+
+		candle: {
+			// warm flames, brighter at the base, with occasional gusts of
+			// wind that make them gutter — one flame per strip
+			params: {
+				flicker: { min: 0.2, max: 2, step: 0.05, def: 1 },
+				wind: { min: 0, max: 1, step: 0.05, def: 0.3 },
+				warmth: { min: 0.4, max: 1, step: 0.02, def: 0.85 },
+				white: { min: 0, max: 1, step: 0.05, def: 0.12 },
+			},
+			fn(x, y, t, p, c) {
+				const f1 = hash(c.i * 5 + c.seed) * TAU
+				const f2 = hash(c.i * 9 + c.seed) * TAU
+				let fl =
+					0.78 +
+					p.flicker *
+						(0.12 * Math.sin(t * 6.3 + f1) + 0.07 * Math.sin(t * 11.7 + f2) + 0.04 * Math.sin(t * 23 + f1 * 2))
+				fl -= p.wind * 0.5 * Math.max(0, Math.sin(t * 0.6 + f2)) ** 10 // gust
+				const v = clamp01(fl) * (1 - 0.3 * c.jo)
+				return [gamma(v), gamma(v * 0.5 * p.warmth), gamma(v * 0.08 * p.warmth), gamma(v * p.white)]
+			},
+		},
+	}
+
+	const PRESET_ORDER = [
+		"off",
+		"color",
+		"chase",
+		"audio",
+		"wave",
+		"interference",
+		"plasma",
+		"fire",
+		"rain",
+		"comet",
+		"aurora",
+		"sparkle",
+		"spiral",
+		"metaball",
+		"bounce",
+		"collide",
+		"vu",
+		"lightning",
+		"police",
+		"candle",
+	]
+
+	const PRESET_LABELS = {
+		interference: "ripples",
+	}
+
+	// ---------------------------------------------------------------- state
+	let currentName = localStorage.getItem("math-preset") ?? "spiral"
+	if (!PRESETS[currentName] || !PRESET_ORDER.includes(currentName)) currentName = "spiral"
+	if (currentName === "audio") currentName = "spiral"
+	let seed = parseFloat(localStorage.getItem("math-seed") ?? "0.37")
+	let values = {}
+
+	function storageKey(preset, param) {
+		return `math-${preset}-${param}`
+	}
+
+	function loadValues(name) {
+		values = {}
+		for (const [param, spec] of Object.entries(PRESETS[name].params)) {
+			const stored = parseFloat(localStorage.getItem(storageKey(name, param)))
+			values[param] = Number.isFinite(stored) ? stored : spec.def
+		}
+	}
+
+	// ---------------------------------------------------------------- UI
+	const bank = document.getElementById("preset-bank")
+	const controls = document.getElementById("preset-controls")
+
+	function buildControls(name) {
+		controls.innerHTML = ""
+		for (const [param, spec] of Object.entries(PRESETS[name].params)) {
+			const label = document.createElement("label")
+			label.className = "slider"
+
+			const title = document.createElement("span")
+			title.textContent = param
+
+			const input = document.createElement("input")
+			input.type = "range"
+			input.min = spec.min
+			input.max = spec.max
+			input.step = spec.step
+			input.value = values[param]
+
+			const val = document.createElement("span")
+			val.className = "slider-value"
+			const fmt = v => (spec.step >= 1 ? String(Math.round(v)) : v.toFixed(2))
+			val.textContent = fmt(values[param])
+
+			input.addEventListener("input", () => {
+				values[param] = parseFloat(input.value)
+				val.textContent = fmt(values[param])
+				localStorage.setItem(storageKey(name, param), input.value)
+			})
+
+			label.append(title, input, val)
+			controls.appendChild(label)
+		}
+	}
+
+	async function selectPreset(name, fromUser = false) {
+		currentName = name
+		localStorage.setItem("math-preset", name)
+		loadValues(name)
+		buildControls(name)
+		bank.querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.name === name))
+		if (name === "audio" && fromUser) {
+			try {
+				await startAudio()
+			} catch {
+				// Keep the preset selectable even when the browser denies mic access.
+			}
+		} else if (name !== "audio") {
+			stopAudio()
+		}
+	}
+
+	PRESET_ORDER.forEach((name, idx) => {
+		if (idx === 4) {
+			const sep = document.createElement("span")
+			sep.className = "preset-sep"
+			bank.appendChild(sep)
+		}
+		const btn = document.createElement("button")
+		btn.textContent = PRESET_LABELS[name] ?? name
+		btn.dataset.name = name
+		btn.addEventListener("click", () => selectPreset(name, true))
+		bank.appendChild(btn)
+	})
+
+	document.getElementById("p-seed").addEventListener("click", () => {
+		seed = Math.random()
+		localStorage.setItem("math-seed", String(seed))
+	})
+
+	document.getElementById("p-dice").addEventListener("click", () => {
+		for (const [param, spec] of Object.entries(PRESETS[currentName].params)) {
+			const steps = Math.round((spec.max - spec.min) / spec.step)
+			const v = spec.min + Math.round(Math.random() * steps) * spec.step
+			values[param] = Math.min(spec.max, v)
+			localStorage.setItem(storageKey(currentName, param), String(values[param]))
+		}
+		buildControls(currentName)
+	})
+
+	selectPreset(currentName)
+
+	// ---------------------------------------------------------------- render
+	let rafId = null
+	let lastFrame = 0
+	let ctx
+
+	function syncPreview() {
+		ctx = window.fitPreview("h")
+		lastFrame = 0
+	}
+
+	function render(now) {
+		const { devices } = window
+		const entries = [...devices.entries()]
+		if (!entries.length) return
+
+		const t = now / 1000
+		const fn = PRESETS[currentName].fn
+		const p = values
+		const cols = entries.length
+		const total = entries.reduce((sum, [, config]) => sum + config.num_leds, 0)
+		if (currentName === "audio" && analyser && audioData) analyser.getByteFrequencyData(audioData)
+		const colors = new Map()
+		let linear = 0
+
+		entries.forEach(([address, config], i) => {
+			const io = cols > 1 ? i / (cols - 1) : 0.5
+			const rows = config.num_leds
+			const x = io * 2 - 1
+			const leds = []
+			for (let j = 0; j < rows; j++) {
+				const jo = rows > 1 ? j / (rows - 1) : 0.5
+				leds.push(fn(x, jo * 2 - 1, t, p, { i, j, io, jo, seed, linear: linear + j, total, strips: cols }))
+			}
+			linear += rows
+			colors.set(address, leds)
+		})
+
+		ctx.clearRect(0, 0, window.previewCanvas.width, window.previewCanvas.height)
+		window.drawStrips(ctx, devices, colors, "h")
+	}
+
+	function loop(now) {
+		rafId = requestAnimationFrame(loop)
+		if (!window.devices.size) return
+		// Cap at ~60fps: rAF runs at 120Hz on ProMotion displays and would
+		// double the UDP traffic for no visible gain on the strips.
+		if (now - lastFrame < 15) return
+		lastFrame = now
+		render(now)
+	}
+
+	function main() {
+		syncPreview()
+		if (rafId) cancelAnimationFrame(rafId)
+		rafId = requestAnimationFrame(loop)
+	}
+
+	window.addEventListener("devices-changed", syncPreview)
+	window.main = main
+	window.example_cleanup = () => {
+		cancelAnimationFrame(rafId)
+		window.removeEventListener("devices-changed", syncPreview)
+		stopAudio()
+	}
+</script>

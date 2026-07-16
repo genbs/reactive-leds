@@ -1,6 +1,6 @@
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { debug, ok, validateByte, validateDevicePort, validateHost } from "../utils"
+import { debug, ok, validateByte, validateTarget } from "../utils"
 import { resolveTargets } from "./wifi"
 
 const randomByte = () => Math.floor(Math.random() * 256)
@@ -8,23 +8,23 @@ const randomByte = () => Math.floor(Math.random() * 256)
 export const colorCommand: Command = {
 	name: "color",
 	description:
-		"Set all LEDs to a solid color.\nIf r, g, b are omitted a random color is used.\nIf <host> is omitted the command is applied to all devices found on the network.",
-	examples: ["color", "color 255 0 0", "color 255 0 0 128", "color 255 0 0 0 192.168.1.10"],
+		"Set all LEDs on <target> to a solid color. If r, g, b are omitted a random color is used.",
+	examples: ["color", "color all 255 0 0", "color 192.168.1.10 255 0 0 128", "color 192.168.1.10:4211 255 0 0"],
 	args: [
+		{ required: false, name: "target", type: String, validator: validateTarget },
 		{ required: false, name: "r", type: Number, validator: validateByte },
 		{ required: false, name: "g", type: Number, validator: validateByte },
 		{ required: false, name: "b", type: Number, validator: validateByte },
 		{ required: false, name: "w", type: Number, validator: validateByte },
-		{ required: false, name: "host", type: String, validator: validateHost },
-		{ required: false, name: "port", type: Number, default: 4210, validator: validateDevicePort },
 	],
-	execute: async (r: number | undefined, g: number | undefined, b: number | undefined, w: number, host: string | undefined, port: number) => {
+	execute: async (target: string | undefined, r: number | undefined, g: number | undefined, b: number | undefined, w: number | undefined) => {
 		if (r === undefined) { r = randomByte(); g = randomByte(); b = randomByte() }
 		else { g = g ?? 0; b = b ?? 0 }
+		w = w ?? 0
 
 		console.log(`Color: rgb(${r}, ${g}, ${b}) w=${w}`)
 
-		const targets = await resolveTargets(host, port)
+		const targets = await resolveTargets(target)
 		if (targets.length === 0) return false
 
 		debug("color", "Found devices:", targets)

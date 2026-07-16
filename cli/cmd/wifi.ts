@@ -6,7 +6,7 @@ import path from "path"
 
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { debug, fail, green, ok, validateDevicePort, validateHost } from "../utils"
+import { debug, fail, green, ok, validateDevicePort, validateTarget } from "../utils"
 
 ////////////////////// Commands
 
@@ -31,13 +31,12 @@ export const scanCommand: Command = {
 
 export const pingCommand: Command = {
 	name: "ping",
-	description: "Ping a device over Wi-Fi. If <host> is omitted, every device discovered on the network is pinged.",
+	description: "Ping a device over Wi-Fi. Use \"all\" or omit <target> to ping every discovered device.",
 	args: [
-		{ name: "host", required: false, validator: validateHost },
-		{ name: "port", type: Number, required: false, default: 4210, validator: validateDevicePort },
+		{ name: "target", required: false, validator: validateTarget },
 	],
-	execute: async (host: string | undefined, port: number) => {
-		const targets = await resolveTargets(host, port)
+	execute: async (target: string | undefined) => {
+		const targets = await resolveTargets(target)
 		if (targets.length === 0) return false
 
 		for (const target of targets) {
@@ -50,13 +49,12 @@ export const pingCommand: Command = {
 
 export const resetWifiCommand: Command = {
 	name: "reset-wifi",
-	description: "Reset the Wi-Fi credentials on a device. If <host> is omitted, every discovered device is reset.",
+	description: "Reset Wi-Fi credentials. Use \"all\" or omit <target> to reset every discovered device.",
 	args: [
-		{ name: "host", required: false, validator: validateHost },
-		{ name: "port", type: Number, required: false, default: 4210, validator: validateDevicePort },
+		{ name: "target", required: false, validator: validateTarget },
 	],
-	execute: async (host: string | undefined, port: number) => {
-		const targets = await resolveTargets(host, port)
+	execute: async (target: string | undefined) => {
+		const targets = await resolveTargets(target)
 		if (targets.length === 0) return false
 
 		for (const target of targets) {
@@ -143,10 +141,10 @@ export async function scan(
 }
 
 /**
- * Resolve `identifier` (an IP, a hostname, or undefined) to a list of target
+ * Resolve `identifier` (an IP, hostname, "all", optional ":port", or undefined) to a list of target
  * devices with their cached config.
  *
- * - **undefined**: returns every device from `scan()` (5-min cache).
+ * - **undefined** or **"all"**: returns every device from `scan()` (5-min cache).
  * - **IPv4 address**: returns a single target; config is fetched on the spot
  *   (one UDP round trip) since we don't have it cached.
  * - **hostname**: looked up in the scan cache (matches `config.hostname`). If
@@ -157,38 +155,46 @@ export async function scan(
  */
 export async function resolveTargets(
 	identifier: string | undefined,
-	port: number
+	defaultPort = 4210,
+	verbose = true
 ): Promise<Target[]> {
-	if (!identifier) {
-		const devices = await scan(port)
+	const { host, port } = parseTarget(identifier, defaultPort)
+	if (!host || host.toLowerCase() === "all") {
+		const devices = await scan(port, { verbose })
 		if (devices.length === 0) {
-			console.log("No devices found")
+			if (verbose) console.log("No devices found")
 			return []
 		}
 		return devices.map(d => ({ ip: d.ip, port, config: d.config }))
 	}
 
-	if (isIPv4(identifier)) {
-		const config = await proto.getConfig(identifier, port).catch(() => null)
-		return [{ ip: identifier, port, config }]
+	if (isIPv4(host)) {
+		const config = await proto.getConfig(host, port).catch(() => null)
+		return [{ ip: host, port, config }]
 	}
 
 	// Treat as hostname: cache lookup, then fresh-scan fallback.
-	let devices = await scan(port)
-	let found = devices.find(d => d.config?.hostname === identifier)
+	let devices = await scan(port, { verbose })
+	let found = devices.find(d => d.config?.hostname === host)
 
 	if (!found) {
-		console.log(`Hostname "${identifier}" not in cache, running fresh scan...`)
-		devices = await scan(port, { useCache: false })
-		found = devices.find(d => d.config?.hostname === identifier)
+		if (verbose) console.log(`Hostname "${host}" not in cache, running fresh scan...`)
+		devices = await scan(port, { useCache: false, verbose })
+		found = devices.find(d => d.config?.hostname === host)
 	}
 
 	if (!found) {
-		console.log(`Hostname "${identifier}" not found on the network`)
+		if (verbose) console.log(`Hostname "${host}" not found on the network`)
 		return []
 	}
 
 	return [{ ip: found.ip, port, config: found.config }]
+}
+
+function parseTarget(identifier: string | undefined, defaultPort: number): { host: string | undefined; port: number } {
+	if (!identifier) return { host: undefined, port: defaultPort }
+	const [host, portText] = identifier.split(":")
+	return { host, port: portText === undefined ? defaultPort : Number(portText) }
 }
 
 function isIPv4(value: string): boolean {

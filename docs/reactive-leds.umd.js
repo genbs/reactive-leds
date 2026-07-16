@@ -31,6 +31,7 @@ var reactiveLeds = (() => {
     connect: () => connect,
     default: () => main_default,
     getConfig: () => getConfig,
+    getInfo: () => getInfo,
     getStatus: () => getStatus,
     isConnected: () => isConnected,
     onConnectionChange: () => onConnectionChange,
@@ -48,7 +49,7 @@ var reactiveLeds = (() => {
     PacketType2[PacketType2["SET_CONFIG"] = 2] = "SET_CONFIG";
     PacketType2[PacketType2["SET_LEDS"] = 3] = "SET_LEDS";
     PacketType2[PacketType2["RESET_WIFI"] = 4] = "RESET_WIFI";
-    PacketType2[PacketType2["GET_VERSION"] = 5] = "GET_VERSION";
+    PacketType2[PacketType2["GET_INFO"] = 5] = "GET_INFO";
     PacketType2[PacketType2["GET_STATUS"] = 6] = "GET_STATUS";
     return PacketType2;
   })(PacketType || {});
@@ -63,15 +64,57 @@ var reactiveLeds = (() => {
       hostname: decodeBuffer(buffer.subarray(4)).substring(0, 32)
     };
   }
+  function bufferToDeviceInfo(buffer) {
+    if (buffer.length < 14)
+      throw new Error(`Device info buffer too short: ${buffer.length} bytes, need at least 14`);
+    const ip = Array.from(buffer.subarray(0, 4)).join(".");
+    const port = buffer[4] << 8 | buffer[5];
+    const mac = Array.from(buffer.subarray(6, 12), (byte) => byte.toString(16).padStart(2, "0").toUpperCase()).join(":");
+    const versionLen = buffer[12];
+    const versionStart = 13;
+    const versionEnd = versionStart + versionLen;
+    if (buffer.length < versionEnd + 1)
+      throw new Error(`Device info buffer too short for version: ${buffer.length} bytes, need ${versionEnd + 1}`);
+    const hostnameLen = buffer[versionEnd];
+    const hostnameStart = versionEnd + 1;
+    const hostnameEnd = hostnameStart + hostnameLen;
+    if (buffer.length < hostnameEnd)
+      throw new Error(`Device info buffer too short for hostname: ${buffer.length} bytes, need ${hostnameEnd}`);
+    return {
+      ip,
+      port,
+      mac,
+      version: decodeBuffer(buffer.subarray(versionStart, versionEnd)),
+      hostname: decodeBuffer(buffer.subarray(hostnameStart, hostnameEnd)).substring(0, 32)
+    };
+  }
+  var ARRIVAL_GAP_BUCKETS = 6;
   function bufferToStatus(buffer) {
     if (buffer.length < 9)
       throw new Error(`Status buffer too short: ${buffer.length} bytes, need at least 9`);
     const uptime = (buffer[0] << 24 | buffer[1] << 16 | buffer[2] << 8 | buffer[3]) >>> 0;
     const heap = (buffer[4] << 24 | buffer[5] << 16 | buffer[6] << 8 | buffer[7]) >>> 0;
     const rssi = buffer[8] << 24 >> 24;
+    const readU32 = (offset) => (buffer[offset] << 24 | buffer[offset + 1] << 16 | buffer[offset + 2] << 8 | buffer[offset + 3]) >>> 0;
     const status = { uptime, heap, rssi };
-    if (buffer.length >= 15) {
-      status.mac = Array.from(buffer.subarray(9, 15), (byte) => byte.toString(16).padStart(2, "0").toUpperCase()).join(":");
+    if (buffer.length >= 41) {
+      status.internalHeap = readU32(9);
+      status.largestHeapBlock = readU32(13);
+      status.minHeap = readU32(17);
+      status.framesReceived = readU32(21);
+      status.framesShown = readU32(25);
+      status.framesDropped = readU32(29);
+      status.udpPacketsRead = readU32(33);
+      status.protocolLoopMaxGapMs = readU32(37);
+    }
+    if (buffer.length >= 89) {
+      status.arrivalGapHist = Array.from({ length: ARRIVAL_GAP_BUCKETS }, (_, i) => readU32(41 + i * 4));
+      status.arrivalGapMaxMs = readU32(65);
+      status.arrivalGapMaxAgeS = readU32(69);
+      status.seqLost = readU32(73);
+      status.seqReordered = readU32(77);
+      status.beaconTimeouts = readU32(81);
+      status.wifiDisconnects = readU32(85);
     }
     return status;
   }
@@ -188,18 +231,31 @@ var reactiveLeds = (() => {
   var requests = /* @__PURE__ */ new Map();
   var connectionChangeCallbacks = [];
   var connected = false;
+  var DEFAULT_SYNC_TIMEOUT = 3e3;
   var rid = 0;
-  function createRequest(buffer) {
+  function createRequest(buffer, timeout = DEFAULT_SYNC_TIMEOUT) {
     const requestId = FIRST_REQUEST_ID + rid++ % (255 - FIRST_REQUEST_ID) + 1;
     const newBuffer = new Uint8Array(1 + buffer.length);
     newBuffer[0] = requestId;
     newBuffer.set(buffer, 1);
-    const request = new Promise((resolve) => {
-      requests.set(requestId, { resolve });
+    const request = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        requests.delete(requestId);
+        reject(new Error(`Request ${requestId} timed out`));
+      }, timeout);
+      requests.set(requestId, { resolve, reject, timer });
     });
     return [request, newBuffer, requestId];
   }
+  function rejectPendingRequests(message) {
+    for (const [requestId, request] of requests) {
+      clearTimeout(request.timer);
+      request.reject(new Error(`${message} (${requestId})`));
+    }
+    requests.clear();
+  }
   function handleResponse(event) {
+    if (!(event.data instanceof Uint8Array)) return;
     const message = event.data;
     const responseId = message[0];
     const responseData = message.subarray(1);
@@ -209,6 +265,7 @@ var reactiveLeds = (() => {
         const next = responseData[1] === TRUE;
         if (next !== connected) {
           connected = next;
+          if (!connected) rejectPendingRequests("Proxy disconnected");
           debug && console.log(`[Proxy] Connection change event: ${connected}`);
           connectionChangeCallbacks.forEach((callback) => callback(connected));
         }
@@ -218,6 +275,7 @@ var reactiveLeds = (() => {
       return;
     }
     requests.delete(responseId);
+    clearTimeout(request.timer);
     request.resolve(responseData);
   }
   var daemon = null;
@@ -238,7 +296,7 @@ var reactiveLeds = (() => {
     encodeBuffer(serverURL, buffer, 1);
     buffer[1 + serverURL.length] = debug ? TRUE : FALSE;
     debug && console.log(`[Proxy] try to connect to ${serverURL}`, buffer);
-    return sendSync(buffer).then(((response) => response[1] === TRUE));
+    return sendSync(buffer).then((response) => response[1] === TRUE).catch(() => false);
   }
   function onConnectionChange(callback) {
     checkConnected();
@@ -252,11 +310,20 @@ var reactiveLeds = (() => {
     checkConnected();
     return connected;
   }
-  function sendSync(data) {
+  function sendSync(data, timeout = DEFAULT_SYNC_TIMEOUT) {
     checkConnected();
-    let [promise, buffer, requestId] = createRequest(data);
+    let [promise, buffer, requestId] = createRequest(data, timeout);
     debug && console.log(`[Proxy] sendSync [${requestId}] ${WorkerRequestTypeMap[buffer[1]]}`, buffer);
-    daemon.postMessage(buffer);
+    try {
+      daemon.postMessage(buffer);
+    } catch (err) {
+      const request = requests.get(requestId);
+      if (request) {
+        clearTimeout(request.timer);
+        requests.delete(requestId);
+      }
+      throw err;
+    }
     return promise;
   }
   function send(data) {
@@ -295,19 +362,25 @@ var reactiveLeds = (() => {
   function ping(ip, port = 4210) {
     return sendSync(createPacket(ip, port, 0 /* PING */)).then(
       (response) => response.length === 1 && response[0] === TRUE
-    );
+    ).catch(() => false);
   }
   function getConfig(ip, port = 4210) {
     return sendSync(createPacket(ip, port, 1 /* GET_CONFIG */)).then((response) => {
       if (response.length === 1 && response[0] === FALSE) return null;
       return bufferToConfig(response);
-    });
+    }).catch(() => null);
+  }
+  function getInfo(ip, port = 4210) {
+    return sendSync(createPacket(ip, port, 5 /* GET_INFO */)).then((response) => {
+      if (response.length === 1 && response[0] === FALSE) return null;
+      return bufferToDeviceInfo(response);
+    }).catch(() => null);
   }
   function getStatus(ip, port = 4210) {
     return sendSync(createPacket(ip, port, 6 /* GET_STATUS */)).then((response) => {
       if (response.length === 1 && response[0] === FALSE) return null;
       return bufferToStatus(response);
-    });
+    }).catch(() => null);
   }
   function setLEDs(ip, port = 4210, leds) {
     send(createPacket(ip, port, 3 /* SET_LEDS */, leds));
@@ -336,6 +409,7 @@ var reactiveLeds = (() => {
     isConnected,
     connect,
     ping,
+    getInfo,
     getConfig,
     getStatus,
     setLEDs,
