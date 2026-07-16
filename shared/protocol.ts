@@ -36,7 +36,7 @@ export const availableConfigKeys: (keyof Config)[] = ["hostname", "pin", "num_le
 
 export type LEDs = Uint8Array // [r, g, b, w, ...] (4 bytes per LED)
 
-export function ledsToBuffer(leds: LEDs, startIndex = 0): Uint8Array {
+export function validateLEDs(leds: LEDs, startIndex = 0): void {
 	if (!Number.isInteger(startIndex) || startIndex < 0 || startIndex > 255) {
 		throw new RangeError("startIndex must be an integer between 0 and 255")
 	}
@@ -46,7 +46,10 @@ export function ledsToBuffer(leds: LEDs, startIndex = 0): Uint8Array {
 	if (startIndex + leds.length / 4 > 255) {
 		throw new RangeError("LED range exceeds 255 pixels")
 	}
+}
 
+export function ledsToBuffer(leds: LEDs, startIndex = 0): Uint8Array {
+	validateLEDs(leds, startIndex)
 	const buffer = new Uint8Array(1 + leds.length)
 	buffer[0] = startIndex
 	buffer.set(leds, 1)

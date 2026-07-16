@@ -7,9 +7,9 @@ import {
 	Config,
 	DeviceInfo,
 	IP,
-	ledsToBuffer,
 	PacketType,
 	Status,
+	validateLEDs,
 } from "@reactive-leds/shared"
 import { FALSE, TRUE, WorkerRequestType } from "./comm"
 import { sample } from "./mapping"
@@ -21,7 +21,7 @@ import { Device } from "./types"
 const addressBuffers = new Map<string, AddressBuffer>()
 
 // @internal Create a packet to send to the worker and then to the server.
-function createPacket(ip: IP, port: number, type: PacketType, data?: Uint8Array): Uint8Array {
+function createPacket(ip: IP, port: number, type: PacketType, data?: Uint8Array, dataPrefix?: number): Uint8Array {
 	const address = `${ip}:${port}`
 	let addressPacket = addressBuffers.get(address)
 
@@ -31,7 +31,7 @@ function createPacket(ip: IP, port: number, type: PacketType, data?: Uint8Array)
 	}
 
 	const addrLen = addressPacket.length
-	const dataLen = data ? data.length : 0
+	const dataLen = (data ? data.length : 0) + (dataPrefix === undefined ? 0 : 1)
 	const totalLen = 2 + addrLen + 1 + dataLen
 
 	let offset = 1 // request ID is filled by send/sendSync
@@ -42,6 +42,7 @@ function createPacket(ip: IP, port: number, type: PacketType, data?: Uint8Array)
 
 	buffer[offset++] = type
 
+	if (dataPrefix !== undefined) buffer[offset++] = dataPrefix
 	if (data) buffer.set(data, offset)
 
 	return buffer
@@ -85,7 +86,8 @@ export function getStatus(ip: IP, port = 4210): Promise<Status | null> {
 
 /** Send LED colors to the device — fire-and-forget, no response expected. */
 export function setLEDs(ip: IP, port = 4210, leds: Uint8Array, startIndex = 0): void {
-	send(createPacket(ip, port, PacketType.SET_LEDS, ledsToBuffer(leds, startIndex)))
+	validateLEDs(leds, startIndex)
+	send(createPacket(ip, port, PacketType.SET_LEDS, leds, startIndex))
 }
 
 /** Ping the device and fetch its config. Returns null if unreachable. */

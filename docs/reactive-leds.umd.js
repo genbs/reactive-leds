@@ -53,7 +53,7 @@ var reactiveLeds = (() => {
     PacketType2[PacketType2["GET_STATUS"] = 6] = "GET_STATUS";
     return PacketType2;
   })(PacketType || {});
-  function ledsToBuffer(leds, startIndex = 0) {
+  function validateLEDs(leds, startIndex = 0) {
     if (!Number.isInteger(startIndex) || startIndex < 0 || startIndex > 255) {
       throw new RangeError("startIndex must be an integer between 0 and 255");
     }
@@ -63,10 +63,6 @@ var reactiveLeds = (() => {
     if (startIndex + leds.length / 4 > 255) {
       throw new RangeError("LED range exceeds 255 pixels");
     }
-    const buffer = new Uint8Array(1 + leds.length);
-    buffer[0] = startIndex;
-    buffer.set(leds, 1);
-    return buffer;
   }
   var DEFAULT_SYNC_TIMEOUT = 1e3;
   function bufferToConfig(buffer) {
@@ -354,7 +350,7 @@ var reactiveLeds = (() => {
 
   // src/main.ts
   var addressBuffers = /* @__PURE__ */ new Map();
-  function createPacket(ip, port, type, data) {
+  function createPacket(ip, port, type, data, dataPrefix) {
     const address = `${ip}:${port}`;
     let addressPacket = addressBuffers.get(address);
     if (!addressPacket) {
@@ -362,7 +358,7 @@ var reactiveLeds = (() => {
       addressBuffers.set(address, addressPacket);
     }
     const addrLen = addressPacket.length;
-    const dataLen = data ? data.length : 0;
+    const dataLen = (data ? data.length : 0) + (dataPrefix === void 0 ? 0 : 1);
     const totalLen = 2 + addrLen + 1 + dataLen;
     let offset = 1;
     const buffer = new Uint8Array(totalLen);
@@ -370,6 +366,7 @@ var reactiveLeds = (() => {
     buffer.set(addressPacket, offset);
     offset += addrLen;
     buffer[offset++] = type;
+    if (dataPrefix !== void 0) buffer[offset++] = dataPrefix;
     if (data) buffer.set(data, offset);
     return buffer;
   }
@@ -400,7 +397,8 @@ var reactiveLeds = (() => {
     }).catch(() => null);
   }
   function setLEDs(ip, port = 4210, leds, startIndex = 0) {
-    send(createPacket(ip, port, 3 /* SET_LEDS */, ledsToBuffer(leds, startIndex)));
+    validateLEDs(leds, startIndex);
+    send(createPacket(ip, port, 3 /* SET_LEDS */, leds, startIndex));
   }
   async function connect(ip, port = 4210) {
     const alive = await ping(ip, port);
