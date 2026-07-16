@@ -25,6 +25,7 @@ export default class WS {
 	public settings: WSSettings
 	public connected: boolean
 	private socket!: WebSocket | null
+	private socketURL: string | null = null
 
 	constructor(settings: Partial<WSSettings> = {}) {
 		this.settings = { ...defaultSettings, ...settings } as WSSettings
@@ -37,7 +38,7 @@ export default class WS {
 
 	/**
 	 * Connects to the WebSocket server.
-	 * If already connected, it will close the existing connection and create a new one.
+	 * Reuses an open connection to the same URL. A different URL replaces it.
 	 */
 	public connect() {
 		if (this.retryTimer) {
@@ -47,6 +48,17 @@ export default class WS {
 		}
 
 		this.settings.debug && console.log("[WS] Connecting to", this.settings.url)
+
+		if (
+			this.socket &&
+			this.connected &&
+			this.socket.readyState === WebSocket.OPEN &&
+			this.socketURL === this.settings.url
+		) {
+			this.settings.debug && console.log("[WS] Already connected to", this.settings.url)
+			this.settings.onConnectionChange?.(true)
+			return
+		}
 
 		if (this.socket) {
 			this.settings.debug && console.log("[WS] Warning: already connected, closing existing connection")
@@ -80,6 +92,7 @@ export default class WS {
 		}
 
 		this.socket = socket
+		this.socketURL = this.settings.url
 		socket.binaryType = "arraybuffer"
 		socket.addEventListener("open", onOpen)
 		socket.addEventListener("message", onMessage)
@@ -122,6 +135,7 @@ export default class WS {
 		this.settings.debug && console.log("[WS] Connection closed", e)
 
 		this.socket = null
+		this.socketURL = null
 		// Always notify, even if the connection never opened: a pending Connect
 		// request in the worker is resolved by this event — without it, a failed
 		// first connect would leave begin() hanging forever. Duplicate `false`

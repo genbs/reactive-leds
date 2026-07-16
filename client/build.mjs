@@ -1,7 +1,7 @@
 // Build script for @reactive-leds/client.
 // Produces four artifacts in build/:
 //   - reactive-leds.js       ESM bundle (import / <script type="module">)
-//   - reactive-leds.umd.js   UMD bundle (require / AMD / <script> global `reactiveLeds`)
+//   - reactive-leds.umd.js   UMD bundle (require / AMD / <script> global `rleds`)
 //   - reactive-leds.d.ts     bundled type declarations (IDE autocomplete)
 //   - daemon.worker.js       module worker, loaded at runtime next to either bundle
 import { execSync } from "child_process"
@@ -9,13 +9,18 @@ import { build } from "esbuild"
 
 // esbuild has no native UMD output: wrap its IIFE in the classic UMD factory.
 // The global/exported value is the API object itself (the module's default
-// export), so script users call `reactiveLeds.begin(...)` directly.
+// export). Browser scripts get the short `rleds` name plus the backwards-
+// compatible `reactiveLeds` alias.
 const umdBanner = `(function (root, factory) {
 	if (typeof define === 'function' && define.amd) define(factory)
 	else if (typeof module === 'object' && module.exports) module.exports = factory()
-	else root.reactiveLeds = factory()
+	else {
+		var api = factory()
+		root.rleds = api
+		root.reactiveLeds = api
+	}
 })(typeof self !== 'undefined' ? self : globalThis, function () {`
-const umdFooter = `return reactiveLeds.default })`
+const umdFooter = `return rleds.default })`
 
 await build({
 	entryPoints: ["src/main.ts"],
@@ -28,7 +33,7 @@ await build({
 	entryPoints: ["src/main.ts"],
 	bundle: true,
 	format: "iife",
-	globalName: "reactiveLeds",
+	globalName: "rleds",
 	banner: { js: umdBanner },
 	footer: { js: umdFooter },
 	outfile: "build/reactive-leds.umd.js",

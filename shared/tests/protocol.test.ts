@@ -1,15 +1,14 @@
-import { addressToBuffer, bufferToConfig, bufferToDeviceInfo, bufferToStatus, configToBuffer, decodeBuffer, deviceInfoToBuffer, encodeBuffer, ledsToBuffer, PacketType, statusToBuffer } from ".."
+import { addressToBuffer, bufferToConfig, bufferToDeviceInfo, bufferToStatus, configToBuffer, decodeBuffer, deviceInfoToBuffer, encodeBuffer, PacketType, statusToBuffer, validateLEDs } from ".."
 
 describe("LEDs", () => {
-	test("serializes contiguous RGBW pixels with one start index", () => {
-		expect(ledsToBuffer(new Uint8Array([255, 0, 0, 0, 0, 255, 0, 0]), 2))
-			.toEqual(new Uint8Array([2, 255, 0, 0, 0, 0, 255, 0, 0]))
+	test("accepts contiguous RGBW pixels with a valid start index", () => {
+		expect(() => validateLEDs(new Uint8Array([255, 0, 0, 0, 0, 255, 0, 0]), 2)).not.toThrow()
 	})
 
 	test("rejects empty, misaligned and overflowing ranges", () => {
-		expect(() => ledsToBuffer(new Uint8Array())).toThrow(RangeError)
-		expect(() => ledsToBuffer(new Uint8Array(5))).toThrow(RangeError)
-		expect(() => ledsToBuffer(new Uint8Array(8), 254)).toThrow(RangeError)
+		expect(() => validateLEDs(new Uint8Array())).toThrow(RangeError)
+		expect(() => validateLEDs(new Uint8Array(5))).toThrow(RangeError)
+		expect(() => validateLEDs(new Uint8Array(8), 254)).toThrow(RangeError)
 	})
 })
 

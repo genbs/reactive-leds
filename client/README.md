@@ -52,7 +52,7 @@ npm run build
 Produces four artifacts in `build/`:
 
 - `reactive-leds.js` — ESM bundle (`import` / `<script type="module">`)
-- `reactive-leds.umd.js` — UMD bundle (`require` / AMD / `<script>` with the `reactiveLeds` global)
+- `reactive-leds.umd.js` — UMD bundle (`require` / AMD / `<script>` with the `rleds` global; `reactiveLeds` remains as an alias)
 - `reactive-leds.d.ts` — bundled type declarations (IDE autocompletion, wired via `types` in package.json)
 - `daemon.worker.js` — module worker, loaded at runtime; keep it next to the bundle you serve
 
@@ -83,6 +83,8 @@ if (device) {
 	device.send(data) // same as setLEDs — for `data` see "LED control"
 }
 ```
+
+Every connected `Device` also owns a reusable `data` buffer and a `sample()` method. A plain `connect()` maps the full source frame; use `mapping()` to place multiple strips.
 
 ### Device state
 
@@ -117,6 +119,35 @@ For the format details see the [protocol](../shared/README.md#set_leds-format).
 await leds.ping("192.168.X.Y") // true if the device responds
 await leds.getConfig("192.168.X.Y") // { pin, num_leds, port, hostname }
 ```
+
+### Connecting a mapping
+
+The Mapping tool exports a serializable address-to-polygon object. `mapping()` connects every reachable device, reads its live LED count and creates one reusable output buffer per device:
+
+```ts
+const mapping = {
+	grid: [8, 16],
+	devices: {
+		"192.168.0.10:4210": [0, 16, 1, 16, 1, 0, 0, 0],
+		"192.168.0.7:4210": [1, 16, 3, 16, 3, 0, 1, 0],
+	},
+} as const
+
+const devices = await leds.mapping(mapping)
+
+devices.frame(pixels, width, height)
+```
+
+Unreachable devices are omitted. `devices.frame()` samples and sends every device, reusing each `device.data` buffer without per-frame LED-buffer allocations.
+
+Canvas `ImageData` carries its own dimensions, so it can be sampled directly:
+
+```ts
+const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+devices.frame(imageData)
+```
+
+Raw WebGL buffers still take explicit dimensions: `devices.frame(pixels, width, height)`.
 
 ### sample — canvas to LEDs
 

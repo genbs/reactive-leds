@@ -760,20 +760,14 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		if (added) persistMapping()
 	}
 
-	// Self-contained mapping: everything a sketch needs to drive the devices —
-	// ip/port to send to, LED count, and the polygon itself. Kept as an array
-	// so the visual order is preserved. Naming rule: `ip` is the bare IP;
-	// `address` would be the combined "ip:port" form.
+	// Self-contained, serializable mapping. Object insertion order preserves the
+	// visual order and each address is directly consumable by mapping().
 	function exportSnippet() {
-		const devices = []
-		for (const [key, config] of window.devices.entries()) {
+		const devices = {}
+		for (const [key] of window.devices.entries()) {
 			const quad = maps.get(key)
 			if (!quad) continue
-			devices.push({
-				ip: config.ip,
-				port: config.port,
-				quad,
-			})
+			devices[key] = quad
 		}
 		// collapse numeric arrays (grid, quad) to one line each — with the default
 		// pretty-print every quad would take 8 lines and drown the panel.
@@ -791,29 +785,16 @@ const mapping = ${exportSnippet()}
 
 await rleds.begin("ws://localhost:8000")
 
-// connect (ping + config) to each device: unreachable ones are dropped, the
-// LED count comes from the live config, and each device gets its own
-// reusable output buffer (no per-frame allocations)
-mapping.devices = (
-	await Promise.all(
-		mapping.devices.map(async d => {
-			const device = await rleds.connect(d.ip, d.port)
-			if (!device) return null
-			return { ...d, leds: device.config.num_leds, send: device.send, data: new Uint8Array(device.config.num_leds * 4) }
-		})
-	)
-).filter(Boolean)
+// Unreachable devices are dropped; LED counts and reusable buffers come from
+// each device's live configuration.
+const devices = await rleds.mapping(mapping)
 
 const ctx = canvas.getContext("2d", { willReadFrequently: true })
 
 // call this after each frame you draw on your canvas
 function sendFrame() {
-	const { width, height } = ctx.canvas
-	const pixels = ctx.getImageData(0, 0, width, height).data
-	for (const d of mapping.devices) {
-		rleds.sample(pixels, [width, height], mapping.grid, d.quad, d.leds, 0, d.data)
-		d.send(d.data)
-	}
+	const imageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
+	devices.frame(imageData)
 }`
 	}
 

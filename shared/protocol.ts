@@ -48,14 +48,6 @@ export function validateLEDs(leds: LEDs, startIndex = 0): void {
 	}
 }
 
-export function ledsToBuffer(leds: LEDs, startIndex = 0): Uint8Array {
-	validateLEDs(leds, startIndex)
-	const buffer = new Uint8Array(1 + leds.length)
-	buffer[0] = startIndex
-	buffer.set(leds, 1)
-	return buffer
-}
-
 /** Used by the device to send the response status */
 export enum PacketStatus {
 	OK = 1,

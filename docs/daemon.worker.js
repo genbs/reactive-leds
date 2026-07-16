@@ -30,6 +30,7 @@ var WS = class {
   constructor(settings = {}) {
     this.retries = 0;
     this.retryTimer = null;
+    this.socketURL = null;
     this.settings = { ...defaultSettings, ...settings };
     if (this.settings.autoConnect) this.connect();
     else this.socket = null;
@@ -37,7 +38,7 @@ var WS = class {
   }
   /**
    * Connects to the WebSocket server.
-   * If already connected, it will close the existing connection and create a new one.
+   * Reuses an open connection to the same URL. A different URL replaces it.
    */
   connect() {
     if (this.retryTimer) {
@@ -46,6 +47,11 @@ var WS = class {
       this.retries = 0;
     }
     this.settings.debug && console.log("[WS] Connecting to", this.settings.url);
+    if (this.socket && this.connected && this.socket.readyState === WebSocket.OPEN && this.socketURL === this.settings.url) {
+      this.settings.debug && console.log("[WS] Already connected to", this.settings.url);
+      this.settings.onConnectionChange?.(true);
+      return;
+    }
     if (this.socket) {
       this.settings.debug && console.log("[WS] Warning: already connected, closing existing connection");
       this.socket.close();
@@ -70,6 +76,7 @@ var WS = class {
       return;
     }
     this.socket = socket;
+    this.socketURL = this.settings.url;
     socket.binaryType = "arraybuffer";
     socket.addEventListener("open", onOpen);
     socket.addEventListener("message", onMessage);
@@ -101,6 +108,7 @@ var WS = class {
   onSocketClose(e) {
     this.settings.debug && console.log("[WS] Connection closed", e);
     this.socket = null;
+    this.socketURL = null;
     this.settings.onConnectionChange?.(false);
     this.connected = false;
     const shouldReconnect = typeof this.settings.shouldReconnect === "function" ? this.settings.shouldReconnect() : this.settings.shouldReconnect;
@@ -180,7 +188,7 @@ function handleConnectionChange(status) {
 }
 function handleMessage(packet) {
   const requestId = packet[0];
-  const message = packet.slice(1);
+  const message = packet.subarray(1);
   debug && console.log(`[Worker] received from backend [${requestId}]`, message);
   self.postMessage(packet);
 }

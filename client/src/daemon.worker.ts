@@ -90,7 +90,7 @@ function handleConnectionChange(status: boolean) {
 /** When the server sends a message to the worker, relay it to the client */
 function handleMessage(packet: Uint8Array) {
 	const requestId = packet[0]
-	const message = packet.slice(1)
+	const message = packet.subarray(1)
 
 	debug && console.log(`[Worker] received from backend [${requestId}]`, message)
 	self.postMessage(packet)

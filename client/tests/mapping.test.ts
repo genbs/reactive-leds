@@ -121,6 +121,16 @@ describe("mapping module", () => {
 		expect(result).toEqual(expected)
 	})
 
+	test("keeps exact pixel-boundary samples on the expected pixel", () => {
+		const pixels = new Uint8Array(64 * 4)
+		pixels.set(GREENA, 31 * 4)
+		const polygon: Polygon = [15.5, 0, 15.5, 1, 0.5, 1, 0.5, 0]
+
+		const result = sample(pixels, [64, 1], [16, 1], polygon, 30)
+
+		expect(result.slice(15 * 4, 16 * 4)).toEqual(new Uint8Array([...GREEN, 0]))
+	})
+
 	test("reversed polygon flips the strip direction", () => {
 		/**
 		 * Source Pixels (1x4):        Polygon: same area, but the start edge

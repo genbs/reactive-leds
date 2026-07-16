@@ -1,10 +1,14 @@
 (function (root, factory) {
 	if (typeof define === 'function' && define.amd) define(factory)
 	else if (typeof module === 'object' && module.exports) module.exports = factory()
-	else root.reactiveLeds = factory()
+	else {
+		var api = factory()
+		root.rleds = api
+		root.reactiveLeds = api
+	}
 })(typeof self !== 'undefined' ? self : globalThis, function () {
 "use strict";
-var reactiveLeds = (() => {
+var rleds = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -34,6 +38,7 @@ var reactiveLeds = (() => {
     getInfo: () => getInfo,
     getStatus: () => getStatus,
     isConnected: () => isConnected,
+    mapping: () => mapping,
     onConnectionChange: () => onConnectionChange,
     ping: () => ping,
     sample: () => sample,
@@ -190,28 +195,25 @@ var reactiveLeds = (() => {
   var FIRST_REQUEST_ID = 2;
 
   // src/mapping.ts
-  function step(t, xStart, yStart, xEnd, yEnd, out) {
-    out[0] = (1 - t) * xStart + t * xEnd;
-    out[1] = (1 - t) * yStart + t * yEnd;
-  }
   function sample(pixels, pixelsSize, grid, polygon, steps, wa = 0, output = new Uint8Array(steps * 4)) {
     const [imgWidth, imgHeight] = pixelsSize;
     const [cells, rows] = grid;
     const [x0, y0, x1, y1, x2, y2, x3, y3] = polygon;
     const cellWidth = imgWidth / cells;
     const cellHeight = imgHeight / rows;
-    const top = [0, 0];
-    const bot = [0, 0];
-    const point = [0, 0];
-    step(0.5, x0, y0, x1, y1, top);
-    step(0.5, x3, y3, x2, y2, bot);
+    const topX = (x0 + x1) * 0.5;
+    const topY = (y0 + y1) * 0.5;
+    const botX = (x3 + x2) * 0.5;
+    const botY = (y3 + y2) * 0.5;
     const fixedW = typeof wa === "number" ? wa : 0;
     const whiteFn = typeof wa === "function" ? wa : null;
     const useAlpha = wa === true;
     for (let i = 0; i < steps; i++) {
-      step((i + 0.5) / steps, top[0], top[1], bot[0], bot[1], point);
-      let sx = Math.floor(point[0] * cellWidth);
-      let sy = Math.floor(point[1] * cellHeight);
+      const t = (i + 0.5) / steps;
+      const pointX = (1 - t) * topX + t * botX;
+      const pointY = (1 - t) * topY + t * botY;
+      let sx = Math.floor(pointX * cellWidth);
+      let sy = Math.floor(pointY * cellHeight);
       if (sx < 0) sx = 0;
       else if (sx >= imgWidth) sx = imgWidth - 1;
       if (sy < 0) sy = 0;
@@ -350,20 +352,26 @@ var reactiveLeds = (() => {
 
   // src/main.ts
   var addressBuffers = /* @__PURE__ */ new Map();
-  function createPacket(ip, port, type, data, dataPrefix) {
-    const address = `${ip}:${port}`;
-    let addressPacket = addressBuffers.get(address);
-    if (!addressPacket) {
-      addressPacket = addressToBuffer(ip, port);
-      addressBuffers.set(address, addressPacket);
+  function formatAddress(ip, port) {
+    return `${Array.isArray(ip) ? ip.join(".") : ip}:${port}`;
+  }
+  function getAddressBuffer(ip, port) {
+    const address = formatAddress(ip, port);
+    let addressBuffer = addressBuffers.get(address);
+    if (!addressBuffer) {
+      addressBuffer = addressToBuffer(ip, port);
+      addressBuffers.set(address, addressBuffer);
     }
-    const addrLen = addressPacket.length;
+    return addressBuffer;
+  }
+  function createPacket(address, type, data, dataPrefix) {
+    const addrLen = address.length;
     const dataLen = (data ? data.length : 0) + (dataPrefix === void 0 ? 0 : 1);
     const totalLen = 2 + addrLen + 1 + dataLen;
     let offset = 1;
     const buffer = new Uint8Array(totalLen);
     buffer[offset++] = 2 /* Send */;
-    buffer.set(addressPacket, offset);
+    buffer.set(address, offset);
     offset += addrLen;
     buffer[offset++] = type;
     if (dataPrefix !== void 0) buffer[offset++] = dataPrefix;
@@ -374,55 +382,112 @@ var reactiveLeds = (() => {
     return wsconnect(serverURL, debug2);
   }
   function ping(ip, port = 4210) {
-    return sendSync(createPacket(ip, port, 0 /* PING */)).then(
+    return pingAddress(getAddressBuffer(ip, port));
+  }
+  function pingAddress(address) {
+    return sendSync(createPacket(address, 0 /* PING */)).then(
       (response) => response.length === 1 && response[0] === TRUE
     ).catch(() => false);
   }
   function getConfig(ip, port = 4210) {
-    return sendSync(createPacket(ip, port, 1 /* GET_CONFIG */)).then((response) => {
+    return getConfigAddress(getAddressBuffer(ip, port));
+  }
+  function getConfigAddress(address) {
+    return sendSync(createPacket(address, 1 /* GET_CONFIG */)).then((response) => {
       if (response.length === 1 && response[0] === FALSE) return null;
       return bufferToConfig(response);
     }).catch(() => null);
   }
   function getInfo(ip, port = 4210) {
-    return sendSync(createPacket(ip, port, 5 /* GET_INFO */)).then((response) => {
+    return sendSync(createPacket(getAddressBuffer(ip, port), 5 /* GET_INFO */)).then((response) => {
       if (response.length === 1 && response[0] === FALSE) return null;
       return bufferToDeviceInfo(response);
     }).catch(() => null);
   }
   function getStatus(ip, port = 4210) {
-    return sendSync(createPacket(ip, port, 6 /* GET_STATUS */)).then((response) => {
+    return sendSync(createPacket(getAddressBuffer(ip, port), 6 /* GET_STATUS */)).then((response) => {
       if (response.length === 1 && response[0] === FALSE) return null;
       return bufferToStatus(response);
     }).catch(() => null);
   }
   function setLEDs(ip, port = 4210, leds, startIndex = 0) {
-    validateLEDs(leds, startIndex);
-    send(createPacket(ip, port, 3 /* SET_LEDS */, leds, startIndex));
+    setLEDsAddress(getAddressBuffer(ip, port), leds, startIndex);
   }
-  async function connect(ip, port = 4210) {
-    const alive = await ping(ip, port);
+  function setLEDsAddress(address, leds, startIndex = 0) {
+    validateLEDs(leds, startIndex);
+    send(createPacket(address, 3 /* SET_LEDS */, leds, startIndex));
+  }
+  var defaultDeviceMapping = {
+    grid: [1, 1],
+    polygon: [0, 0, 1, 0, 1, 1, 0, 1]
+  };
+  async function connect(ip, port = 4210, deviceMapping = defaultDeviceMapping) {
+    const addressBuffer = getAddressBuffer(ip, port);
+    const alive = await pingAddress(addressBuffer);
     if (!alive) return null;
-    const config = await getConfig(ip, port);
+    const config = await getConfigAddress(addressBuffer);
     if (!config) return null;
+    const address = formatAddress(ip, port);
+    const numLEDs = config.num_leds;
+    const data = new Uint8Array(numLEDs * 4);
+    const { grid, polygon } = deviceMapping;
+    function sampleDevice(source, widthOrWhite = 0, height = 0, whiteChannel = 0) {
+      if (!ArrayBuffer.isView(source)) {
+        return sample(source.data, [source.width, source.height], grid, polygon, numLEDs, widthOrWhite, data);
+      }
+      return sample(source, [widthOrWhite, height], grid, polygon, numLEDs, whiteChannel, data);
+    }
     return {
+      address,
       config,
-      send: (leds, startIndex = 0) => setLEDs(ip, port, leds, startIndex),
-      sendRaw: (type, data) => sendRaw(ip, port, type, data),
-      sendRawSync: (type, data) => sendRawSync(ip, port, type, data)
+      grid,
+      polygon,
+      data,
+      send: (leds, startIndex = 0) => setLEDsAddress(addressBuffer, leds, startIndex),
+      sendRaw: (type, data2) => send(createPacket(addressBuffer, type, data2)),
+      sendRawSync: (type, data2) => sendSync(createPacket(addressBuffer, type, data2)),
+      sample: sampleDevice
     };
   }
+  function parseAddress(address) {
+    const separator = address.lastIndexOf(":");
+    const ip = address.slice(0, separator);
+    const port = Number(address.slice(separator + 1));
+    if (separator < 1 || !ip || !Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new TypeError(`Invalid device address "${address}"; expected "ip:port"`);
+    }
+    return [ip, port];
+  }
+  async function mapping(config) {
+    const devices = await Promise.all(
+      Object.entries(config.devices).map(async ([address, polygon]) => {
+        const [ip, port] = parseAddress(address);
+        return connect(ip, port, { grid: config.grid, polygon });
+      })
+    );
+    const group = devices.filter((device) => device !== null);
+    function frame(source, widthOrWhite = 0, height = 0, whiteChannel = 0) {
+      for (const device of group) {
+        const data = ArrayBuffer.isView(source) ? device.sample(source, widthOrWhite, height, whiteChannel) : device.sample(source, widthOrWhite);
+        device.send(data);
+      }
+      return group;
+    }
+    group.frame = frame;
+    return group;
+  }
   function sendRaw(ip, port, type, data) {
-    send(createPacket(ip, port, type, data));
+    send(createPacket(getAddressBuffer(ip, port), type, data));
   }
   function sendRawSync(ip, port, type, data) {
-    return sendSync(createPacket(ip, port, type, data));
+    return sendSync(createPacket(getAddressBuffer(ip, port), type, data));
   }
-  var reactiveLeds = {
+  var rleds = {
     begin,
     onConnectionChange,
     isConnected,
     connect,
+    mapping,
     ping,
     getInfo,
     getConfig,
@@ -433,7 +498,7 @@ var reactiveLeds = (() => {
     sample,
     PacketType
   };
-  var main_default = reactiveLeds;
+  var main_default = rleds;
   return __toCommonJS(main_exports);
 })();
-return reactiveLeds.default })
+return rleds.default })

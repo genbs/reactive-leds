@@ -52,7 +52,7 @@ npm run build
 Produce quattro artefatti in `build/`:
 
 - `reactive-leds.js` — bundle ESM (`import` / `<script type="module">`)
-- `reactive-leds.umd.js` — bundle UMD (`require` / AMD / `<script>` con global `reactiveLeds`)
+- `reactive-leds.umd.js` — bundle UMD (`require` / AMD / `<script>` con global `rleds`; `reactiveLeds` resta disponibile come alias)
 - `reactive-leds.d.ts` — dichiarazioni di tipo bundlate (autocompletamento IDE, agganciate via `types` nel package.json)
 - `daemon.worker.js` — module worker, caricato a runtime; tienilo accanto al bundle che servi
 
@@ -83,6 +83,8 @@ if (device) {
 	device.send(data) // equivalente a setLEDs — per `data` vedi «Controllo LED»
 }
 ```
+
+Ogni `Device` connesso contiene anche un buffer `data` riutilizzabile e il metodo `sample()`. Un semplice `connect()` mappa l'intero frame sorgente; usa `mapping()` per posizionare più strisce.
 
 ### Stato del device
 
@@ -117,6 +119,35 @@ Per i dettagli sul formato consulta il [protocollo](../shared/README-it.md#forma
 await leds.ping("192.168.X.Y") // true se il device risponde
 await leds.getConfig("192.168.X.Y") // { pin, num_leds, port, hostname }
 ```
+
+### Connessione di un mapping
+
+Il tool di Mapping esporta un oggetto serializzabile che associa ogni indirizzo al suo poligono. `mapping()` connette tutti i device raggiungibili, legge il numero di LED dalla configurazione live e crea un buffer riutilizzabile per ogni device:
+
+```ts
+const mapping = {
+	grid: [8, 16],
+	devices: {
+		"192.168.0.10:4210": [0, 16, 1, 16, 1, 0, 0, 0],
+		"192.168.0.7:4210": [1, 16, 3, 16, 3, 0, 1, 0],
+	},
+} as const
+
+const devices = await leds.mapping(mapping)
+
+devices.frame(pixels, width, height)
+```
+
+I device non raggiungibili vengono esclusi. `devices.frame()` campiona e invia tutti i device riutilizzando ogni buffer `device.data`, senza allocare buffer LED a ogni frame.
+
+`ImageData` contiene già le proprie dimensioni, quindi può essere campionato direttamente:
+
+```ts
+const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+devices.frame(imageData)
+```
+
+I buffer WebGL raw continuano a richiedere le dimensioni esplicite: `devices.frame(pixels, width, height)`.
 
 ### sample — da canvas a LED
 

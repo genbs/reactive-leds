@@ -2,15 +2,7 @@
  * Canvas-to-LED sampling.
  */
 
-type WhiteChannel = number | boolean | ((r: number, g: number, b: number) => number)
-type Polygon = [number, number, number, number, number, number, number, number]
-type Point = [number, number]
-
-/** Linear interpolation between two points — used for bilinear quad mapping */
-function step(t: number, xStart: number, yStart: number, xEnd: number, yEnd: number, out: Point): void {
-	out[0] = (1 - t) * xStart + t * xEnd
-	out[1] = (1 - t) * yStart + t * yEnd
-}
+import type { Grid, Pixels, Polygon, WhiteChannel } from "./types"
 
 /**
  * Samples a canvas frame onto a straight LED strip.
@@ -33,13 +25,13 @@ function step(t: number, xStart: number, yStart: number, xEnd: number, yEnd: num
  * @param output output buffer [r, g, b, w, ...] — allocated automatically if not provided
  */
 export function sample(
-	pixels: Uint8Array,
+	pixels: Pixels,
 	pixelsSize: [number, number],
-	grid: [number, number],
+	grid: Grid,
 	polygon: Polygon,
 	steps: number,
 	wa: WhiteChannel = 0,
-	output = new Uint8Array(steps * 4)
+	output: Uint8Array = new Uint8Array(steps * 4)
 ): Uint8Array {
 	const [imgWidth, imgHeight] = pixelsSize
 	const [cells, rows] = grid
@@ -51,23 +43,25 @@ export function sample(
 	const cellWidth = imgWidth / cells
 	const cellHeight = imgHeight / rows
 
-	// Midpoints of the start (TL-TR) and end (BL-BR) edges: the centerline
-	const top: Point = [0, 0]
-	const bot: Point = [0, 0]
-	const point: Point = [0, 0]
-	step(0.5, x0, y0, x1, y1, top)
-	step(0.5, x3, y3, x2, y2, bot)
+	// Midpoints of the start (TL-TR) and end (BL-BR) edges: the centerline.
+	// Scalars keep the hot path allocation-free when an output buffer is reused.
+	const topX = (x0 + x1) * 0.5
+	const topY = (y0 + y1) * 0.5
+	const botX = (x3 + x2) * 0.5
+	const botY = (y3 + y2) * 0.5
 
 	const fixedW = typeof wa === "number" ? wa : 0
 	const whiteFn = typeof wa === "function" ? wa : null
 	const useAlpha = wa === true
 
 	for (let i = 0; i < steps; i++) {
-		step((i + 0.5) / steps, top[0], top[1], bot[0], bot[1], point)
+		const t = (i + 0.5) / steps
+		const pointX = (1 - t) * topX + t * botX
+		const pointY = (1 - t) * topY + t * botY
 
 		// Convert grid coordinates to source image pixel coordinates, clamped to bounds
-		let sx = Math.floor(point[0] * cellWidth)
-		let sy = Math.floor(point[1] * cellHeight)
+		let sx = Math.floor(pointX * cellWidth)
+		let sy = Math.floor(pointY * cellHeight)
 		if (sx < 0) sx = 0
 		else if (sx >= imgWidth) sx = imgWidth - 1
 		if (sy < 0) sy = 0

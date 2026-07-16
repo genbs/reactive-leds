@@ -13,7 +13,7 @@ import {
 	PacketType,
 	PacketTypeMap,
 	Status,
-	ledsToBuffer,
+	validateLEDs,
 } from "@reactive-leds/shared"
 import dgram from "dgram"
 import { debug } from "./utils"
@@ -125,7 +125,8 @@ class Protocol {
 	 * @param leds [r, g, b, brightness / whiteness, ...]
 	 */
 	setLEDs(ip: string, port: number, leds: Uint8Array, startIndex = 0, packetId: PacketID = EMPTY_PACKET_ID): Promise<boolean> {
-		return this.send(ip, port, PacketType.SET_LEDS, ledsToBuffer(leds, startIndex), packetId)
+		validateLEDs(leds, startIndex)
+		return this.send(ip, port, PacketType.SET_LEDS, leds, packetId, startIndex)
 	}
 
 	/**
@@ -172,13 +173,14 @@ class Protocol {
 	 *
 	 * @param data any
 	 */
-	private send(ip: string, port: number, type: PacketType, data: Uint8Array, packetID: PacketID): Promise<boolean> {
+	private send(ip: string, port: number, type: PacketType, data: Uint8Array, packetID: PacketID, dataPrefix?: number): Promise<boolean> {
 		this.ensureSocket()
 
-		const message = new Uint8Array(1 + 1 + data.length)
+		const message = new Uint8Array(2 + data.length + (dataPrefix === undefined ? 0 : 1))
 		message[0] = packetID
 		message[1] = type
-		message.set(data, 2)
+		if (dataPrefix !== undefined) message[2] = dataPrefix
+		message.set(data, dataPrefix === undefined ? 2 : 3)
 
 		debug("Request (not sync)", `Sending ${PacketTypeMap[type]} to ${ip}:${port}`, data)
 
