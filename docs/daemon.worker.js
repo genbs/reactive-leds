@@ -156,9 +156,8 @@ self.addEventListener("message", async (e) => {
         debug && console.log("[Worker] Send error, not connected, can't send message");
         return;
       }
-      const request = new Uint8Array(message.length + 1);
+      const request = e.data.subarray(1);
       request[0] = requestId;
-      request.set(message, 1);
       globalWS.send(request);
       break;
     default:
