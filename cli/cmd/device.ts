@@ -65,7 +65,7 @@ export const configCommand: Command = {
 export const ledsCommand: Command = {
 	name: "leds",
 	description:
-		"Set LEDs on <target>. Use \"all\" to target every discovered device.\nThe <led_package> argument must be a comma-separated list of values in the format <led_index>,<r>,<g>,<b>,<brightness/whiteness>.",
+		"Set contiguous LEDs on <target>. Use \"all\" to target every discovered device.\nThe <led_package> argument must be <start_index>, followed by one or more <r>,<g>,<b>,<brightness/whiteness> groups.",
 	examples: ["leds 192.168.1.100 0,255,0,128,0,1,0,255,128,0", "leds all 0,255,0,128,0", "leds all:4211 0,255,0,128,0"],
 	args: [
 		{ required: true, name: "target", type: String, validator: validateTarget },
@@ -84,8 +84,10 @@ export const ledsCommand: Command = {
 		}
 
 		const data = new Uint8Array(ledsPackage.split(",").map(Number)) // validated
+		const startIndex = data[0]
+		const colors = data.subarray(1)
 		for (const target of targets) {
-			await proto.setLEDs(target.ip, target.port, data)
+			await proto.setLEDs(target.ip, target.port, colors, startIndex)
 			console.log(`${targetLabel(target)}: ${ok("LEDs request sent")}`)
 		}
 	},
@@ -132,8 +134,8 @@ function configValue(key: string, value: string): string | number {
 function validateLedsPackage(ledsPackage: string): boolean | string {
 	const ledData = ledsPackage.split(",").map(Number)
 
-	if (ledData.length % 5 !== 0)
-		return "Invalid LED package format. Must be a comma-separated list of values in the format <led_index>,<r>,<g>,<b>,<brightness/whiteness>."
+	if (ledData.length < 5 || (ledData.length - 1) % 4 !== 0)
+		return "Invalid LED package format. Use <start_index>, followed by one or more <r>,<g>,<b>,<brightness/whiteness> groups."
 
 	for (let i = 0; i < ledData.length; i++) {
 		if (isNaN(ledData[i]) || ledData[i] < 0 || ledData[i] > 255) {

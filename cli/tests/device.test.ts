@@ -71,7 +71,7 @@ describe("device commands", () => {
 
 		expect(mockResolveTargets).toHaveBeenCalledWith("all")
 		expect(mockProto.setLEDs).toHaveBeenCalledTimes(2)
-		expect(mockProto.setLEDs).toHaveBeenCalledWith("192.168.1.2", 4210, new Uint8Array([0, 255, 0, 0, 0]))
-		expect(mockProto.setLEDs).toHaveBeenCalledWith("192.168.1.3", 4210, new Uint8Array([0, 255, 0, 0, 0]))
+		expect(mockProto.setLEDs).toHaveBeenCalledWith("192.168.1.2", 4210, new Uint8Array([255, 0, 0, 0]), 0)
+		expect(mockProto.setLEDs).toHaveBeenCalledWith("192.168.1.3", 4210, new Uint8Array([255, 0, 0, 0]), 0)
 	})
 })

@@ -406,8 +406,8 @@ function drawStrips(
 	if (send && proxyConnected()) {
 		for (const [address, config] of devices.entries()) {
 			const leds = colors.get(address) ?? []
-			const data = new Uint8Array(config.num_leds * 5)
-			for (let i = 0; i < config.num_leds; i++) data.set([i, ...(leds[i] ?? [0, 0, 0, 0])], i * 5)
+			const data = new Uint8Array(config.num_leds * 4)
+			for (let i = 0; i < config.num_leds; i++) data.set(leds[i] ?? [0, 0, 0, 0], i * 4)
 			window.rleds.setLEDs(config.ip, config.port, data)
 		}
 	}
@@ -577,7 +577,7 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 		for (const [address, config] of window.devices.entries()) {
 			const quad = maps.get(address)
 			if (!quad) continue
-			const out = new Uint8Array(config.num_leds * 5)
+			const out = new Uint8Array(config.num_leds * 4)
 			try {
 				rleds.sample(
 					imageData.data,
@@ -617,9 +617,9 @@ window.mockDevices = (count = 4, num_leds = 16) => {
 				const v = (i + 0.5) / config.num_leds
 				const px = ((1 - v) * tx + v * bx) * cellW
 				const py = ((1 - v) * ty + v * by) * cellH
-				const r = out[i * 5 + 1],
-					g = out[i * 5 + 2],
-					b = out[i * 5 + 3]
+				const r = out[i * 4],
+					g = out[i * 4 + 1],
+					b = out[i * 4 + 2]
 				ctx.fillStyle = `rgb(${r},${g},${b})`
 				ctx.strokeStyle = `hsl(${entry_hue},80%,70%)`
 				ctx.beginPath()
@@ -799,7 +799,7 @@ mapping.devices = (
 		mapping.devices.map(async d => {
 			const device = await rleds.connect(d.ip, d.port)
 			if (!device) return null
-			return { ...d, leds: device.config.num_leds, send: device.send, data: new Uint8Array(device.config.num_leds * 5) }
+			return { ...d, leds: device.config.num_leds, send: device.send, data: new Uint8Array(device.config.num_leds * 4) }
 		})
 	)
 ).filter(Boolean)
@@ -1122,7 +1122,7 @@ function sendFrame() {
 			}
 			const leds = []
 			for (let i = 0; i < config.num_leds; i++)
-				leds.push([out[i * 5 + 1], out[i * 5 + 2], out[i * 5 + 3], out[i * 5 + 4]])
+				leds.push([out[i * 4], out[i * 4 + 1], out[i * 4 + 2], out[i * 4 + 3]])
 			colors.set(address, leds)
 		}
 

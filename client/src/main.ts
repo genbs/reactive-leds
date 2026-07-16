@@ -7,6 +7,7 @@ import {
 	Config,
 	DeviceInfo,
 	IP,
+	ledsToBuffer,
 	PacketType,
 	Status,
 } from "@reactive-leds/shared"
@@ -83,8 +84,8 @@ export function getStatus(ip: IP, port = 4210): Promise<Status | null> {
 }
 
 /** Send LED colors to the device — fire-and-forget, no response expected. */
-export function setLEDs(ip: IP, port = 4210, leds: Uint8Array): void {
-	send(createPacket(ip, port, PacketType.SET_LEDS, leds))
+export function setLEDs(ip: IP, port = 4210, leds: Uint8Array, startIndex = 0): void {
+	send(createPacket(ip, port, PacketType.SET_LEDS, ledsToBuffer(leds, startIndex)))
 }
 
 /** Ping the device and fetch its config. Returns null if unreachable. */
@@ -97,7 +98,7 @@ export async function connect(ip: IP, port = 4210): Promise<Device | null> {
 
 	return {
 		config,
-		send: (leds: Uint8Array) => setLEDs(ip, port, leds),
+		send: (leds: Uint8Array, startIndex = 0) => setLEDs(ip, port, leds, startIndex),
 		sendRaw: (type: PacketType, data?: Uint8Array) => sendRaw(ip, port, type, data),
 		sendRawSync: (type: PacketType, data?: Uint8Array) => sendRawSync(ip, port, type, data),
 	}

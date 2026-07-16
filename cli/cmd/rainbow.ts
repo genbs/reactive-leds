@@ -26,7 +26,7 @@ export const rainbowCommand: Command = {
 		const start = performance.now()
 		const w = 0
 		const numLedsPerTarget = targets.map(t => t.config?.num_leds ?? 16)
-		const ledsPackages = numLedsPerTarget.map(n => new Uint8Array(n * 5))
+		const ledsPackages = numLedsPerTarget.map(n => new Uint8Array(n * 4))
 
 		// Time-based: hue position derived from wall-clock time so timer jitter
 		// doesn't accumulate. Send rate capped at FPS; the per-target buffers are
@@ -46,7 +46,7 @@ export const rainbowCommand: Command = {
 					const r = Math.floor(Math.sin((pixelIndex * Math.PI) / 128 + 0) * 127 + 128)
 					const g = Math.floor(Math.sin((pixelIndex * Math.PI) / 128 + (2 * Math.PI) / 3) * 127 + 128)
 					const b = Math.floor(Math.sin((pixelIndex * Math.PI) / 128 + (4 * Math.PI) / 3) * 127 + 128)
-					pkg.set([j, r, g, b, w], j * 5)
+					pkg.set([r, g, b, w], j * 4)
 				}
 				proto.setLEDs(targets[t].ip, targets[t].port, pkg)
 			}
@@ -57,10 +57,7 @@ export const rainbowCommand: Command = {
 		// off all targets at the end
 		for (let t = 0; t < targets.length; t++) {
 			const numLeds = numLedsPerTarget[t]
-			const pkg = new Uint8Array(numLeds * 5)
-			for (let j = 0; j < numLeds; j++) {
-				pkg.set([j, 0, 0, 0, w], j * 5)
-			}
+			const pkg = new Uint8Array(numLeds * 4)
 			await proto.setLEDs(targets[t].ip, targets[t].port, pkg)
 		}
 

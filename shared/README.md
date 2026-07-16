@@ -52,28 +52,28 @@ The same pattern applies to every request/response type: send `[id, type, ...dat
 | `PING`        | 2 B (fixed)                        | 3 B (fixed)                             |
 | `GET_CONFIG`  | 2 B (fixed)                        | 6–38 B (header + hostname 0–32 B)       |
 | `SET_CONFIG`  | 6–38 B (header + hostname 0–32 B)  | 3 B (`id, type, status`)                |
-| `SET_LEDS`    | 7–82 B (2 + N×5, N = 1..num_leds, 16 by default) | — (no response)           |
+| `SET_LEDS`    | 7–1023 B (3 + N×4, N = 1..255)   | — (no response)           |
 | `RESET_WIFI`  | 2 B (fixed)                        | 3 B (fixed)                             |
 | `GET_INFO`    | 2 B (fixed)                        | 16–80 B (identity + version/hostname 0–32 B each) |
 | `GET_STATUS`  | 2 B (fixed)                        | 11 B base / 43 B with metrics / 91 B with benchmark counters |
 
 ### SET_LEDS format
 
-To update the LEDs, send a PacketData made of 5-byte sequences, one per LED:
+To update contiguous LEDs, send the start index followed by 4-byte RGBW groups:
 
 ```
-[pixel_index, r, g, b, w]
+[start_index, r, g, b, w, r, g, b, w, ...]
 ```
 
-Multiple LEDs can be packed into a single packet:
+```
+[PacketID, SET_LEDS, start_index, r, g, b, w, r, g, b, w, ...]
+```
 
-```
-[PacketID, SET_LEDS, pixel_index, r, g, b, w, pixel_index, r, g, b, w, ...]
-```
+The first group updates `start_index`; following groups update consecutive indices. LEDs outside that range are unchanged.
 
 `SET_LEDS` has no response — it is fire-and-forget to minimize latency.
 
-**The protocol ceiling is 255 LEDs per device**: both `pixel_index` and the config's `num_leds` field are single bytes. This is deliberate, tailored to segment strips (16 segments/m ≈ 15 m of FCOB per device), not high-density panels.
+**The protocol ceiling is 255 LEDs per device**: both `start_index` and the config's `num_leds` field are single bytes. This is deliberate, tailored to segment strips (16 segments/m ≈ 15 m of FCOB per device), not high-density panels.
 
 ### Updating the configuration
 

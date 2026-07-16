@@ -186,20 +186,20 @@ describe("Protocol", () => {
 
 	describe("setLEDs", () => {
 		test("sends a fire-and-forget packet with the right header and payload", async () => {
-			const data = new Uint8Array([0, 255, 0, 0, 0, 1, 0, 255, 0, 0])
-			await proto.setLEDs("10.0.0.1", 4210, data)
+			const data = new Uint8Array([255, 0, 0, 0, 0, 255, 0, 0])
+			await proto.setLEDs("10.0.0.1", 4210, data, 4)
 
 			expect(sendCalls).toHaveLength(1)
 			const sent = sendCalls[0].message
-			// [EMPTY_PACKET_ID=0, SET_LEDS, ...data]
+			// [EMPTY_PACKET_ID=0, SET_LEDS, start_index, ...data]
 			expect(sent[0]).toBe(0)
 			expect(sent[1]).toBe(PacketType.SET_LEDS)
-			expect(Array.from(sent.slice(2))).toEqual(Array.from(data))
+			expect(Array.from(sent.slice(2))).toEqual([4, ...data])
 		})
 
 		test("resolves the promise only after dgram's send callback fires", async () => {
 			let resolved = false
-			const promise = proto.setLEDs("10.0.0.1", 4210, new Uint8Array([0, 1, 2, 3, 4])).then(() => {
+			const promise = proto.setLEDs("10.0.0.1", 4210, new Uint8Array([1, 2, 3, 4])).then(() => {
 				resolved = true
 			})
 
@@ -212,7 +212,7 @@ describe("Protocol", () => {
 		})
 
 		test("can send SET_LEDS with an explicit packet id", async () => {
-			const ok = await proto.setLEDs("10.0.0.1", 4210, new Uint8Array([0, 1, 2, 3, 4]), 23)
+			const ok = await proto.setLEDs("10.0.0.1", 4210, new Uint8Array([1, 2, 3, 4]), 0, 23)
 
 			expect(ok).toBe(true)
 			expect(sendCalls).toHaveLength(1)
@@ -220,6 +220,11 @@ describe("Protocol", () => {
 			expect(sent[0]).toBe(23)
 			expect(sent[1]).toBe(PacketType.SET_LEDS)
 			expect(Array.from(sent.slice(2))).toEqual([0, 1, 2, 3, 4])
+		})
+
+		test("rejects a range beyond the protocol limit", () => {
+			expect(() => proto.setLEDs("10.0.0.1", 4210, new Uint8Array(8), 254)).toThrow(RangeError)
+			expect(sendCalls).toHaveLength(0)
 		})
 	})
 

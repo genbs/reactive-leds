@@ -96,7 +96,7 @@ Per il profilo ho stampato 5 pezzi in PLA, ciascuno lungo 20 cm. Per la barra di
 ## Limitazioni e problemi noti
 
 - **Controllo a segmenti, non per LED**: la striscia FCOB ha 896 LED per metro ma solo 16 IC per metro. Il controllo avviene per segmento (16 segmenti/m), non per singolo LED. È una scelta consapevole: ho preferito una striscia più luminosa a scapito della risoluzione.
-- **255 LED per device**: `num_leds` e `pixel_index` sono singoli byte nel protocollo UDP. Più che sufficienti per strisce a segmenti (~15 m di FCOB per device); non è pensato per pannelli a matrice ad alta densità.
+- **255 LED per device**: `num_leds` e `start_index` sono singoli byte nel protocollo UDP. Più che sufficienti per strisce a segmenti (~15 m di FCOB per device); non è pensato per pannelli a matrice ad alta densità.
 - **Ordine dei colori**: la sequenza di byte RGB/WRGB dipende dall'IC della striscia. Il firmware è configurato per la striscia indicata nei Materiali. Strisce diverse potrebbero richiedere un ordine diverso (vedi `firmware/main/leds.c`).
 - **WiFi sleep disabilitato**: la modalità risparmio energetico della radio WiFi è disabilitata esplicitamente per evitare picchi di latenza e perdita di pacchetti durante gli aggiornamenti real-time.
 - **Credenziali WiFi in chiaro via BLE**: durante il provisioning le credenziali vengono inviate senza cifratura. Per un progetto personale la semplicità ha priorità, ma tienilo a mente se usi reti sensibili.

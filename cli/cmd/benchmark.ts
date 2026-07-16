@@ -132,7 +132,7 @@ function toBenchTarget(target: Target): BenchTarget {
 	return {
 		...target,
 		leds,
-		data: new Uint8Array(leds * 5),
+		data: new Uint8Array(leds * 4),
 		attempted: 0,
 		ok: 0,
 		errors: 0,
@@ -202,13 +202,13 @@ async function sendFrames(target: BenchTarget, fps: number, duration: number) {
 // ~50-60ms marker→frame-0 pause never shows up in the histogram or max gap.
 async function sendStartMarker(target: BenchTarget) {
 	writeFrame(target.data, target.leds, 0)
-	await proto.setLEDs(target.ip, target.port, target.data, START_PACKET_ID)
+	await proto.setLEDs(target.ip, target.port, target.data, 0, START_PACKET_ID)
 }
 
 async function sendFrame(target: BenchTarget, frame: number) {
 	writeFrame(target.data, target.leds, frame)
 	target.attempted++
-	const ok = await proto.setLEDs(target.ip, target.port, target.data, benchmarkPacketId(frame))
+	const ok = await proto.setLEDs(target.ip, target.port, target.data, 0, benchmarkPacketId(frame))
 	if (ok) target.ok++
 	else target.errors++
 }
@@ -223,13 +223,12 @@ export function benchmarkPacketId(frame: number): number {
 
 function writeFrame(data: Uint8Array, leds: number, frame: number) {
 	for (let i = 0; i < leds; i++) {
-		const offset = i * 5
+		const offset = i * 4
 		const phase = (frame + i * 5) % 96
-		data[offset] = i
-		data[offset + 1] = phase < 32 ? BRIGHTNESS : 0
-		data[offset + 2] = phase >= 32 && phase < 64 ? BRIGHTNESS : 0
-		data[offset + 3] = phase >= 64 ? BRIGHTNESS : 0
-		data[offset + 4] = 0
+		data[offset] = phase < 32 ? BRIGHTNESS : 0
+		data[offset + 1] = phase >= 32 && phase < 64 ? BRIGHTNESS : 0
+		data[offset + 2] = phase >= 64 ? BRIGHTNESS : 0
+		data[offset + 3] = 0
 	}
 }
 

@@ -19,8 +19,7 @@ export const offCommand: Command = {
 		const packets = targets.map(target => {
 			const numLeds = target.config?.num_leds ?? 16
 
-			const data = new Uint8Array(numLeds * 5)
-			for (let i = 0; i < numLeds; i++) data[i * 5] = i
+			const data = new Uint8Array(numLeds * 4)
 
 			return { target, data }
 		})

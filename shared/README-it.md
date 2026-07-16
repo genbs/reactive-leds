@@ -52,28 +52,28 @@ Lo stesso pattern vale per ogni tipo richiesta/risposta: invia `[id, type, ...da
 | `PING`        | 2 B (fissa)                        | 3 B (fissa)                             |
 | `GET_CONFIG`  | 2 B (fissa)                        | 6–38 B (header + hostname 0–32 B)       |
 | `SET_CONFIG`  | 6–38 B (header + hostname 0–32 B)  | 3 B (`id, type, status`)                |
-| `SET_LEDS`    | 7–82 B (2 + N×5, N = 1..num_leds, 16 di default) | — (nessuna risposta)      |
+| `SET_LEDS`    | 7–1023 B (3 + N×4, N = 1..255)   | — (nessuna risposta)      |
 | `RESET_WIFI`  | 2 B (fissa)                        | 3 B (fissa)                             |
 | `GET_INFO`    | 2 B (fissa)                        | 16–80 B (identità + versione/hostname 0–32 B ciascuno) |
 | `GET_STATUS`  | 2 B (fissa)                        | 11 B base / 43 B con metriche / 91 B con contatori benchmark |
 
 ### Formato SET_LEDS
 
-Per aggiornare i LED si invia un PacketData composto da sequenze di 5 byte, una per LED:
+Per aggiornare LED contigui si invia l'indice iniziale seguito da gruppi RGBW di 4 byte:
 
 ```
-[pixel_index, r, g, b, w]
+[start_index, r, g, b, w, r, g, b, w, ...]
 ```
 
-Più LED possono essere raggruppati in un singolo pacchetto:
+```
+[PacketID, SET_LEDS, start_index, r, g, b, w, r, g, b, w, ...]
+```
 
-```
-[PacketID, SET_LEDS, pixel_index, r, g, b, w, pixel_index, r, g, b, w, ...]
-```
+Il primo gruppo aggiorna `start_index`, i successivi gli indici consecutivi. I LED fuori dall'intervallo non vengono modificati.
 
 `SET_LEDS` non ha risposta — è fire-and-forget per minimizzare la latenza.
 
-**Il tetto del protocollo è 255 LED per device**: sia `pixel_index` che il campo `num_leds` della config sono singoli byte. È una scelta deliberata, su misura per strisce a segmenti (16 segmenti/m ≈ 15 m di FCOB per device), non per pannelli ad alta densità.
+**Il tetto del protocollo è 255 LED per device**: sia `start_index` che il campo `num_leds` della config sono singoli byte. È una scelta deliberata, su misura per strisce a segmenti (16 segmenti/m ≈ 15 m di FCOB per device), non per pannelli ad alta densità.
 
 ### Aggiornare la configurazione
 

@@ -9,6 +9,22 @@ var PacketType = /* @__PURE__ */ ((PacketType2) => {
   PacketType2[PacketType2["GET_STATUS"] = 6] = "GET_STATUS";
   return PacketType2;
 })(PacketType || {});
+function ledsToBuffer(leds, startIndex = 0) {
+  if (!Number.isInteger(startIndex) || startIndex < 0 || startIndex > 255) {
+    throw new RangeError("startIndex must be an integer between 0 and 255");
+  }
+  if (leds.length < 4 || leds.length % 4 !== 0) {
+    throw new RangeError("leds must contain one or more RGBW pixels");
+  }
+  if (startIndex + leds.length / 4 > 255) {
+    throw new RangeError("LED range exceeds 255 pixels");
+  }
+  const buffer = new Uint8Array(1 + leds.length);
+  buffer[0] = startIndex;
+  buffer.set(leds, 1);
+  return buffer;
+}
+var DEFAULT_SYNC_TIMEOUT = 1e3;
 function bufferToConfig(buffer) {
   if (buffer.length < 4) {
     throw new Error(`Config buffer too short: ${buffer.length} bytes, need at least 4`);
@@ -138,7 +154,7 @@ function step(t, xStart, yStart, xEnd, yEnd, out) {
   out[0] = (1 - t) * xStart + t * xEnd;
   out[1] = (1 - t) * yStart + t * yEnd;
 }
-function sample(pixels, pixelsSize, grid, polygon, steps, wa = 0, output = new Uint8Array(steps * 5)) {
+function sample(pixels, pixelsSize, grid, polygon, steps, wa = 0, output = new Uint8Array(steps * 4)) {
   const [imgWidth, imgHeight] = pixelsSize;
   const [cells, rows] = grid;
   const [x0, y0, x1, y1, x2, y2, x3, y3] = polygon;
@@ -161,12 +177,11 @@ function sample(pixels, pixelsSize, grid, polygon, steps, wa = 0, output = new U
     if (sy < 0) sy = 0;
     else if (sy >= imgHeight) sy = imgHeight - 1;
     const srcIndex = sy * imgWidth + sx << 2;
-    const dstIndex = i * 5;
-    output[dstIndex] = i;
-    output[dstIndex + 1] = pixels[srcIndex];
-    output[dstIndex + 2] = pixels[srcIndex + 1];
-    output[dstIndex + 3] = pixels[srcIndex + 2];
-    output[dstIndex + 4] = whiteFn ? whiteFn(pixels[srcIndex], pixels[srcIndex + 1], pixels[srcIndex + 2]) : useAlpha ? pixels[srcIndex + 3] : fixedW;
+    const dstIndex = i * 4;
+    output[dstIndex] = pixels[srcIndex];
+    output[dstIndex + 1] = pixels[srcIndex + 1];
+    output[dstIndex + 2] = pixels[srcIndex + 2];
+    output[dstIndex + 3] = whiteFn ? whiteFn(pixels[srcIndex], pixels[srcIndex + 1], pixels[srcIndex + 2]) : useAlpha ? pixels[srcIndex + 3] : fixedW;
   }
   return output;
 }
@@ -186,10 +201,16 @@ function createWorker() {
 var requests = /* @__PURE__ */ new Map();
 var connectionChangeCallbacks = [];
 var connected = false;
-var DEFAULT_SYNC_TIMEOUT = 3e3;
-var rid = 0;
+var rid = FIRST_REQUEST_ID - 1;
+function nextRequestId() {
+  for (let i = FIRST_REQUEST_ID; i <= 255; i++) {
+    rid = rid === 255 ? FIRST_REQUEST_ID : rid + 1;
+    if (!requests.has(rid)) return rid;
+  }
+  throw new Error("Too many pending requests");
+}
 function createRequest(buffer, timeout = DEFAULT_SYNC_TIMEOUT) {
-  const requestId = FIRST_REQUEST_ID + rid++ % (255 - FIRST_REQUEST_ID) + 1;
+  const requestId = nextRequestId();
   const newBuffer = new Uint8Array(1 + buffer.length);
   newBuffer[0] = requestId;
   newBuffer.set(buffer, 1);
@@ -265,12 +286,12 @@ function isConnected() {
   checkConnected();
   return connected;
 }
-function sendSync(data, timeout = DEFAULT_SYNC_TIMEOUT) {
+async function sendSync(data, timeout = DEFAULT_SYNC_TIMEOUT) {
   checkConnected();
   let [promise, buffer, requestId] = createRequest(data, timeout);
   debug && console.log(`[Proxy] sendSync [${requestId}] ${WorkerRequestTypeMap[buffer[1]]}`, buffer);
   try {
-    daemon.postMessage(buffer);
+    daemon.postMessage(buffer, [buffer.buffer]);
   } catch (err) {
     const request = requests.get(requestId);
     if (request) {
@@ -287,7 +308,7 @@ function send(data) {
   buffer[0] = EMPTY_REQUEST_ID;
   buffer.set(data, 1);
   debug && console.log(`[Proxy] send ${WorkerRequestTypeMap[buffer[1]]}`, buffer);
-  daemon.postMessage(buffer);
+  daemon.postMessage(buffer, [buffer.buffer]);
 }
 
 // src/main.ts
@@ -337,8 +358,8 @@ function getStatus(ip, port = 4210) {
     return bufferToStatus(response);
   }).catch(() => null);
 }
-function setLEDs(ip, port = 4210, leds) {
-  send(createPacket(ip, port, 3 /* SET_LEDS */, leds));
+function setLEDs(ip, port = 4210, leds, startIndex = 0) {
+  send(createPacket(ip, port, 3 /* SET_LEDS */, ledsToBuffer(leds, startIndex)));
 }
 async function connect(ip, port = 4210) {
   const alive = await ping(ip, port);
@@ -347,7 +368,7 @@ async function connect(ip, port = 4210) {
   if (!config) return null;
   return {
     config,
-    send: (leds) => setLEDs(ip, port, leds),
+    send: (leds, startIndex = 0) => setLEDs(ip, port, leds, startIndex),
     sendRaw: (type, data) => sendRaw(ip, port, type, data),
     sendRawSync: (type, data) => sendRawSync(ip, port, type, data)
   };

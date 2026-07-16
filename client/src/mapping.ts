@@ -18,7 +18,7 @@ function step(t: number, xStart: number, yStart: number, xEnd: number, yEnd: num
  * The strip is a single line running from the polygon's start edge (TL→TR) to
  * its end edge (BL→BR), sampled along the centerline: for each LED `i` the
  * source pixel under its point is read via bilinear interpolation of the
- * quadrilateral, and `[index, r, g, b, w]` is written into `output`. The
+ * quadrilateral, and `[r, g, b, w]` is written into `output`. The
  * polygon's width doesn't matter — only the centerline is read. To run the
  * strip horizontally, rotate the polygon (start edge on the left). Skewed,
  * rotated or perspective-distorted polygons all work — the sampling follows
@@ -30,7 +30,7 @@ function step(t: number, xStart: number, yStart: number, xEnd: number, yEnd: num
  * @param polygon region of the grid to map onto the LEDs [TL, TR, BR, BL] as (x0,y0, x1,y1, x2,y2, x3,y3) in grid coordinates
  * @param steps number of LEDs
  * @param wa white/brightness channel: fixed number, true = use source alpha, or a function(r,g,b) => w
- * @param output output buffer [led_index, r, g, b, w, ...] — allocated automatically if not provided
+ * @param output output buffer [r, g, b, w, ...] — allocated automatically if not provided
  */
 export function sample(
 	pixels: Uint8Array,
@@ -39,7 +39,7 @@ export function sample(
 	polygon: Polygon,
 	steps: number,
 	wa: WhiteChannel = 0,
-	output = new Uint8Array(steps * 5)
+	output = new Uint8Array(steps * 4)
 ): Uint8Array {
 	const [imgWidth, imgHeight] = pixelsSize
 	const [cells, rows] = grid
@@ -74,13 +74,12 @@ export function sample(
 		else if (sy >= imgHeight) sy = imgHeight - 1
 
 		const srcIndex = (sy * imgWidth + sx) << 2 // 4 bytes per pixel (RGBA)
-		const dstIndex = i * 5                      // 5 bytes per LED (index, R, G, B, W)
+		const dstIndex = i * 4                      // 4 bytes per LED (R, G, B, W)
 
-		output[dstIndex] = i
-		output[dstIndex + 1] = pixels[srcIndex]
-		output[dstIndex + 2] = pixels[srcIndex + 1]
-		output[dstIndex + 3] = pixels[srcIndex + 2]
-		output[dstIndex + 4] =
+		output[dstIndex] = pixels[srcIndex]
+		output[dstIndex + 1] = pixels[srcIndex + 1]
+		output[dstIndex + 2] = pixels[srcIndex + 2]
+		output[dstIndex + 3] =
 			whiteFn
 				? whiteFn(pixels[srcIndex], pixels[srcIndex + 1], pixels[srcIndex + 2])
 				: useAlpha

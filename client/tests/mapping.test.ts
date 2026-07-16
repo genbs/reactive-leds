@@ -53,7 +53,7 @@ describe("mapping module", () => {
 		const steps = 4
 		const w = 0
 
-		const output = new Uint8Array(steps * 5)
+		const output = new Uint8Array(steps * 4)
 		/**
 		 * Expected LED Output (4 LEDs):
 		 * LED:  0   1   2   3
@@ -61,10 +61,10 @@ describe("mapping module", () => {
 		 */
 		const expected = new Uint8Array(
 			[
-				[0, ...BLACK, w],
-				[1, ...RED, w],
-				[2, ...GREEN, w],
-				[3, ...BLUE, w],
+				[...BLACK, w],
+				[...RED, w],
+				[...GREEN, w],
+				[...BLUE, w],
 			].flat()
 		)
 
@@ -110,10 +110,10 @@ describe("mapping module", () => {
 		 */
 		const expected = new Uint8Array(
 			[
-				[0, ...BLACK, w],
-				[1, ...RED, w],
-				[2, ...GREEN, w],
-				[3, ...BLUE, w],
+				[...BLACK, w],
+				[...RED, w],
+				[...GREEN, w],
+				[...BLUE, w],
 			].flat()
 		)
 
@@ -145,10 +145,10 @@ describe("mapping module", () => {
 		 */
 		const expected = new Uint8Array(
 			[
-				[0, ...BLUE, 0],
-				[1, ...GREEN, 0],
-				[2, ...RED, 0],
-				[3, ...BLACK, 0],
+				[...BLUE, 0],
+				[...GREEN, 0],
+				[...RED, 0],
+				[...BLACK, 0],
 			].flat()
 		)
 
@@ -200,10 +200,10 @@ describe("mapping module", () => {
 		 */
 		const expected = new Uint8Array(
 			[
-				[0, ...GREEN, 0],
-				[1, ...GREEN, 0],
-				[2, ...GREEN, 0],
-				[3, ...GREEN, 0],
+				[...GREEN, 0],
+				[...GREEN, 0],
+				[...GREEN, 0],
+				[...GREEN, 0],
 			].flat()
 		)
 
@@ -261,10 +261,10 @@ describe("mapping module", () => {
 		 */
 		const expected = new Uint8Array(
 			[
-				[0, ...GREEN, 0],
-				[1, ...BLUE, 0],
-				[2, ...YELLOW, 0],
-				[3, ...MAGENTA, 0],
+				[...GREEN, 0],
+				[...BLUE, 0],
+				[...YELLOW, 0],
+				[...MAGENTA, 0],
 			].flat()
 		)
 
@@ -276,37 +276,37 @@ describe("mapping module", () => {
 		/**
 		 * Source Pixels (1x1):         wa = (r, g, b) => r
 		 * +--------------+
-		 * | rgb(100,0,0) |  →  LED 0 = [0, 100, 0, 0, w=100]
+		 * | rgb(100,0,0) |  →  LED 0 = [100, 0, 0, w=100]
 		 * +--------------+
 		 */
 		const sourcePixels = new Uint8Array([100, 0, 0, 255])
 		const result = sample(sourcePixels, [1, 1], [1, 1], [0, 0, 1, 0, 1, 1, 0, 1], 1, (r, _g, _b) => r)
-		expect(result[4]).toBe(100)
+		expect(result[3]).toBe(100)
 	})
 
 	test("wa=true uses source alpha as white channel", () => {
 		/**
 		 * Source Pixels (1x1):         wa = true → white channel = source alpha
 		 * +------------------+
-		 * | rgba(255,0,0,128)|  →  LED 0 = [0, 255, 0, 0, w=128]
+		 * | rgba(255,0,0,128)|  →  LED 0 = [255, 0, 0, w=128]
 		 * +------------------+
 		 */
 		const sourcePixels = new Uint8Array([255, 0, 0, 128])
 		const result = sample(sourcePixels, [1, 1], [1, 1], [0, 0, 1, 0, 1, 1, 0, 1], 1, true)
-		expect(result[4]).toBe(128)
+		expect(result[3]).toBe(128)
 	})
 
 	test("writes into the provided output buffer and returns it", () => {
 		/**
 		 * Source Pixels (1x1):         wa = 42 (fixed white)
 		 * +-----+
-		 * | R   |  →  output buffer = [0, 255, 0, 0, 42]
+		 * | R   |  →  output buffer = [255, 0, 0, 42]
 		 * +-----+
 		 */
 		const sourcePixels = new Uint8Array([...REDA])
-		const output = new Uint8Array(5)
+		const output = new Uint8Array(4)
 		const result = sample(sourcePixels, [1, 1], [1, 1], [0, 0, 1, 0, 1, 1, 0, 1], 1, 42, output)
 		expect(result).toBe(output)
-		expect([...output]).toEqual([0, ...RED, 42])
+		expect([...output]).toEqual([...RED, 42])
 	})
 })

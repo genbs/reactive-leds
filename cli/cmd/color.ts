@@ -34,9 +34,9 @@ export const colorCommand: Command = {
 		const packets = targets.map(target => {
 			const numLeds = target.config?.num_leds ?? 16
 
-			const data = new Uint8Array(numLeds * 5)
+			const data = new Uint8Array(numLeds * 4)
 			for (let i = 0; i < numLeds; i++) {
-				data.set([i, r, g!, b!, w], i * 5)
+				data.set([r, g!, b!, w], i * 4)
 			}
 
 			return { target, data }

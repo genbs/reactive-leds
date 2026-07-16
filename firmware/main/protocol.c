@@ -323,8 +323,15 @@ static void protocol_set_leds(const udp_packet* request)
     const uint8_t *data = request->data;
     size_t len = request->len;
 
-    if (len < 2 + 5) { // Header + at least one LED (5 bytes per LED - index + R + G + B + W)
-        ESP_LOGW(PROTOCOL_TAG, "Invalid SET_LEDS packet: too short");
+    if (len < 2 + 1 + 4 || (len - 3) % 4 != 0) { // Header + start index + RGBW pixels
+        ESP_LOGW(PROTOCOL_TAG, "Invalid SET_LEDS packet length");
+        return;
+    }
+
+    const uint8_t start_index = data[2];
+    const size_t count = (len - 3) / 4;
+    if (start_index >= config.num_leds || count > config.num_leds - start_index) {
+        ESP_LOGW(PROTOCOL_TAG, "LED range out of bounds");
         return;
     }
 
@@ -335,21 +342,13 @@ static void protocol_set_leds(const udp_packet* request)
         track_set_leds_metrics(data[0]);
     }
 
-    bool updated = false;
-    for (int i = 2; i + 4 < len; i += 5) {
-        uint8_t pixel_index = data[i];
-        if (pixel_index >= config.num_leds) {
-            ESP_LOGW(PROTOCOL_TAG, "LED index %d out of range", pixel_index);
-            continue;
-        }
-        leds_update(pixel_index, data[i+1] /* R */, data[i+2] /* G */, data[i+3] /* B */, data[i+4] /* W */);
-        updated = true;
+    for (size_t i = 0; i < count; i++) {
+        const size_t offset = 3 + i * 4;
+        leds_update(start_index + i, data[offset], data[offset + 1], data[offset + 2], data[offset + 3]);
     }
-    
-    if (updated) {
-        s_led_frames_received++;
-        leds_show();
-    }
+
+    s_led_frames_received++;
+    leds_show();
 }
 
 static void protocol_reset_wifi(const udp_packet* request)

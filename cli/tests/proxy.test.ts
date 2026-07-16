@@ -73,7 +73,7 @@ describe("handleProxyMessage", () => {
 	test("SET_LEDS → no response (null), fire-and-forget", async () => {
 		const data = [0, 255, 0, 0, 0]
 		const res = await handleProxyMessage(req(PacketType.SET_LEDS, data))
-		expect(mock.setLEDs).toHaveBeenCalledWith("192.168.1.10", PORT, expect.any(Uint8Array))
+		expect(mock.setLEDs).toHaveBeenCalledWith("192.168.1.10", PORT, new Uint8Array([255, 0, 0, 0]), 0)
 		expect(res).toBeNull()
 	})
 
@@ -152,6 +152,14 @@ describe("handleProxyMessage", () => {
 		const warn = jest.spyOn(console, "warn").mockImplementation(() => {})
 		const res = await handleProxyMessage(req(PacketType.SET_LEDS, [0, 255]))
 		expect(warn).toHaveBeenCalled()
+		expect(mock.setLEDs).not.toHaveBeenCalled()
+		expect(res).toBeNull()
+		warn.mockRestore()
+	})
+
+	test("misaligned SET_LEDS payload is dropped", async () => {
+		const warn = jest.spyOn(console, "warn").mockImplementation(() => {})
+		const res = await handleProxyMessage(req(PacketType.SET_LEDS, [0, 255, 0, 0, 0, 1]))
 		expect(mock.setLEDs).not.toHaveBeenCalled()
 		expect(res).toBeNull()
 		warn.mockRestore()

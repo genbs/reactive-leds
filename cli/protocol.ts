@@ -13,6 +13,7 @@ import {
 	PacketType,
 	PacketTypeMap,
 	Status,
+	ledsToBuffer,
 } from "@reactive-leds/shared"
 import dgram from "dgram"
 import { debug } from "./utils"
@@ -117,14 +118,14 @@ class Protocol {
 	}
 
 	/**
-	 * Turn on the leds based on the index and the specified color.
+	 * Update contiguous LEDs starting at the specified index.
 	 * Resolves when the kernel has handed the packet to the network stack,
 	 * so callers can `await` to ensure the packet leaves before process exit.
 	 *
-	 * @param data [led_index, r, g, b, brightness / whiteness, led_index, r, g, b, brightness / whiteness, ...]
+	 * @param leds [r, g, b, brightness / whiteness, ...]
 	 */
-	setLEDs(ip: string, port: number, data: Uint8Array, packetId: PacketID = EMPTY_PACKET_ID): Promise<boolean> {
-		return this.send(ip, port, PacketType.SET_LEDS, data, packetId)
+	setLEDs(ip: string, port: number, leds: Uint8Array, startIndex = 0, packetId: PacketID = EMPTY_PACKET_ID): Promise<boolean> {
+		return this.send(ip, port, PacketType.SET_LEDS, ledsToBuffer(leds, startIndex), packetId)
 	}
 
 	/**

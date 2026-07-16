@@ -126,7 +126,7 @@ var debug = false;
 self.addEventListener("message", async (e) => {
   const requestId = e.data[0];
   const type = e.data[1];
-  const message = e.data.slice(2);
+  const message = e.data.subarray(2);
   debug && console.log(
     `[Worker] recv from client [${requestId}] ${WorkerRequestTypeMap[type]}`,
     message

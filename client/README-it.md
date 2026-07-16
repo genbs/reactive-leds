@@ -101,9 +101,12 @@ const status = await leds.getStatus("192.168.X.Y")
 Invia colori a un device — fire-and-forget, nessuna risposta attesa:
 
 ```ts
-// [pixel_index, r, g, b, w] per ogni LED — 5 byte per LED
-const data = new Uint8Array([0, 255, 0, 0, 0]) // LED 0 → rosso
+// [r, g, b, w] per ogni LED — 4 byte per LED
+const data = new Uint8Array([255, 0, 0, 0]) // rosso
 leds.setLEDs("192.168.X.Y", 4210, data)
+
+// Aggiorna solo il LED 2, senza modificare gli altri
+leds.setLEDs("192.168.X.Y", 4210, data, 2)
 ```
 
 Per i dettagli sul formato consulta il [protocollo](../shared/README-it.md#formato-set_leds).
@@ -166,7 +169,7 @@ import leds, { PacketType } from "@reactive-leds/client"
 const ok = await leds.sendRawSync("192.168.X.Y", 4210, PacketType.RESET_WIFI)
 
 // fire-and-forget, nessuna risposta attesa
-leds.sendRaw("192.168.X.Y", 4210, PacketType.SET_LEDS, data)
+leds.sendRaw("192.168.X.Y", 4210, PacketType.SET_LEDS, new Uint8Array([0, ...data]))
 ```
 
 Anche l'handle di `connect` li espone, senza ripetere ip e porta: `device.sendRaw(type, data?)` e `device.sendRawSync(type, data?)`. Il formato dei pacchetti è documentato in [`shared/README-it.md`](../shared/README-it.md).

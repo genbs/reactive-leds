@@ -173,7 +173,7 @@ export async function sendSync(data: Uint8Array, timeout = DEFAULT_SYNC_TIMEOUT)
 	let [promise, buffer, requestId] = createRequest(data, timeout)
 	debug && console.log(`[Proxy] sendSync [${requestId}] ${WorkerRequestTypeMap[buffer[1] as WorkerRequestType]}`, buffer)
 	try {
-		daemon!.postMessage(buffer)
+		daemon!.postMessage(buffer, [buffer.buffer])
 	} catch (err) {
 		const request = requests.get(requestId)
 		if (request) {
@@ -195,5 +195,5 @@ export function send(data: Uint8Array): void {
 	buffer.set(data, 1)
 
 	debug && console.log(`[Proxy] send ${WorkerRequestTypeMap[buffer[1] as WorkerRequestType]}`, buffer)
-	daemon!.postMessage(buffer)
+	daemon!.postMessage(buffer, [buffer.buffer])
 }

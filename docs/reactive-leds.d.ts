@@ -75,7 +75,7 @@ export type Polygon = [
  * The strip is a single line running from the polygon's start edge (TL→TR) to
  * its end edge (BL→BR), sampled along the centerline: for each LED `i` the
  * source pixel under its point is read via bilinear interpolation of the
- * quadrilateral, and `[index, r, g, b, w]` is written into `output`. The
+ * quadrilateral, and `[r, g, b, w]` is written into `output`. The
  * polygon's width doesn't matter — only the centerline is read. To run the
  * strip horizontally, rotate the polygon (start edge on the left). Skewed,
  * rotated or perspective-distorted polygons all work — the sampling follows
@@ -87,7 +87,7 @@ export type Polygon = [
  * @param polygon region of the grid to map onto the LEDs [TL, TR, BR, BL] as (x0,y0, x1,y1, x2,y2, x3,y3) in grid coordinates
  * @param steps number of LEDs
  * @param wa white/brightness channel: fixed number, true = use source alpha, or a function(r,g,b) => w
- * @param output output buffer [led_index, r, g, b, w, ...] — allocated automatically if not provided
+ * @param output output buffer [r, g, b, w, ...] — allocated automatically if not provided
  */
 export declare function sample(pixels: Uint8Array, pixelsSize: [
 	number,
@@ -103,7 +103,7 @@ export declare function isConnected(): boolean;
 /** Runtime LED device handle for the client. */
 export type Device = {
 	config: Config;
-	send: (leds: Uint8Array) => void;
+	send: (leds: Uint8Array, startIndex?: number) => void;
 	sendRaw: (type: PacketType, data?: Uint8Array) => void;
 	sendRawSync: (type: PacketType, data?: Uint8Array) => Promise<Uint8Array>;
 };
@@ -118,7 +118,7 @@ export declare function getInfo(ip: IP, port?: number): Promise<DeviceInfo | nul
 /** Get device status: uptime, heap, WiFi RSSI and optional metrics. */
 export declare function getStatus(ip: IP, port?: number): Promise<Status | null>;
 /** Send LED colors to the device — fire-and-forget, no response expected. */
-export declare function setLEDs(ip: IP, port: number | undefined, leds: Uint8Array): void;
+export declare function setLEDs(ip: IP, port: number | undefined, leds: Uint8Array, startIndex?: number): void;
 /** Ping the device and fetch its config. Returns null if unreachable. */
 export declare function connect(ip: IP, port?: number): Promise<Device | null>;
 /**

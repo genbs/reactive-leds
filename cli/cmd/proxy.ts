@@ -7,7 +7,7 @@ import { debug, validateDevicePort, validateHost, validatePort } from "../utils"
 import { formatDevice, scan, ScanResult } from "./wifi"
 
 const SCAN_INTERVAL = 10_000
-const MAX_PROXY_PAYLOAD = 1506 // 8-byte proxy header + 1498-byte UDP payload
+const MAX_PROXY_PAYLOAD = 1029 // 8-byte proxy header + start index + 255 RGBW pixels
 
 export const proxyCommand: Command = {
 	name: "proxy",
@@ -57,7 +57,7 @@ export async function handleProxyMessage(payload: Uint8Array): Promise<Uint8Arra
 		return status(false)
 	}
 
-	if (packetType === PacketType.SET_LEDS && (packet.length < 5 || packet.length % 5 !== 0)) {
+	if (packetType === PacketType.SET_LEDS && (packet.length < 5 || (packet.length - 1) % 4 !== 0)) {
 		console.warn(`Invalid SET_LEDS payload: ${packet.length} bytes`)
 		return null
 	}
@@ -88,7 +88,7 @@ export async function handleProxyMessage(payload: Uint8Array): Promise<Uint8Arra
 		}
 
 		case PacketType.SET_LEDS:
-			proto.setLEDs(ip, port, packet)
+			proto.setLEDs(ip, port, packet.subarray(1), packet[0])
 			return null // fire-and-forget
 
 		case PacketType.GET_INFO: {
