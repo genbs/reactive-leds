@@ -1,25 +1,66 @@
 {
-    "private": true,
-    "name": "@leds/server",
-    "version": "1.0.0",
-    "description": "",
-    "scripts": {
-        "start": "ts-node -r tsconfig-paths/register ./main.ts",
-        "test": "jest"
+    "name": "@reactive-leds/cli",
+    "version": "1.0.2",
+    "description": "Command-line tools for provisioning, discovering, and controlling reactive-leds ESP32-S3 devices over UDP, USB and BLE. Includes a WebSocket proxy for browser-based LED control.",
+    "keywords": [
+        "led",
+        "esp32",
+        "ws2812",
+        "livecoding",
+        "visuals",
+        "diy",
+        "reactive-leds",
+        "neopixel",
+        "led-strip",
+        "bluetooth",
+        "ble",
+        "serialport",
+        "provisioning",
+        "udp",
+        "cli"
+    ],
+    "author": "Gennaro Bosone",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/genbs/reactive-leds.git",
+        "directory": "cli"
     },
-    "main": "./dist/main.js",
-    "license": "ISC",
+    "homepage": "https://github.com/genbs/reactive-leds/tree/master/cli#readme",
+    "bin": {
+        "rleds": "bin/rleds.js"
+    },
+    "files": [
+        "bin/",
+        "README.md",
+        "README-it.md",
+        "THIRD_PARTY_NOTICES"
+    ],
+    "engines": {
+        "node": ">=18"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "build": "node build.mjs",
+        "test": "jest",
+        "prepare": "npm run build",
+        "prepublishOnly": "npm test"
+    },
+    "license": "GPL-3.0-only",
     "devDependencies": {
-        "@jest/globals": "^29.7.0",
+        "@reactive-leds/shared": "file:../shared",
         "@types/jest": "^29.5.14",
+        "@types/ws": "^8.0.0",
+        "esbuild": "^0.25.0",
         "jest": "^29.7.0",
         "ts-jest": "^29.4.0",
-        "tsconfig-paths": "^4.2.0",
         "typescript": "^5.4.5"
     },
     "dependencies": {
-        "@abandonware/noble": "^1.9.2-26",
-        "dgram": "^1.0.1"
+        "@stoprocent/noble": "^2.5.3",
+        "serialport": "^12.0.0",
+        "ws": "^8.0.0"
     },
     "jest": {
         "preset": "ts-jest",

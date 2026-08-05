@@ -1,4 +1,7 @@
 import { Command, validate } from "../cmd"
+import { benchmarkCommand } from "../cmd/benchmark"
+import { configCommand } from "../cmd/device"
+import { proxyCommand } from "../cmd/proxy/proxy"
 
 describe("command", () => {
 	test("validate simple arg", () => {
@@ -143,5 +146,53 @@ describe("command", () => {
 		const validationResult = validate(cmd, ["invalid"])
 		expect(validationResult.status).toBe(false)
 		expect(validationResult.errors).toEqual(['"invalid" is not a valid value for argument input'])
+	})
+
+	test("config command validates device config ranges", () => {
+		expect(validate(configCommand, ["192.168.1.10", "pin", "18"]).status).toBe(true)
+		expect(validate(configCommand, ["192.168.1.10:4211", "pin", "18"]).status).toBe(true)
+		expect(validate(configCommand, ["192.168.1.10", "pin", "50"]).status).toBe(false)
+		expect(validate(configCommand, ["192.168.1.10", "pin", "1.5"]).status).toBe(false)
+
+		expect(validate(configCommand, ["192.168.1.10", "num_leds", "16"]).status).toBe(true)
+		expect(validate(configCommand, ["192.168.1.10", "num_leds", "0"]).status).toBe(false)
+		expect(validate(configCommand, ["192.168.1.10", "num_leds", "256"]).status).toBe(false)
+
+		expect(validate(configCommand, ["192.168.1.10", "port", "4210"]).status).toBe(true)
+		expect(validate(configCommand, ["192.168.1.10", "port", "1023"]).status).toBe(false)
+		expect(validate(configCommand, ["192.168.1.10", "port", "1.5"]).status).toBe(false)
+	})
+
+	test("proxy command separates bind port and device port validation", () => {
+		expect(validate(proxyCommand, ["0.0.0.0", "0", "4210"]).status).toBe(true)
+		expect(validate(proxyCommand, ["0.0.0.0", "8000", "1023"]).status).toBe(false)
+	})
+
+	test("proxy command parses named UI and origin options", () => {
+		const result = validate(proxyCommand, ["--ui", "--origin", "https://genbs.github.io"])
+		expect(result.status).toBe(true)
+		expect(result.args).toEqual({
+			host: "127.0.0.1", port: 8000, device_port: 4210, ui: true,
+			origin: "https://genbs.github.io",
+		})
+	})
+
+	test("proxy command rejects unknown and valueless options", () => {
+		expect(validate(proxyCommand, ["--wat"]).errors).toContain("Unknown option: --wat")
+		expect(validate(proxyCommand, ["--origin"]).errors).toContain("Missing value for option: --origin")
+	})
+
+	test("benchmark command requires a single explicit target", () => {
+		// single-device by design: benchmarking several devices at once
+		// conflates per-link quality, host batching and AP contention
+		expect(validate(benchmarkCommand, ["192.168.1.10"]).status).toBe(true)
+		expect(validate(benchmarkCommand, ["192.168.1.10:4211", "60", "30"]).status).toBe(true)
+		expect(validate(benchmarkCommand, ["192.168.1.10", "60", "30", "json"]).status).toBe(true)
+		expect(validate(benchmarkCommand, []).status).toBe(false)
+		expect(validate(benchmarkCommand, ["all", "90", "30"]).status).toBe(false)
+		expect(validate(benchmarkCommand, ["90", "30"]).status).toBe(false)
+		expect(validate(benchmarkCommand, ["192.168.1.10", "0", "30"]).status).toBe(false)
+		expect(validate(benchmarkCommand, ["192.168.1.10", "60", "0"]).status).toBe(false)
+		expect(validate(benchmarkCommand, ["192.168.1.10", "60", "30", "csv"]).status).toBe(false)
 	})
 })

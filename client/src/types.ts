@@ -1,16 +1,36 @@
-import { Config, DeviceIP } from "@leds/shared"
+import { Config, PacketType } from "@reactive-leds/shared"
 
-// Runtime LED device handle for the client.
+export type Pixels = Uint8Array | Uint8ClampedArray
+export type WhiteChannel = number | boolean | ((r: number, g: number, b: number) => number)
+export type Grid = readonly [number, number]
+export type Polygon = readonly [number, number, number, number, number, number, number, number]
+
+/** Runtime LED device handle for the client. */
 export type Device = {
+	address: string
 	config: Config
-	send: (leds: Uint8Array) => void
-	isValidMapping: (srcWidth: number, srcHeight: number, x0: number, y0: number, x1: number, y1: number) => boolean
+	readonly grid: Grid
+	readonly polygon: Polygon
+	readonly data: Uint8Array
+	send: (leds: Uint8Array, startIndex?: number) => void
+	sendRaw: (type: PacketType, data?: Uint8Array) => void
+	sendRawSync: (type: PacketType, data?: Uint8Array) => Promise<Uint8Array>
+	sample(imageData: ImageData, whiteChannel?: WhiteChannel): Uint8Array
+	sample(pixels: Pixels, width: number, height: number, whiteChannel?: WhiteChannel): Uint8Array
 }
 
-// Minimal mock payload used to emulate devices in the client.
-export type Mock = {
-	devices: {
-		ip: DeviceIP
-		config: Pick<Partial<Config>, "hostname" | "num_leds">
-	}[]
+export type DeviceGroup = Device[] & {
+	frame(imageData: ImageData, whiteChannel?: WhiteChannel): DeviceGroup
+	frame(pixels: Pixels, width: number, height: number, whiteChannel?: WhiteChannel): DeviceGroup
+}
+
+export type DeviceMapping = {
+	grid: Grid
+	polygon: Polygon
+}
+
+/** Serializable mapping exported by the browser mapping tool. */
+export type Mapping = {
+	grid: Grid
+	devices: Record<string, Polygon>
 }

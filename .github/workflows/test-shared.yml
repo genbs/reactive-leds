@@ -1,0 +1,25 @@
+name: Test shared
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - shared/**
+  push:
+    branches: [master]
+    paths:
+      - shared/**
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install
+      - name: Type-check
+        run: npx tsc --noEmit -p shared/tsconfig.json
+      - run: npm test --workspace=shared

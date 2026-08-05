@@ -1,3 +1,15 @@
+# Custom partition table for reactive-leds on ESP32-S3 N16R8 (16 MB flash).
+#
+# - nvs      (24 KB): Wi-Fi credentials, device config (pin, num_leds, port, hostname).
+# - phy_init  (4 KB): RF calibration data written by ESP-IDF at first boot.
+# - factory  (1.5 MB): main application image, flashed via USB.
+# - ota_0    (1.5 MB): OTA slot A — reserved for future use, NOT currently used.
+# - ota_1    (1.5 MB): OTA slot B — reserved for future use, NOT currently used.
+#
+# The OTA slots are kept so a future OTA implementation can land without
+# requiring a re-partition (which would erase NVS, including stored Wi-Fi
+# credentials, forcing all devices through BLE provisioning again).
+#
 # Name,   Type,  SubType, Offset,   Size
 nvs,      data,  nvs,     0x9000,   0x6000,
 phy_init, data,  phy,     0xF000,   0x1000,

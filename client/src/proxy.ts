@@ -1,9 +1,9 @@
 /**
  * Create a tunnel to the worker thread.
- * The client (browser) can send messages to the worker with this public functions.
+ * The client (browser) can send messages to the worker with these public functions.
  */
 
-import { encodeBuffer, logger } from "@leds/shared"
+import { DEFAULT_SYNC_TIMEOUT, encodeBuffer } from "@reactive-leds/shared"
 import {
 	CONNECTION_CHANGE_REQUEST_ID,
 	EMPTY_REQUEST_ID,
@@ -13,142 +13,182 @@ import {
 	WorkerRequestType,
 	WorkerRequestTypeMap,
 } from "./comm"
-// @ts-ignore
-import Deamon from "./deamon.worker"
+// document.currentScript is only valid during the initial script evaluation,
+// so it must be captured at load time. It's the worker-URL base for the UMD
+// build, where import.meta.url doesn't exist (esbuild lowers it to undefined).
+const scriptSrc =
+	typeof document !== "undefined" ? (document.currentScript as HTMLScriptElement | null)?.src : undefined
 
-// Logic to send and receive messages from the worker
-// the client need to send a message and wait for the response, like 'connect' function
-type ProxyRequest = {
-	resolve: (data: Uint8Array) => void
-	requestId: number
-	message: Uint8Array
+function createWorker() {
+	const base = import.meta.url || scriptSrc || ""
+	const url = new URL("./daemon.worker.js", base).href
+	try {
+		return new Worker(url, { type: "module" })
+	} catch {
+		// The bundle was loaded cross-origin (e.g. from a CDN): the Worker
+		// constructor requires a same-origin script, so bootstrap it through a
+		// local blob that re-imports the worker module (CDNs serve CORS headers).
+		const blob = new Blob([`import ${JSON.stringify(url)}`], { type: "text/javascript" })
+		return new Worker(URL.createObjectURL(blob), { type: "module" })
+	}
 }
 
-// @internal The requests need to be stored to handle the response from the worker
-let requests: ProxyRequest[] = []
+// Pending sync requests waiting for a response from the worker
+type ProxyRequest = {
+	resolve: (data: Uint8Array) => void
+	reject: (error: Error) => void
+	timer: ReturnType<typeof setTimeout>
+}
 
-// @internal The callbacks for connection change events
+let requests = new Map<number, ProxyRequest>()
 let connectionChangeCallbacks: ((connected: boolean) => void)[] = []
-
-// @internal The first request id to use for sync requests
 let connected = false
 
 ////////////////////// Internal functions
 
-// @internal Create sync request to proxy. Add to client buffer a requestId before send it to worker.
-let rid = 0
-function createRequest(buffer: Uint8Array) {
-	const requestId = FIRST_REQUEST_ID + (rid++ % (255 - FIRST_REQUEST_ID)) + 1
-
-	const newBuffer = new Uint8Array(1 + buffer.length)
-	newBuffer[0] = requestId
-	newBuffer.set(buffer, 1)
-
-	const request = new Promise<Uint8Array>(resolve => {
-		requests.push({
-			resolve,
-			requestId,
-			message: newBuffer,
-		})
-	})
-
-	return [request, newBuffer, requestId] as const
+// @internal Create sync request to proxy. Fill the reserved request ID byte.
+let rid = FIRST_REQUEST_ID - 1
+function nextRequestId() {
+	for (let i = FIRST_REQUEST_ID; i <= 255; i++) {
+		rid = rid === 255 ? FIRST_REQUEST_ID : rid + 1
+		if (!requests.has(rid)) return rid
+	}
+	throw new Error("Too many pending requests")
 }
 
-// @internal When the worker sends a response to the client, check if it is a sync request. If so, resolve the promise with the response data.
+function createRequest(buffer: Uint8Array, timeout = DEFAULT_SYNC_TIMEOUT) {
+	const requestId = nextRequestId()
+	buffer[0] = requestId
+
+	const request = new Promise<Uint8Array>((resolve, reject) => {
+		const timer = setTimeout(() => {
+			requests.delete(requestId)
+			reject(new Error(`Request ${requestId} timed out`))
+		}, timeout)
+		requests.set(requestId, { resolve, reject, timer })
+	})
+
+	return [request, buffer, requestId] as const
+}
+
+function rejectPendingRequests(message: string) {
+	for (const [requestId, request] of requests) {
+		clearTimeout(request.timer)
+		request.reject(new Error(`${message} (${requestId})`))
+	}
+	requests.clear()
+}
+
+// @internal Resolve the pending sync request matching the response ID
 function handleResponse(event: MessageEvent) {
+	if (!(event.data instanceof Uint8Array)) return
+
 	const message: Uint8Array = event.data
 	const responseId = message[0]
-	const responseData = message.slice(1) // remove the requestId from the response
-	const request = requests.find(r => r.requestId === responseId)
+	const responseData = message.subarray(1) // remove the requestId from the response
+	const request = requests.get(responseId)
 
 	if (!request) {
-		// check if it's a connection change event (connection change not need send request)
-		if (responseId == CONNECTION_CHANGE_REQUEST_ID && responseData[0] === WorkerRequestType.ConnectionChange) {
-			connected = responseData[1] === TRUE
-			logger.debug(`[Proxy] Connection change event: ${connected}`)
-
-			connectionChangeCallbacks.forEach(callback => callback(connected))
+		// connection change events don't require a prior request
+		if (responseId === CONNECTION_CHANGE_REQUEST_ID && responseData[0] === WorkerRequestType.ConnectionChange) {
+			const next = responseData[1] === TRUE
+			// Dedupe: failed reconnect retries emit one `false` each (ws.ts notifies
+			// every close) — only forward actual state transitions to subscribers.
+			if (next !== connected) {
+				connected = next
+				if (!connected) rejectPendingRequests("Proxy disconnected")
+				debug && console.log(`[Proxy] Connection change event: ${connected}`)
+				connectionChangeCallbacks.forEach(callback => callback(connected))
+			}
 			return
 		}
 
-		logger.debug(`[Proxy] Unknown request id ${responseId}`)
+		debug && console.log(`[Proxy] Unknown request id ${responseId}`)
 		return
 	}
 
-	requests = requests.filter(r => r.requestId !== responseId)
+	requests.delete(responseId)
+	clearTimeout(request.timer)
 	request.resolve(responseData)
 }
 
-// @internal Global worker instance
-export let deamon: Worker | null = null
+export let daemon: Worker | null = null
+let debug = false
 
+// @internal Throws if the worker has not been initialized yet
 export function checkConnected() {
-	if (!deamon) throw new Error("Worker not initialized")
+	if (!daemon) throw new Error("Worker not initialized")
 }
 
 ////////////////////// Public functions
 
-// Send a connection request to the web worker.
-export function wsconnect(serverURL: string, debug = false): Promise<boolean> {
-	if (!deamon) {
-		deamon = new Deamon()
+/** Connect to the WebSocket server via the worker */
+export function wsconnect(serverURL: string, _debug = false): Promise<boolean> {
+	if (!daemon) {
+		daemon = createWorker()
 		checkConnected()
 
-		deamon!.addEventListener("message", handleResponse)
+		daemon!.addEventListener("message", handleResponse)
 
-		logger.debug("[Proxy] Worker created")
+		debug = _debug
+		debug && console.log("[Proxy] Worker created")
 	}
 
-	// create a packet to send to the worker [requestType, serverURL, debug]
-	const buffer = new Uint8Array(1 + serverURL.length + 1)
-	buffer[0] = WorkerRequestType.Connect
-	encodeBuffer(serverURL, buffer, 1)
-	buffer[1 + serverURL.length] = debug ? TRUE : FALSE
+	// create a packet [requestId, requestType, serverURL, debug]
+	const buffer = new Uint8Array(2 + serverURL.length + 1)
+	buffer[1] = WorkerRequestType.Connect
+	encodeBuffer(serverURL, buffer, 2)
+	buffer[2 + serverURL.length] = debug ? TRUE : FALSE
 
-	// handshake with the worker
-	logger.debug(`[Proxy] connect to ${serverURL} with debug=${debug}`, buffer)
-	return sendSync(buffer).then(response => (connected = response[0] === TRUE))
+	debug && console.log(`[Proxy] try to connect to ${serverURL}`, buffer)
+	return sendSync(buffer).then(response => response[1] === TRUE).catch(() => false)
 }
 
+/** Register a callback for connection state changes, returns an unsubscribe function */
 export function onConnectionChange(callback: (connected: boolean) => void) {
 	checkConnected()
 
-	if (!connectionChangeCallbacks.includes(callback)) {
+	if (!connectionChangeCallbacks.includes(callback))
 		connectionChangeCallbacks.push(callback)
 
-		return () => {
-			connectionChangeCallbacks = connectionChangeCallbacks.filter(cb => cb !== callback)
-		}
+	return () => {
+		connectionChangeCallbacks = connectionChangeCallbacks.filter(cb => cb !== callback)
 	}
 }
 
+/** Return the current WebSocket connection state */
 export function isConnected() {
 	checkConnected()
 
 	return connected
 }
 
-// Send a synchronous message to the worker.
-export function sendSync(data: Uint8Array): Promise<Uint8Array> {
+/** Send a message to the worker and wait for the response */
+export async function sendSync(data: Uint8Array, timeout = DEFAULT_SYNC_TIMEOUT): Promise<Uint8Array> {
 	checkConnected()
 
-	let [promise, buffer, requestId] = createRequest(data)
-	logger.debug(`[Proxy] sendSync [${requestId}] ${WorkerRequestTypeMap[buffer[1] as WorkerRequestType]}`, buffer)
-	deamon!.postMessage(buffer)
+	let [promise, buffer, requestId] = createRequest(data, timeout)
+	debug && console.log(`[Proxy] sendSync [${requestId}] ${WorkerRequestTypeMap[buffer[1] as WorkerRequestType]}`, buffer)
+	try {
+		daemon!.postMessage(buffer, [buffer.buffer])
+	} catch (err) {
+		const request = requests.get(requestId)
+		if (request) {
+			clearTimeout(request.timer)
+			requests.delete(requestId)
+		}
+		throw err
+	}
 
 	return promise
 }
 
-// send async request, no need to wait for the response
+/** Send a message to the worker, no response expected */
 export function send(data: Uint8Array): void {
 	checkConnected()
 
-	// like 'createRequest' add a requestId to the buffer
-	const buffer = new Uint8Array(1 + data.length)
-	buffer[0] = EMPTY_REQUEST_ID
-	buffer.set(data, 1)
+	data[0] = EMPTY_REQUEST_ID
 
-	logger.debug(`[Proxy] send ${WorkerRequestTypeMap[buffer[1] as WorkerRequestType]}`, buffer)
-	deamon!.postMessage(buffer)
+	debug && console.log(`[Proxy] send ${WorkerRequestTypeMap[data[1] as WorkerRequestType]}`, data)
+	daemon!.postMessage(data, [data.buffer])
 }

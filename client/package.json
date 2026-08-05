@@ -1,31 +1,69 @@
 {
-    "private": true,
-    "name": "@leds/client",
-    "version": "1.0.0",
-    "description": "",
-    "scripts": {
-        "start": "webpack serve --config webpack.config.js --mode development",
-        "format": "npx prettier ./src --write \"!**/*.json\" > /dev/null",
-        "build": "webpack --config webpack.config.js --mode production",
-        "test": "jest"
+    "name": "@reactive-leds/client",
+    "version": "1.0.2",
+    "description": "Browser JavaScript client for realtime LED control over WebSocket. Bridges the reactive-leds UDP protocol to browser applications via a local proxy.",
+    "keywords": [
+        "led",
+        "esp32",
+        "ws2812",
+        "websocket",
+        "livecoding",
+        "visuals",
+        "browser",
+        "reactive-leds",
+        "neopixel",
+        "led-strip",
+        "canvas",
+        "realtime",
+        "udp",
+        "proxy"
+    ],
+    "author": "Gennaro Bosone",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/genbs/reactive-leds.git",
+        "directory": "client"
     },
-    "license": "ISC",
+    "homepage": "https://github.com/genbs/reactive-leds/tree/master/client#readme",
+    "main": "build/reactive-leds.umd.js",
+    "module": "build/reactive-leds.js",
+    "types": "build/reactive-leds.d.ts",
+    "exports": {
+        ".": {
+            "types": "./build/reactive-leds.d.ts",
+            "import": "./build/reactive-leds.js",
+            "require": "./build/reactive-leds.umd.js",
+            "default": "./build/reactive-leds.js"
+        }
+    },
+    "files": [
+        "build/",
+        "README.md",
+        "README-it.md"
+    ],
+    "sideEffects": false,
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "build": "node build.mjs",
+        "prepare": "npm run build",
+        "test": "jest",
+        "prepublishOnly": "npm test"
+    },
+    "license": "MIT",
     "devDependencies": {
-        "@babel/preset-env": "^7.26.9",
-        "@babel/preset-typescript": "^7.27.0",
         "@jest/globals": "^29.7.0",
-        "raw-loader": "^4.0.2",
+        "@reactive-leds/shared": "file:../shared",
+        "dts-bundle-generator": "^9.5.1",
+        "esbuild": "^0.25.0",
         "ts-jest": "^29.3.2",
-        "ts-loader": "^9.5.1",
-        "ts-node": "^10.9.2",
-        "tsconfig-paths": "^4.2.0",
-        "typescript": "^5.8.3",
-        "webpack": "^5.88.2",
-        "webpack-cli": "^5.1.4",
-        "webpack-dev-server": "^5.1.0",
-        "worker-loader": "^3.0.8"
+        "typescript": "^5.4.5"
     },
     "jest": {
-        "preset": "ts-jest"
+        "preset": "ts-jest",
+        "moduleNameMapper": {
+            "\\.worker$": "<rootDir>/tests/__mocks__/workerMock.ts"
+        }
     }
 }

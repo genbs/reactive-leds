@@ -1,79 +1,103 @@
-import { availableConfigKeys, logger } from "@leds/shared"
+import { availableConfigKeys } from "@reactive-leds/shared"
 import { Command } from "../cmd"
 import proto from "../protocol"
-import { validateIP, validatePort } from "../utils"
+import { fail, ok, validateDevicePort, validateTarget } from "../utils"
+import { clearScanCache, resolveTargets, Target } from "./wifi"
+
+const ALL_TARGETS = "all"
 
 export const configCommand: Command = {
 	name: "config",
 
 	description:
-		"Get configuration of the device at <ip>:<port>.\nIf <key> and <value> are provided, set the configuration.",
+		"Get configuration of <target>. Use \"all\" to target every discovered device.\nIf <key> and <value> are provided, set the configuration.",
 
-	examples: ["config 192.168.1.1 4210", "config 192.168.1.1 4210 hostname my-device"],
+	examples: ["config 192.168.1.1", "config 192.168.1.1:4211", "config all", "config 192.168.1.1 hostname my-device"],
 
 	args: [
-		{ required: true, name: "ip", type: String, validator: validateIP },
-		{ required: false, name: "udp_port", type: Number, validator: validatePort, default: 4210 },
+		{ required: true, name: "target", type: String, validator: validateTarget },
 		{ required: false, name: "key", type: String, validator: validateConfigKey },
-		{ required: false, name: "value", type: String, validator: (value, args) => validateConfigValue(args[2], value) },
+		{ required: false, name: "value", type: String, validator: (value, args) => validateConfigValue(args[1], value) },
 	],
 
-	execute: async (ip, port, key?, value?) => {
-		const config = await proto.getConfig(ip as string, port as number)
-		if (!config) {
-			logger.log(`Failed to get config for ${ip}:${port}`)
+	execute: async (targetArg: string, key?: string, value?: string) => {
+		const targets = await resolveTargets(targetArg)
+		if (targets.length === 0) {
+			console.log(fail(`Failed to get config for ${targetArg}`))
 			return false
 		}
 
 		if (typeof key !== "undefined" && typeof value !== "undefined") {
-			const result = await proto.setConfig(ip as string, port as number, { ...config, [key as string]: value })
-			if (result) {
-				logger.log("Config updated successfully")
-			} else {
-				logger.log("Failed to update config")
+			if (targetArg.toLowerCase().split(":")[0] === ALL_TARGETS && key === "hostname") {
+				console.log(fail("Refusing to set the same hostname on all devices"))
 				return false
 			}
+
+			let anyOk = false
+			for (const target of targets) {
+				if (!target.config) {
+					console.log(`${targetLabel(target)}: ${fail("failed to read config")}`)
+					continue
+				}
+
+				const result = await proto.setConfig(target.ip, target.port, { ...target.config, [key]: configValue(key, value) })
+				console.log(`${targetLabel(target)}: ${result ? ok(`updated ${key} = ${value}; rebooting`) : fail("failed")}`)
+				anyOk ||= result
+			}
+
+			if (anyOk) clearScanCache()
+			return anyOk
 		}
 
-		logger.log(`Config: 
-			\r\t- pin: ${config.pin}
-			\r\t- Num LEDs: ${config.num_leds}
-			\r\t- Brightness: ${config.brightness}
-			\r\t- Port: ${config.port}
-			\r\t- Hostname: ${config.hostname}
-		`)
+		let anyOk = false
+		for (const target of targets) {
+			if (!target.config) {
+				console.log(`${targetLabel(target)}: ${fail("failed to read config")}`)
+				continue
+			}
+			anyOk = true
+			console.log(`${targetLabel(target)}:\n\t- pin: ${target.config.pin}\n\t- Num LEDs: ${target.config.num_leds}\n\t- Port: ${target.config.port}\n\t- Hostname: ${target.config.hostname}`)
+		}
+		return anyOk
 	},
 }
 
 export const ledsCommand: Command = {
 	name: "leds",
 	description:
-		"Set the LEDs on the device at <ip>:<port>.\nThe <led_package> argument must be a comma-separated list of values in the format <led_index>,<r>,<g>,<b>,<brightness/whiteness>.",
-	examples: ["leds 192.168.1.100 4210 0,255,0,128,0,1,0,255,128,0"],
+		"Set contiguous LEDs on <target>. Use \"all\" to target every discovered device.\nThe <led_package> argument must be <start_index>, followed by one or more <r>,<g>,<b>,<brightness/whiteness> groups.",
+	examples: ["leds 192.168.1.100 0,255,0,128,0,1,0,255,128,0", "leds all 0,255,0,128,0", "leds all:4211 0,255,0,128,0"],
 	args: [
-		{ required: true, name: "ip", type: String, validator: validateIP },
-		{ required: false, name: "udp_port", type: Number, validator: validatePort, default: 4210 },
+		{ required: true, name: "target", type: String, validator: validateTarget },
 		{
 			required: true,
 			name: "leds_package",
-			type: String /* by now array is not supported */,
+			type: String, // array not supported yet
 			validator: validateLedsPackage,
 		},
 	],
-	execute: async (ip: string, port: number, ledsPackage: string) => {
-		const ledData = (ledsPackage as string).split(",").map(Number) // validated
-		const retryCount = 5
-		for (let i = 0; i < retryCount; i++) {
-			const data = new Uint8Array(ledData)
-			proto.setLEDs(ip as string, port, data)
-			await new Promise(resolve => setTimeout(resolve, 100))
+	execute: async (targetArg: string, ledsPackage: string) => {
+		const targets = await resolveTargets(targetArg)
+		if (targets.length === 0) {
+			console.log(fail(`Device ${targetArg} not found`))
+			return false
 		}
 
-		logger.log("LEDs request sent")
+		const data = new Uint8Array(ledsPackage.split(",").map(Number)) // validated
+		const startIndex = data[0]
+		const colors = data.subarray(1)
+		for (const target of targets) {
+			await proto.setLEDs(target.ip, target.port, colors, startIndex)
+			console.log(`${targetLabel(target)}: ${ok("LEDs request sent")}`)
+		}
 	},
 }
 
-//////////////////////
+function targetLabel(target: Target): string {
+	return target.config?.hostname ? `${target.config.hostname} (${target.ip}:${target.port})` : `${target.ip}:${target.port}`
+}
+
+////////////////////// Validators
 
 function validateConfigKey(key: (typeof availableConfigKeys)[number]): boolean {
 	return !!(key && availableConfigKeys.includes(key))
@@ -83,31 +107,35 @@ function validateConfigValue(key: string, value: string): boolean | string {
 	switch (key) {
 		case "hostname":
 			if (value.length > 32) return `Invalid value for key "${key}". Length must be less than 32 characters.`
-			break
-		case "pin":
-			if (isNaN(Number(value))) return `Invalid value for key "${key}". Value must be a number.`
-			break
-		case "num_leds":
-			if (isNaN(Number(value))) return `Invalid value for key "${key}". Value must be a number.`
-			break
+			return true
 		case "port":
-			if (!validatePort(value)) return `Invalid value for key "${key}". Value must be a number.`
-			break
-		case "brightness":
-			if (isNaN(Number(value))) return `Invalid value for key "${key}". Value must be a number.`
-			if (Number(value) < 0 || Number(value) > 255)
-				return `Invalid value for key "${key}". Value must be between 0 and 255.`
-			break
+			if (!validateDevicePort(value)) return `Invalid value for key "${key}". Value must be an integer between 1024 and 65535.`
+			return true
+		case "pin": {
+			const n = Number(value)
+			if (!Number.isInteger(n) || n < 0 || n > 48 || (n >= 22 && n <= 25))
+				return `Invalid value for key "${key}". Use an output GPIO in 0..21 or 26..48.`
+			return true
+		}
+		case "num_leds": {
+			const n = Number(value)
+			if (!Number.isInteger(n) || n < 1 || n > 255) return `Invalid value for key "${key}". Value must be an integer between 1 and 255.`
+			return true
+		}
 	}
 
 	return true
 }
 
+function configValue(key: string, value: string): string | number {
+	return key === "hostname" ? value : Number(value)
+}
+
 function validateLedsPackage(ledsPackage: string): boolean | string {
 	const ledData = ledsPackage.split(",").map(Number)
 
-	if (ledData.length % 5 !== 0)
-		return "Invalid LED package format. Must be a comma-separated list of values in the format <led_index>,<r>,<g>,<b>,<brightness/whiteness>."
+	if (ledData.length < 5 || (ledData.length - 1) % 4 !== 0)
+		return "Invalid LED package format. Use <start_index>, followed by one or more <r>,<g>,<b>,<brightness/whiteness> groups."
 
 	for (let i = 0; i < ledData.length; i++) {
 		if (isNaN(ledData[i]) || ledData[i] < 0 || ledData[i] > 255) {

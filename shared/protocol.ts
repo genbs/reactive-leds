@@ -7,136 +7,286 @@
  */
 export type PacketID = number
 
-// Packet types, defined by the firmware
+/**
+ * The packet types, defined by the firmware
+ */
 export enum PacketType {
-	/**
-	 * send a ping to the device
-	 * request: DeviceAddress, MessageID
-	 * response: MessageID, MessageType(PING), 1 (true) or 0 (false)
-	 */
 	PING = 0,
-
-	/**
-	 * get the configuration of the device
-	 * request: DeviceAddress, MessageID
-	 * response: MessageID, MessageType(GET_CONFIG), pin, num_leds, brightness, port_h, port_l, hostname...
-	 */
 	GET_CONFIG = 1,
-
-	/**
-	 * set the configuration of the device
-	 * request: DeviceAddress, MessageID, pin, num_leds, brightness, port_h, port_l, hostname...
-	 * response: MessageID, MessageType(SET_CONFIG), 1 (true) or 0 (false)
-	 */
-
 	SET_CONFIG = 2,
-
-	/**
-	 * set the RGB LEDs of the device
-	 * request: DeviceAddress, MessageID, pixel_index, r, g, b, b/w, pixel_index, r, g, b, b/w...
-	 * response: None, this is an async request, no response needed
-	 */
 	SET_LEDS = 3,
-
-	/**
-	 * Clear all wi-Fi credentials stored in the device
-	 */
 	RESET_WIFI = 4,
+	GET_INFO = 5,
+	GET_STATUS = 6,
 }
 
 export type Packet = Uint8Array // [PacketID, PacketType, ...number[]]
 
-export type Color = [number, number, number, number] // [r, g, b, b/w]
+export type Color = [number, number, number, number] // [r, g, b, w]
 
-// example of config packet: [MessageID, MessageType, PORT_H, PORT_L, ID, NUM_LEDS, BRIGHTNESS, HOSTNAME...]
+/** Serialized as: [pin, num_leds, port_h, port_l, hostname...] */
 export type Config = {
 	hostname: string // like 'esp-1'
 	port: number // default 4210
 	pin: number // default 18
 	num_leds: number // default 16
-	brightness: number // default 255
 }
 
-export const availableConfigKeys: (keyof Config)[] = ["hostname", "pin", "num_leds", "port", "brightness"] as const
+export const availableConfigKeys: (keyof Config)[] = ["hostname", "pin", "num_leds", "port"]
 
-export type LEDs = Uint8Array // [pixel_index, r, g, b, b/w, pixel_index, r, g, b, b/w, ...] (5 bytes per LED)
+export type LEDs = Uint8Array // [r, g, b, w, ...] (4 bytes per LED)
 
-// Used by the device to send the response status
+export function validateLEDs(leds: LEDs, startIndex = 0): void {
+	if (!Number.isInteger(startIndex) || startIndex < 0 || startIndex > 255) {
+		throw new RangeError("startIndex must be an integer between 0 and 255")
+	}
+	if (leds.length < 4 || leds.length % 4 !== 0) {
+		throw new RangeError("leds must contain one or more RGBW pixels")
+	}
+	if (startIndex + leds.length / 4 > 255) {
+		throw new RangeError("LED range exceeds 255 pixels")
+	}
+}
+
+/** Used by the device to send the response status */
 export enum PacketStatus {
 	OK = 1,
 	ERROR = 0,
 }
 
-export type DeviceIP = string | [number, number, number, number]
-export type DeviceAddress = Uint8Array // [number, number, number, number, number, number]
+/** A bare IP, as dotted string or 4 octets. `address` is reserved for the combined ip+port form. */
+export type IP = string | [number, number, number, number]
+/** The wire form of an address (ip + port): [ip(4), port_h, port_l] */
+export type AddressBuffer = Uint8Array
 
 export const EMPTY_PACKET_ID = 0
+export const DEFAULT_SYNC_TIMEOUT = 1000
 
-// Label for the packet types
+/** Label for the packet types */
 export const PacketTypeMap = {
 	[PacketType.PING]: "PING",
 	[PacketType.GET_CONFIG]: "GET_CONFIG",
 	[PacketType.SET_CONFIG]: "SET_CONFIG",
 	[PacketType.SET_LEDS]: "SET_LEDS",
 	[PacketType.RESET_WIFI]: "RESET_WIFI",
+	[PacketType.GET_INFO]: "GET_INFO",
+	[PacketType.GET_STATUS]: "GET_STATUS",
 }
 
-// convert a buffer to a config object
+/** Convert a buffer to a config object */
 export function bufferToConfig(buffer: Uint8Array): Config {
+	if (buffer.length < 4) {
+		throw new Error(`Config buffer too short: ${buffer.length} bytes, need at least 4`)
+	}
+
 	return {
 		pin: buffer[0],
 		num_leds: buffer[1],
-		brightness: buffer[2],
-		port: (buffer[3] << 8) | buffer[4],
-		hostname: decodeBuffer(buffer.slice(5)).substring(0, 32), // ensure hostname is at most 32 characters
+		port: (buffer[2] << 8) | buffer[3],
+		hostname: decodeBuffer(buffer.subarray(4)).substring(0, 32),
 	}
 }
 
-// convert a config object to a buffer, no validation
-export function configToBuffer(config: Config, dest?: Uint8Array): Uint8Array {
-	const pin = config.pin
-	const num_leds = config.num_leds
-	const brightness = config.brightness // 0-255
-	const port = config.port
+/** Convert a config object to a buffer */
+export function configToBuffer(config: Config): Uint8Array {
 	const hostname = config.hostname.substring(0, 32)
-
-	const packetLength = 1 + 1 + 1 + 2 + hostname.length // pin, num_leds, brightness, port_h, port_l, hostname
-
-	let packet
-	if (typeof dest !== "undefined") {
-		// check if the destination buffer is large enough
-		if (dest.length < packetLength) throw new Error("Destination buffer is too small")
-
-		packet = dest
-	} else {
-		packet = new Uint8Array(packetLength)
-	}
-
-	packet[0] = pin
-	packet[1] = num_leds
-	packet[2] = brightness
-	packet[3] = (port >> 8) & 0xff
-	packet[4] = port & 0xff
-
-	encodeBuffer(hostname, packet, 5)
-
+	const packet = new Uint8Array(4 + hostname.length)
+	packet[0] = config.pin
+	packet[1] = config.num_leds
+	packet[2] = (config.port >> 8) & 0xff
+	packet[3] = config.port & 0xff
+	encodeBuffer(hostname, packet, 4)
 	return packet
 }
 
-/**
- * Convert address (ip + port) to buffer, not validating input
- */
-export function addressToBuffer(ip: DeviceIP, port: number, dest?: DeviceAddress): DeviceAddress {
-	const buffer = dest || new Uint8Array(6) // 4 bytes for IP + 2 bytes for port
+/** Device identity. Serialized as: [ip(4), port(2), mac(6), version_len(1), version, hostname_len(1), hostname] */
+export type DeviceInfo = {
+	ip: string
+	port: number
+	mac: string
+	version: string
+	hostname: string
+}
+
+/** Convert an info buffer to a DeviceInfo object */
+export function bufferToDeviceInfo(buffer: Uint8Array): DeviceInfo {
+	if (buffer.length < 14)
+		throw new Error(`Device info buffer too short: ${buffer.length} bytes, need at least 14`)
+
+	const ip = Array.from(buffer.subarray(0, 4)).join(".")
+	const port = (buffer[4] << 8) | buffer[5]
+	const mac = Array.from(buffer.subarray(6, 12), byte => byte.toString(16).padStart(2, "0").toUpperCase()).join(":")
+	const versionLen = buffer[12]
+	const versionStart = 13
+	const versionEnd = versionStart + versionLen
+	if (buffer.length < versionEnd + 1)
+		throw new Error(`Device info buffer too short for version: ${buffer.length} bytes, need ${versionEnd + 1}`)
+
+	const hostnameLen = buffer[versionEnd]
+	const hostnameStart = versionEnd + 1
+	const hostnameEnd = hostnameStart + hostnameLen
+	if (buffer.length < hostnameEnd)
+		throw new Error(`Device info buffer too short for hostname: ${buffer.length} bytes, need ${hostnameEnd}`)
+
+	return {
+		ip,
+		port,
+		mac,
+		version: decodeBuffer(buffer.subarray(versionStart, versionEnd)),
+		hostname: decodeBuffer(buffer.subarray(hostnameStart, hostnameEnd)).substring(0, 32),
+	}
+}
+
+/** Convert a DeviceInfo object to its wire payload. */
+export function deviceInfoToBuffer(info: DeviceInfo): Uint8Array {
+	const ip = addressToBuffer(info.ip, info.port).subarray(0, 4)
+	const macParts = info.mac.split(":")
+	if (macParts.length !== 6) throw new Error(`Invalid MAC: "${info.mac}"`)
+
+	const version = encodeBuffer(info.version.substring(0, 32))
+	const hostname = encodeBuffer(info.hostname.substring(0, 32))
+	const buffer = new Uint8Array(4 + 2 + 6 + 1 + version.length + 1 + hostname.length)
+	buffer.set(ip, 0)
+	buffer[4] = (info.port >> 8) & 0xff
+	buffer[5] = info.port & 0xff
+	for (let i = 0; i < 6; i++) {
+		if (!/^[0-9a-f]{1,2}$/i.test(macParts[i])) throw new Error(`Invalid MAC: "${info.mac}"`)
+		buffer[6 + i] = Number.parseInt(macParts[i], 16)
+	}
+
+	buffer[12] = version.length
+	buffer.set(version, 13)
+	const hostnameLenOffset = 13 + version.length
+	buffer[hostnameLenOffset] = hostname.length
+	buffer.set(hostname, hostnameLenOffset + 1)
+	return buffer
+}
+
+/** Device status. Serialized as a fixed 89-byte payload. */
+export type Status = {
+	uptime: number // seconds since boot
+	heap: number // free heap bytes
+	rssi: number // WiFi RSSI in dBm (signed)
+	internalHeap: number // free internal RAM bytes
+	largestHeapBlock: number // largest free 8-bit-capable heap block
+	minHeap: number // minimum free heap seen since boot
+	framesReceived: number // valid SET_LEDS packets accepted
+	framesShown: number // frames submitted to RMT
+	framesDropped: number // frames dropped because RMT was busy
+	udpPacketsRead: number // UDP packets read by the firmware socket
+	protocolLoopMaxGapMs: number // max observed gap between protocol_loop calls
+	arrivalGapHist: number[] // SET_LEDS inter-arrival histogram: ≤5, ≤10, ≤20, ≤50, ≤100, >100 ms
+	arrivalGapMaxMs: number // largest SET_LEDS inter-arrival gap (gaps >2s count as stream pauses, not stalls)
+	arrivalGapMaxAgeS: number // seconds since that largest gap occurred
+	seqLost: number // SET_LEDS sequence gaps; id 0 is untracked
+	seqReordered: number // SET_LEDS packets that arrived out of order
+	beaconTimeouts: number // WiFi beacon-timeout events since boot
+	wifiDisconnects: number // WiFi disconnect events since boot
+}
+
+/** Number of buckets in Status.arrivalGapHist */
+export const ARRIVAL_GAP_BUCKETS = 6
+/** Upper bounds (ms) of the first 5 arrivalGapHist buckets; the 6th is open-ended */
+export const ARRIVAL_GAP_BOUNDS_MS = [5, 10, 20, 50, 100] as const
+/** Size, in bytes, of a GET_STATUS payload excluding PacketID and PacketType. */
+export const STATUS_PAYLOAD_BYTES = 89
+
+/** Convert a status buffer to a Status object */
+export function bufferToStatus(buffer: Uint8Array): Status {
+	if (buffer.length !== STATUS_PAYLOAD_BYTES)
+		throw new Error(`Invalid status buffer length: ${buffer.length} bytes, expected ${STATUS_PAYLOAD_BYTES}`)
+
+	const uptime =
+		((buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3]) >>> 0
+	const heap =
+		((buffer[4] << 24) | (buffer[5] << 16) | (buffer[6] << 8) | buffer[7]) >>> 0
+	const rssi = buffer[8] << 24 >> 24 // sign-extend int8
+
+	const readU32 = (offset: number) =>
+		((buffer[offset] << 24) | (buffer[offset + 1] << 16) | (buffer[offset + 2] << 8) | buffer[offset + 3]) >>> 0
+
+	return {
+		uptime,
+		heap,
+		rssi,
+		internalHeap: readU32(9),
+		largestHeapBlock: readU32(13),
+		minHeap: readU32(17),
+		framesReceived: readU32(21),
+		framesShown: readU32(25),
+		framesDropped: readU32(29),
+		udpPacketsRead: readU32(33),
+		protocolLoopMaxGapMs: readU32(37),
+		arrivalGapHist: Array.from({ length: ARRIVAL_GAP_BUCKETS }, (_, i) => readU32(41 + i * 4)),
+		arrivalGapMaxMs: readU32(65),
+		arrivalGapMaxAgeS: readU32(69),
+		seqLost: readU32(73),
+		seqReordered: readU32(77),
+		beaconTimeouts: readU32(81),
+		wifiDisconnects: readU32(85),
+	}
+}
+
+/** Convert a Status object to its fixed 89-byte wire payload. */
+export function statusToBuffer(status: Status): Uint8Array {
+	const buffer = new Uint8Array(STATUS_PAYLOAD_BYTES)
+	buffer[0] = (status.uptime >>> 24) & 0xff
+	buffer[1] = (status.uptime >>> 16) & 0xff
+	buffer[2] = (status.uptime >>> 8) & 0xff
+	buffer[3] = status.uptime & 0xff
+	buffer[4] = (status.heap >>> 24) & 0xff
+	buffer[5] = (status.heap >>> 16) & 0xff
+	buffer[6] = (status.heap >>> 8) & 0xff
+	buffer[7] = status.heap & 0xff
+	buffer[8] = status.rssi & 0xff // int8 written as a raw byte
+	const writeU32 = (offset: number, value: number) => {
+		buffer[offset] = (value >>> 24) & 0xff
+		buffer[offset + 1] = (value >>> 16) & 0xff
+		buffer[offset + 2] = (value >>> 8) & 0xff
+		buffer[offset + 3] = value & 0xff
+	}
+	writeU32(9, status.internalHeap)
+	writeU32(13, status.largestHeapBlock)
+	writeU32(17, status.minHeap)
+	writeU32(21, status.framesReceived)
+	writeU32(25, status.framesShown)
+	writeU32(29, status.framesDropped)
+	writeU32(33, status.udpPacketsRead)
+	writeU32(37, status.protocolLoopMaxGapMs)
+	for (let i = 0; i < ARRIVAL_GAP_BUCKETS; i++) writeU32(41 + i * 4, status.arrivalGapHist[i] ?? 0)
+	writeU32(65, status.arrivalGapMaxMs)
+	writeU32(69, status.arrivalGapMaxAgeS)
+	writeU32(73, status.seqLost)
+	writeU32(77, status.seqReordered)
+	writeU32(81, status.beaconTimeouts)
+	writeU32(85, status.wifiDisconnects)
+	return buffer
+}
+
+/** Convert ip + port to the 6-byte address buffer */
+export function addressToBuffer(ip: IP, port: number): AddressBuffer {
+	const buffer = new Uint8Array(6) // 4 bytes for IP + 2 bytes for port
 
 	if (typeof ip === "string") {
 		const parts = ip.split(".")
-		buffer[0] = +parts[0] // Il '+' converte la stringa in numero
-		buffer[1] = +parts[1]
-		buffer[2] = +parts[2]
-		buffer[3] = +parts[3]
+		if (parts.length !== 4) {
+			throw new Error(`Invalid IP: "${ip}"`)
+		}
+		for (let i = 0; i < 4; i++) {
+			const octet = Number(parts[i])
+			if (isNaN(octet) || octet < 0 || octet > 255) {
+				throw new Error(`Invalid IP: "${ip}"`)
+			}
+			buffer[i] = octet
+		}
 	} else {
-		buffer.set(ip, 0)
+		if (ip.length < 4) {
+			throw new Error(`IP array too short: ${ip.length} elements`)
+		}
+		buffer[0] = ip[0]
+		buffer[1] = ip[1]
+		buffer[2] = ip[2]
+		buffer[3] = ip[3]
 	}
 
 	buffer[4] = (port >> 8) & 0xff
@@ -148,6 +298,23 @@ export function addressToBuffer(ip: DeviceIP, port: number, dest?: DeviceAddress
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
+/** Serialize WiFi credentials as [ssid_len, password_len, ssid, password]. */
+export function wifiCredentialsToBuffer(ssid: string, password: string): Uint8Array {
+	const ssidBytes = encoder.encode(ssid)
+	const passwordBytes = encoder.encode(password)
+	if (ssidBytes.length < 1 || ssidBytes.length > 32 || ssidBytes.includes(0))
+		throw new RangeError("SSID must contain 1 to 32 non-null UTF-8 bytes")
+	if (passwordBytes.length > 63 || passwordBytes.includes(0))
+		throw new RangeError("Password must contain at most 63 non-null UTF-8 bytes")
+
+	const buffer = new Uint8Array(2 + ssidBytes.length + passwordBytes.length)
+	buffer[0] = ssidBytes.length
+	buffer[1] = passwordBytes.length
+	buffer.set(ssidBytes, 2)
+	buffer.set(passwordBytes, 2 + ssidBytes.length)
+	return buffer
+}
+
 /**
  * Encode a string to a Uint8Array buffer.
  * If a destination buffer is provided, it will encode the string into that buffer starting at the specified position.
@@ -157,11 +324,11 @@ const decoder = new TextDecoder()
  */
 export function encodeBuffer(str: string, dest?: Uint8Array, position?: number): Uint8Array {
 	if (typeof dest !== "undefined") {
-		encoder.encodeInto(str, position ? dest.subarray(position | 0) : dest)
+		const target = typeof position !== "undefined" ? dest.subarray(position) : dest
+		encoder.encodeInto(str, target)
 
-		// if length of the destination buffer is more than the encoded string, add \0 termination
 		if (typeof position === "undefined" && dest.length > str.length) {
-			dest[(position || 0) + str.length] = 0 // add null termination
+			dest[str.length] = 0
 		}
 
 		return dest
@@ -170,10 +337,9 @@ export function encodeBuffer(str: string, dest?: Uint8Array, position?: number):
 	}
 }
 
+/** Decode a Uint8Array buffer to a string, stopping at the first null byte */
 export function decodeBuffer(buffer: Uint8Array): string {
-	// check if the buffer has \0 termination
 	const nullIndex = buffer.indexOf(0)
-	if (nullIndex !== -1) buffer = buffer.subarray(0, nullIndex)
-
+	if (nullIndex !== -1) return decoder.decode(buffer.subarray(0, nullIndex))
 	return decoder.decode(buffer)
 }
