@@ -1,109 +1,112 @@
-import noble, { Peripheral } from "@abandonware/noble"
-import { logger } from "@leds/shared"
+import noble, { Peripheral } from "@stoprocent/noble"
+import { wifiCredentialsToBuffer } from "@reactive-leds/shared"
 import { Command } from "../cmd"
-import { ask } from "../utils"
+import { ask, debug, fail, green, ok } from "../utils"
 
+// Keep in sync with firmware/main/ble.c (SERVICE_UUID_128, CHARACTERISTIC_UUID_128).
+// Contract documented in shared/README.md ("BLE provisioning").
 const SERVICE_UUID = "a9ca1f56-8436-41d7-81dc-947facf48fe8"
 const CHARACTERISTIC_UUID = "474c5e20-2f61-450c-a4d3-b51a3685ba5c"
 const SCAN_TIMEOUT = 5_000
 
-/**
- * Find Bluetooth devices
- */
 export const btScanCommand: Command = {
 	name: "bt-scan",
-	description: "Find devices over Bluetooth",
-	args: [],
-	execute: async () => {
-		const devices = await scanDevices()
+	description: "Find devices over Bluetooth.",
+	args: [
+		{ name: "timeout", type: Number, required: false, default: SCAN_TIMEOUT },
+	],
+	execute: async (timeout: number = SCAN_TIMEOUT) => {
+		const devices = await scanDevices(timeout)
 		if (devices.length === 0) {
-			logger.log("No devices found")
+			console.log(fail("No devices found"))
 		} else {
 			printDevices(devices)
 		}
 	},
 }
 
-/*
- * Send Wi-Fi credentials to a Bluetooth device
- */
 export const btCredentialCommand: Command = {
 	name: "bt-credential",
-	description: "Send Wi-Fi credentials to a Bluetooth device",
+	description: "Send Wi-Fi credentials to a Bluetooth device.",
 	args: [
-		{ name: "host", required: false, type: String },
+		{ name: "indexOrHost", required: false, type: String },
 		{ name: "ssid", required: false, type: String, validator: (v: string) => v.length > 0 && v.length <= 32 },
 	],
-	execute: async (host, ssid) => {
+	execute: async (indexOrHost: string | undefined, ssid: string | undefined) => {
 		const devices = await scanDevices()
 		if (devices.length === 0) {
-			logger.log("No devices found")
+			console.log(fail("No devices found"))
 			return false
 		}
 
-		// if host is not provided, prompt for it
-		if (!host) {
+		if (!indexOrHost) {
 			printDevices(devices)
-
-			host = await ask("Insert host (number or name): ")
-			// check if input host is number
-			if (!isNaN(Number(host))) {
-				const index = Number(host) - 1
-				if (index < 0 || index >= devices.length) {
-					logger.log("Device not found")
-					return false
-				}
-				host = devices[index].advertisement.localName || devices[index].address || devices[index].uuid
-			}
-
-			// otherwise host is a string representing the device name or address
+			indexOrHost = await ask("Insert host (number or name): ")
 		}
 
-		const device = findDevice(devices, host as string)
+		// Resolve numeric index regardless of whether host came from argument or prompt
+		if (indexOrHost && !isNaN(Number(indexOrHost))) {
+			const index = Number(indexOrHost) - 1
+			if (index < 0 || index >= devices.length) {
+				console.log(fail("Device not found"))
+				return false
+			}
+			indexOrHost = devices[index].advertisement.localName || devices[index].address || devices[index].uuid
+		}
+
+		if (!indexOrHost) {
+			console.log(fail("Device not found"))
+			return false
+		}
+
+		const device = findDevice(devices, indexOrHost)
 		if (!device) {
-			logger.log(`Device ${host} not found`)
+			console.log(fail(`Device ${indexOrHost} not found`))
 			return false
 		}
 
 		if (!ssid) ssid = await ask("Insert SSID: ")
 		const password = await ask("Insert password: ", true)
 
-		if (!ssid || !password) {
-			console.error("Invalid credentials")
+		let credentials: Uint8Array
+		try {
+			credentials = wifiCredentialsToBuffer(ssid, password)
+		} catch (err) {
+			console.error(err instanceof Error ? err.message : "Invalid credentials")
 			return false
 		}
 
-		try {
-			await sendBluetoothCredentials(device, ssid as string, password)
-		} catch {
-			return false
-		}
+		const sendOk = await sendBluetoothCredentials(device, ssid, password, credentials)
+		if (!sendOk) return false
+
+		console.log(`\n\r${ok("Credentials sent successfully")}`)
+		return true
 	},
 }
 
-//////////
+////////////////////// Internal
 
 function printDevices(devices: Peripheral[]) {
-	logger.log(
-		`Devices:\n${devices.map((d, i) => `${i + 1}) ${d.advertisement.localName || d.address || d.uuid}`).join("\n")}`
-	)
+	const message = `Available devices:\n\t- ${devices
+		.map((d, i) => green(`${i + 1}) ${d.advertisement.localName || d.address || d.uuid}`))
+		.join("\n\t- ")}`
+	console.log(message)
 }
 
 function findDevice(devices: Peripheral[], host: string): Peripheral | undefined {
 	host = host.toLowerCase()
-	return devices.find(
-		d =>
-			d.advertisement.localName?.toLowerCase().indexOf(host) !== -1 ||
-			d.address.toLowerCase().indexOf(host) !== -1 ||
-			d.uuid.toLowerCase().indexOf(host) !== -1
-	)
+	return devices.find(d => {
+		if (d.advertisement.localName?.toLowerCase().includes(host)) return true
+		if (d.address?.toLowerCase().includes(host)) return true
+		if (d.uuid?.toLowerCase().includes(host)) return true
+		return false
+	})
 }
 
-async function sendBluetoothCredentials(peripheral: Peripheral, ssid: string, password: string) {
-	logger.debug(
-		`Sending credentials (${ssid}:${password.replace(/./g, "*")}) to ${
-			peripheral.advertisement.localName || peripheral.address
-		}`
+async function sendBluetoothCredentials(peripheral: Peripheral, ssid: string, password: string, credentials: Uint8Array) {
+	debug(
+		"ble",
+		`Sending credentials (${ssid}:${password.replace(/./g, "*")}) to ${peripheral.advertisement.localName || peripheral.address || peripheral.uuid}`
 	)
 
 	try {
@@ -122,60 +125,55 @@ async function sendBluetoothCredentials(peripheral: Peripheral, ssid: string, pa
 
 		const wifiCharacteristic = characteristics[0]
 
-		// send credentials
-		const credentials = `${ssid},${password}`
-		const data = Buffer.from(credentials, "utf8")
-
-		await wifiCharacteristic.writeAsync(data, false)
+		await wifiCharacteristic.writeAsync(Buffer.from(credentials), false)
 
 		await peripheral.disconnectAsync()
-	} catch {
-		logger.error(`Failed to send Bluetooth credentials`)
+	} catch (err) {
+		console.log(fail("Failed to send Bluetooth credentials"))
 		return false
 	}
 	return true
 }
 
-let bluetooth_started: Promise<void> | undefined
-async function startBLE() {
-	if (!bluetooth_started) {
-		bluetooth_started = new Promise<void>(resolve => {
-			noble.on("stateChange", state => {
-				const ok = state === "poweredOn"
-				if (!ok) throw new Error("Bluetooth not available")
-
-				resolve()
-			})
-		})
+let bluetoothStarted: Promise<void> | undefined
+function startBLE() {
+	// @stoprocent/noble: resolves once the adapter is powered on, rejects/timeouts
+	// otherwise. Memoized so concurrent callers share one wait.
+	if (!bluetoothStarted) {
+		bluetoothStarted = noble.waitForPoweredOnAsync()
 	}
-
-	return bluetooth_started
+	return bluetoothStarted
 }
 
 async function scanDevices(timeout = SCAN_TIMEOUT): Promise<Peripheral[]> {
 	await startBLE()
 
-	const peripherals = await new Promise<Peripheral[]>(async (resolve, reject) => {
-		noble.startScanning([], false)
-
-		let peripherals: Peripheral[] = []
-
+	const peripherals = await new Promise<Peripheral[]>(resolve => {
+		const found: Peripheral[] = []
 		const onDiscover = (p: Peripheral) => {
-			if (peripherals.includes(p)) return
-			peripherals.push(p)
+			if (found.includes(p)) return
+			found.push(p)
 		}
 
 		noble.on("discover", onDiscover)
-
-		logger.log("Scanning for devices...")
+		noble.startScanningAsync([], false).catch(err => {
+			debug("ble", "startScanning failed:", err)
+			noble.removeListener("discover", onDiscover)
+			resolve(found)
+		})
+		console.log("Scanning for devices...")
 
 		setTimeout(() => {
 			noble.removeListener("discover", onDiscover)
-			resolve(peripherals)
+			resolve(found)
 		}, timeout)
 	})
 
-	noble.stopScanning()
+	await noble.stopScanningAsync()
 
-	return peripherals
+	return peripherals.sort((a, b) => {
+		const nameA = a.advertisement.localName || a.address || a.uuid
+		const nameB = b.advertisement.localName || b.address || b.uuid
+		return nameA.localeCompare(nameB)
+	})
 }

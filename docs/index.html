@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>rleds — Real-time LED control for ESP32-S3</title>
+		<meta
+			name="description"
+			content="Open-source firmware and browser tooling for real-time LED strip control over WiFi. Built around an ESP32-S3 for live performance use."
+		/>
+		<meta name="author" content="genbs" />
+		<meta name="robots" content="index, follow" />
+		<meta name="theme-color" content="#4dde8a" />
+		<link rel="canonical" href="https://genbs.github.io/reactive-leds/" />
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="https://genbs.github.io/reactive-leds/" />
+		<meta property="og:title" content="rleds — Real-time LED control for ESP32-S3" />
+		<meta
+			property="og:description"
+			content="Open-source firmware and browser tooling for real-time LED strip control over WiFi. Built around an ESP32-S3 for live performance use."
+		/>
+		<meta property="og:site_name" content="rleds" />
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@type": "SoftwareApplication",
+				"name": "rleds",
+				"url": "https://genbs.github.io/reactive-leds/",
+				"description": "Open-source firmware and browser tooling for real-time LED strip control over WiFi. Built around an ESP32-S3 for live performance use.",
+				"applicationCategory": "DeveloperApplication",
+				"operatingSystem": "ESP32-S3",
+				"softwareVersion": "1.0.0",
+				"author": {
+					"@type": "Person",
+					"name": "genbs",
+					"url": "https://github.com/genbs"
+				},
+				"codeRepository": "https://github.com/genbs/reactive-leds",
+				"license": [
+					"https://opensource.org/licenses/MIT",
+					"https://www.gnu.org/licenses/gpl-3.0.en.html",
+					"https://creativecommons.org/publicdomain/zero/1.0/"
+				]
+			}
+		</script>
+
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Space+Mono:wght@400;700&display=swap"
+			media="print"
+			onload="this.media = 'all'"
+		/>
+		<noscript
+			><link
+				rel="stylesheet"
+				href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Space+Mono:wght@400;700&display=swap"
+		/></noscript>
+		<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+		<link rel="stylesheet" href="style.css" />
+
+		<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+		<script type="module" src="main.js" async defer></script>
+	</head>
+	<body>
+		<main id="root">
+			<div id="logo-container">
+				<svg id="logo" viewBox="0 0 266 226">
+					<defs>
+						<path
+							id="logo_shape"
+							d="M21.574 225.4H0L39.284 61.824q1.288-4.508 5.152-7.728t8.372-3.22h25.76q4.508 0 6.762 3.22 2.255 3.22.966 7.728l-14.812 61.824H49.91L62.146 72.45h-3.864zm29.367 0L105.36 0h21.574L72.515 225.4zm61.857 0h-25.76q-4.508 0-6.762-2.898-2.254-3.22-1.288-7.728l36.708-152.95q1.288-4.507 5.152-7.728t8.372-3.22h25.76q4.507 0 6.762 3.22t.966 7.728l-18.354 76.314q-1.288 4.507-5.152 7.728-3.542 3.22-8.05 3.22H116.34l-13.202 54.74h3.864l12.236-50.876h21.574l-15.134 61.824q-.966 4.507-4.83 7.728-3.542 2.898-8.05 2.898m8.694-97.888h3.864l13.202-55.062h-3.864zM137.98 225.4q-4.509 0-6.762-2.898-2.254-3.22-1.288-7.728l36.708-152.95q1.287-4.507 5.152-7.728 3.864-3.22 8.372-3.22h14.812L207.21 0h21.574L176.62 214.774q-.966 4.507-4.83 7.728-3.864 2.898-8.372 2.898zM189.5 72.45h-3.864L154.08 203.826h3.864zm25.181 152.95h-25.76q-4.507 0-6.762-2.898-2.254-3.22-1.288-7.728l14.812-61.824h21.574l-12.236 50.876h3.864l13.202-54.74h-14.812q-4.508 0-7.084-3.22-2.254-3.22-.966-7.728l18.354-76.314q1.288-4.508 5.152-7.728t8.372-3.22h25.76q4.507 0 6.762 3.22t.966 7.728l-14.812 61.824h-21.574l12.236-51.198h-3.864l-13.202 55.062h14.812q4.507 0 6.762 3.22 2.254 2.898 1.288 7.406l-18.676 76.636q-.966 4.507-4.83 7.728-3.542 2.898-8.05 2.898"
+						/>
+					</defs>
+					<use href="#logo_shape" id="fill_path" />
+					<mask id="logo_mask">
+						<use href="#logo_shape" fill="#fff" />
+					</mask>
+					<path
+						id="stroke_path"
+						mask="url(#logo_mask)"
+						fill="var(--logo-color)"
+						d="M21.574 225.4v2h1.577l.368-1.533zM0 225.4l-1.945-.467-.592 2.467H0zM39.284 61.824l-1.923-.55-.012.041-.01.042zm47.012 0-1.923-.55-.012.042-.01.042zm-14.812 61.824v2h1.577l.368-1.534zm-21.574 0-1.945-.465-.59 2.465h2.535zM62.146 72.45l1.945.465.59-2.465h-2.535zm-3.864 0v-2h-1.577l-.368 1.533zM21.574 225.4v-2H0v4h21.574zM0 225.4l1.945.467L41.229 62.291l-1.945-.467-1.945-.467-39.284 163.576zM39.284 61.824l1.923.55c.74-2.591 2.217-4.832 4.509-6.742l-1.28-1.536-1.28-1.536c-2.861 2.384-4.818 5.295-5.795 8.715zm5.152-7.728 1.28 1.536c2.261-1.884 4.61-2.756 7.092-2.756v-4c-3.528 0-6.761 1.274-9.652 3.684zm8.372-3.22v2h25.76v-4h-25.76zm25.76 0v2c2.463 0 4.054.84 5.124 2.367l1.638-1.147 1.639-1.147c-1.937-2.766-4.854-4.073-8.401-4.073zm6.762 3.22-1.638 1.147c1.089 1.556 1.41 3.482.681 6.032l1.923.549 1.923.55c.989-3.461.666-6.688-1.25-9.425zm.966 7.728-1.945-.466-14.812 61.824 1.945.466 1.945.466L88.241 62.29zm-14.812 61.824v-2H49.91v4h21.574zm-21.574 0 1.945.465 12.236-51.198-1.945-.465-1.945-.465-12.236 51.198zM62.146 72.45v-2h-3.864v4h3.864zm-3.864 0-1.945-.467-36.708 152.95 1.945.467 1.945.467 36.708-152.95zm-7.34 152.95-1.945-.469-.596 2.469h2.54zM105.358 0v-2h-1.574l-.37 1.53zm21.574 0 1.945.47.596-2.47h-2.541zM72.515 225.4v2h1.575l.37-1.531zm-21.573 0 1.943.469L107.304.469 105.358 0l-1.944-.47-54.417 225.401zM105.36 0v2h21.574v-4H105.36zm21.574 0-1.944-.47-54.418 225.401 1.943.469 1.945.469L128.878.469zM72.515 225.4v-2H50.941v4h21.574zm7.761-2.898-1.638 1.147.028.041.031.04zm-1.288-7.728-1.945-.467-.005.024-.005.024zm36.708-152.95-1.923-.55-.012.042-.01.041zm47.012 0-1.923-.55-.012.041-.009.041zm-18.354 76.314 1.923.549.012-.04.01-.041zm-5.152 7.728-1.28-1.536-.033.027-.032.029zm-22.862 3.22v-2h-1.575l-.369 1.531zm-13.202 54.74-1.944-.469-.596 2.469h2.54zm3.864 0v2h1.576l.369-1.532zm12.236-50.876v-2h-1.576l-.368 1.532zm21.574 0 1.943.476.606-2.476h-2.549zm-15.134 61.824-1.943-.476-.006.029-.006.028zm-4.83 7.728 1.267 1.548.007-.006.006-.006zm.644-94.99-1.945-.466-.591 2.466h2.536zm3.864 0v2h1.577l.368-1.534zm13.202-55.062 1.945.466.591-2.466h-2.536zm-3.864 0v-2h-1.577l-.368 1.534zM112.798 225.4v-2h-25.76v4h25.76zm-25.76 0v-2c-2.544 0-4.146-.792-5.183-2.126l-1.579 1.228-1.579 1.228c1.968 2.53 4.874 3.67 8.341 3.67zm-6.762-2.898 1.639-1.147c-1.129-1.612-1.52-3.597-.971-6.162l-1.956-.419-1.955-.419c-.738 3.446-.272 6.613 1.605 9.294zm-1.288-7.728 1.945.467 36.708-152.95-1.945-.467-1.945-.467-36.708 152.95zm36.708-152.95 1.923.55c.74-2.591 2.218-4.832 4.509-6.742l-1.28-1.536-1.28-1.536c-2.861 2.384-4.818 5.295-5.795 8.715zm5.152-7.728 1.28 1.536c2.261-1.884 4.609-2.756 7.092-2.756v-4c-3.528 0-6.761 1.274-9.652 3.684zm8.372-3.22v2h25.76v-4h-25.76zm25.76 0v2c2.464 0 4.055.84 5.124 2.367l1.638-1.147 1.639-1.147c-1.937-2.766-4.854-4.073-8.401-4.073zm6.762 3.22-1.638 1.147c1.089 1.556 1.41 3.482.681 6.032l1.923.549 1.923.55c.989-3.461.666-6.688-1.25-9.425zm.966 7.728-1.944-.468-18.354 76.314 1.944.468 1.945.468 18.354-76.314zm-18.354 76.314-1.923-.549c-.74 2.59-2.218 4.831-4.509 6.741l1.28 1.536 1.28 1.536c2.861-2.384 4.818-5.295 5.795-8.715zm-5.152 7.728-1.345-1.48c-2.018 1.835-4.23 2.7-6.705 2.7v4c3.536 0 6.691-1.281 9.395-3.74zm-8.05 3.22v-2H116.34v4h14.812zm-14.812 0-1.944-.469-13.202 54.74 1.944.469 1.944.469 13.202-54.74zm-13.202 54.74v2h3.864v-4h-3.864zm3.864 0 1.945.468 12.236-50.876-1.945-.468-1.944-.468-12.236 50.876zm12.236-50.876v2h21.574v-4h-21.574zm21.574 0-1.943-.476-15.134 61.824 1.943.476 1.943.476 15.134-61.824zm-15.134 61.824-1.955-.419c-.542 2.527-1.89 4.723-4.155 6.611l1.28 1.536 1.28 1.536c2.887-2.405 4.759-5.362 5.506-8.845zm-4.83 7.728-1.266-1.548c-2.01 1.645-4.248 2.446-6.784 2.446v4c3.475 0 6.604-1.131 9.317-3.35zm.644-94.99v2h3.864v-4h-3.864zm3.864 0 1.945.466 13.202-55.062-1.945-.466-1.945-.466-13.202 55.062zm13.202-55.062v-2h-3.864v4h3.864zm-3.864 0-1.945-.466-13.202 55.062 1.945.466 1.945.466 13.202-55.062zm-3.476 150.052-1.639 1.147.029.041.031.04zm-1.288-7.728-1.945-.467-.006.024-.005.024zm36.708-152.95-1.924-.55-.011.042-.01.041zm28.336-10.948v2h1.576l.368-1.532zM207.21 0v-2h-1.576l-.369 1.532zm21.574 0 1.943.472.6-2.472h-2.543zM176.62 214.774l-1.944-.472-.006.026-.006.027zm-4.83 7.728 1.2 1.6.041-.031.039-.033zM189.5 72.45l1.944.467.593-2.467H189.5zm-3.864 0v-2h-1.577l-.368 1.533zM154.08 203.826l-1.945-.467-.593 2.467h2.538zm3.864 0v2h1.576l.368-1.533zM137.98 225.4v-2c-2.545 0-4.146-.792-5.184-2.126l-1.578 1.228-1.579 1.228c1.968 2.53 4.874 3.67 8.341 3.67zm-6.762-2.898 1.638-1.147c-1.128-1.612-1.52-3.597-.971-6.162l-1.955-.419-1.956-.419c-.739 3.446-.272 6.613 1.605 9.294zm-1.288-7.728 1.944.467 36.708-152.95-1.944-.467-1.945-.467-36.708 152.95zm36.708-152.95 1.923.55c.74-2.591 2.218-4.832 4.509-6.742l-1.28-1.536-1.281-1.536c-2.861 2.384-4.817 5.295-5.795 8.715zm5.152-7.728 1.28 1.536c2.261-1.884 4.609-2.756 7.092-2.756v-4c-3.528 0-6.762 1.274-9.653 3.684zm8.372-3.22v2h14.812v-4h-14.812zm14.812 0 1.944.468L209.154.468 207.21 0l-1.945-.468-12.236 50.876zM207.21 0v2h21.574v-4H207.21zm21.574 0-1.944-.472-52.164 214.774 1.944.472 1.943.472L230.727.472zM176.62 214.774l-1.956-.419c-.542 2.527-1.889 4.723-4.155 6.611l1.281 1.536 1.28 1.536c2.886-2.405 4.759-5.362 5.505-8.845zm-4.83 7.728-1.2-1.6c-2.257 1.692-4.632 2.498-7.172 2.498v4c3.469 0 6.676-1.126 9.572-3.298zm-8.372 2.898v-2H137.98v4h25.438zM189.5 72.45v-2h-3.864v4h3.864zm-3.864 0-1.945-.467-31.556 131.376 1.945.467 1.944.467L187.58 72.917zM154.08 203.826v2h3.864v-4h-3.864zm3.864 0 1.944.467 31.556-131.376-1.944-.467-1.945-.467-31.556 131.376zm24.215 18.676-1.639 1.147.029.041.031.04zm-1.288-7.728-1.945-.466-.006.023-.005.024zm14.812-61.824v-2h-1.578l-.367 1.534zm21.574 0 1.944.468.594-2.468h-2.538zm-12.236 50.876-1.945-.468-.593 2.468h2.538zm3.864 0v2h1.575l.369-1.531zm13.202-54.74 1.944.469.596-2.469h-2.54zm-21.896-3.22-1.639 1.147.037.052.04.05zm-.966-7.728 1.923.549.012-.04.009-.041zm18.354-76.314-1.923-.55-.012.041-.01.041zm47.012 0-1.923-.55-.012.042-.01.042zm-14.812 61.824v2h1.577l.368-1.534zm-21.574 0-1.945-.465-.589 2.465h2.534zm12.236-51.198 1.945.465.589-2.465h-2.534zm-3.864 0v-2H235l-.368 1.534zm-13.202 55.062-1.945-.466-.591 2.466h2.536zm21.574 3.22-1.639 1.147.029.041.031.04zm1.288 7.406 1.943.474.007-.028.006-.027zm-18.676 76.636-1.943-.474-.007.028-.006.027zm-4.83 7.728 1.266 1.548.007-.006.007-.006zm-8.05 2.898v-2h-25.76v4h25.76zm-25.76 0v-2c-2.544 0-4.146-.792-5.183-2.126l-1.579 1.228-1.579 1.228c1.968 2.53 4.874 3.67 8.341 3.67zm-6.762-2.898 1.638-1.147c-1.128-1.612-1.52-3.597-.97-6.162l-1.956-.419-1.956-.419c-.738 3.446-.271 6.613 1.605 9.294zm-1.288-7.728 1.945.466 14.812-61.824-1.945-.466-1.945-.466-14.812 61.824zm14.812-61.824v2h21.574v-4h-21.574zm21.574 0-1.945-.468-12.236 50.876 1.945.468 1.944.468 12.236-50.876zm-12.236 50.876v2h3.864v-4h-3.864zm3.864 0 1.944.469 13.202-54.74-1.944-.469-1.944-.469-13.202 54.74zm13.202-54.74v-2h-14.812v4h14.812zm-14.812 0v-2c-2.463 0-4.223-.845-5.522-2.469l-1.562 1.249-1.562 1.249c2.136 2.67 5.098 3.971 8.646 3.971zm-7.084-3.22 1.638-1.147c-1.089-1.556-1.41-3.482-.681-6.032l-1.923-.549-1.923-.549c-.989 3.46-.666 6.687 1.25 9.424zm-.966-7.728 1.944.468 18.354-76.314-1.944-.468-1.945-.468-18.354 76.314zm18.354-76.314 1.923.55c.74-2.591 2.218-4.832 4.509-6.742l-1.28-1.536-1.28-1.536c-2.861 2.384-4.818 5.295-5.795 8.715zm5.152-7.728 1.28 1.536c2.261-1.884 4.609-2.756 7.092-2.756v-4c-3.528 0-6.761 1.274-9.652 3.684zm8.372-3.22v2h25.76v-4h-25.76zm25.76 0v2c2.463 0 4.054.84 5.123 2.367l1.639-1.147 1.638-1.147c-1.936-2.766-4.853-4.073-8.4-4.073zm6.762 3.22-1.639 1.147c1.09 1.556 1.41 3.482.682 6.032l1.923.549 1.923.55c.989-3.461.665-6.688-1.251-9.425zm.966 7.728-1.945-.466-14.812 61.824 1.945.466 1.945.466 14.812-61.824zm-14.812 61.824v-2h-21.574v4h21.574zm-21.574 0 1.945.465 12.236-51.198-1.945-.465-1.945-.465-12.236 51.198zm12.236-51.198v-2h-3.864v4h3.864zm-3.864 0-1.945-.466-13.202 55.062 1.945.466 1.945.466 13.202-55.062zm-13.202 55.062v2h14.812v-4h-14.812zm14.812 0v2c2.463 0 4.054.84 5.123 2.367l1.639-1.147 1.638-1.147c-1.936-2.766-4.853-4.073-8.4-4.073zm6.762 3.22-1.579 1.228c1.05 1.35 1.466 3.171.911 5.759l1.956.419 1.956.419c.733-3.423.29-6.539-1.665-9.053zm1.288 7.406-1.943-.474-18.676 76.636 1.943.474 1.943.474 18.676-76.636zm-18.676 76.636-1.956-.419c-.541 2.527-1.889 4.723-4.154 6.611l1.28 1.536 1.28 1.536c2.887-2.405 4.759-5.362 5.506-8.845zm-4.83 7.728-1.267-1.548c-2.009 1.645-4.247 2.446-6.783 2.446v4c3.475 0 6.604-1.131 9.316-3.35z"
+					/>
+				</svg>
+				<div class="logotypes">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 486 486" class="logotype">
+						<path
+							d="M455.4 0c16.569 0 30 13.432 30 30v383.661a59.6 59.6 0 0 0-13.884-1.63c-32.853 0-59.485 26.632-59.485 59.485 0 4.781.565 9.43 1.63 13.884H30c-16.568 0-30-13.431-30-30V71.434a59.7 59.7 0 0 0 13.484 1.535c32.853 0 59.485-26.632 59.485-59.485 0-4.637-.53-9.151-1.534-13.484zM48.229 358.825C38.114 348.862 21 356.027 21 370.224V449c0 8.837 7.163 16 16 16h79.961c14.312 0 21.424-17.353 11.229-27.397zM243 90c-84.5 0-153 68.5-153 153s68.5 153 153 153 153-68.5 153-153S327.5 90 243 90m126.039-69c-14.312 0-21.424 17.353-11.229 27.398l79.961 78.777c10.114 9.963 27.229 2.798 27.229-11.399V37c0-8.837-7.163-16-16-16z"
+						/>
+					</svg>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 486 486" class="logotype">
+						<path
+							d="M455.4 0c16.569 0 30 13.432 30 30v383.661a59.6 59.6 0 0 0-13.884-1.63c-32.853 0-59.485 26.632-59.485 59.485 0 4.781.565 9.43 1.63 13.884H30c-16.568 0-30-13.431-30-30V71.434a59.7 59.7 0 0 0 13.484 1.535c32.853 0 59.485-26.632 59.485-59.485 0-4.637-.53-9.151-1.534-13.484zM48.229 358.825C38.114 348.862 21 356.027 21 370.224V449c0 8.837 7.163 16 16 16h79.961c14.312 0 21.424-17.353 11.229-27.397zM243 90c-84.5 0-153 68.5-153 153s68.5 153 153 153 153-68.5 153-153S327.5 90 243 90m126.039-69c-14.312 0-21.424 17.353-11.229 27.398l79.961 78.777c10.114 9.963 27.229 2.798 27.229-11.399V37c0-8.837-7.163-16-16-16z"
+						/>
+					</svg>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 486 486" class="logotype">
+						<path
+							d="M455.4 0c16.569 0 30 13.432 30 30v383.661a59.6 59.6 0 0 0-13.884-1.63c-32.853 0-59.485 26.632-59.485 59.485 0 4.781.565 9.43 1.63 13.884H30c-16.568 0-30-13.431-30-30V71.434a59.7 59.7 0 0 0 13.484 1.535c32.853 0 59.485-26.632 59.485-59.485 0-4.637-.53-9.151-1.534-13.484zM48.229 358.825C38.114 348.862 21 356.027 21 370.224V449c0 8.837 7.163 16 16 16h79.961c14.312 0 21.424-17.353 11.229-27.397zM243 90c-84.5 0-153 68.5-153 153s68.5 153 153 153 153-68.5 153-153S327.5 90 243 90m126.039-69c-14.312 0-21.424 17.353-11.229 27.398l79.961 78.777c10.114 9.963 27.229 2.798 27.229-11.399V37c0-8.837-7.163-16-16-16z"
+						/>
+					</svg>
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 486 486" class="logotype">
+						<path
+							d="M455.4 0c16.569 0 30 13.432 30 30v383.661a59.6 59.6 0 0 0-13.884-1.63c-32.853 0-59.485 26.632-59.485 59.485 0 4.781.565 9.43 1.63 13.884H30c-16.568 0-30-13.431-30-30V71.434a59.7 59.7 0 0 0 13.484 1.535c32.853 0 59.485-26.632 59.485-59.485 0-4.637-.53-9.151-1.534-13.484zM48.229 358.825C38.114 348.862 21 356.027 21 370.224V449c0 8.837 7.163 16 16 16h79.961c14.312 0 21.424-17.353 11.229-27.397zM243 90c-84.5 0-153 68.5-153 153s68.5 153 153 153 153-68.5 153-153S327.5 90 243 90m126.039-69c-14.312 0-21.424 17.353-11.229 27.398l79.961 78.777c10.114 9.963 27.229 2.798 27.229-11.399V37c0-8.837-7.163-16-16-16z"
+						/>
+					</svg>
+				</div>
+			</div>
+
+			<header class="text-center">
+				<div id="tagline" data-i18n="tagline">An ESP32-S3, an LED strip, a browser. That's it.</div>
+				<div id="tagline_note" class="color-medium text-xs" data-i18n="tagline.note">
+					...and a 24V PSU, an XL4015 DC-DC module, a 330Ω resistor and a few solder joints.<br />But those are details.
+				</div>
+			</header>
+			<nav class="mg-y-s flex gap-m flex-wrap flex-center">
+				<button command="show-modal" commandfor="install-cli-dialog" data-i18n="nav.cli" data-github-only>CLI</button>
+				<button command="show-modal" commandfor="flash-firmware-dialog" data-i18n="nav.flash">Firmware</button>
+				<button command="show-modal" commandfor="live-preview-dialog" data-i18n="nav.preview">Live Preview</button>
+				<button command="show-modal" commandfor="mapping-dialog" data-i18n="nav.mapping">
+					Mapping <small>(Beta)</small>
+				</button>
+			</nav>
+			<footer class="color-medium text-sm text-center">
+				<div data-i18n="footer.lost">
+					Not sure how you got here?
+					<a href="https://github.com/genbs/reactive-leds/blob/master/README.md" class="dark-link"
+						>The README has the full story.</a
+					>
+				</div>
+				<div class="mg-t-s">
+					<a href="https://github.com/genbs/reactive-leds">GitHub</a> &nbsp;·&nbsp; MIT / GPL-3.0 / CC0 &nbsp;·&nbsp;
+					<button id="lang-btn">IT</button>
+				</div>
+			</footer>
+		</main>
+
+		<dialog id="install-cli-dialog">
+			<button class="close-button" commandfor="install-cli-dialog" command="close">X</button>
+			<h2 data-i18n="cli.title" class="title">Install the CLI</h2>
+			<section class="pd-lg">
+				<div data-i18n="cli.desc">
+					<code>rleds</code> is the terminal tool for managing devices, provisioning WiFi over Bluetooth and running the
+					WebSocket proxy.
+				</div>
+				<div class="code-block">
+					<code id="cli-cmd">npm install -g @reactive-leds/cli</code>
+					<button class="copy-btn" onclick="copy('cli-cmd', this)">copy</button>
+				</div>
+				<p class="note" data-i18n="cli.context">
+					After installing, run <code>rleds --help</code> to see the list of available commands.
+				</p>
+				<p data-i18n="cli.hint">
+					Start the proxy as described in Live Preview,
+					<button class="link" command="show-modal" commandfor="flash-firmware-dialog">flash the firmware</button>
+					and open <button class="link" command="show-modal" commandfor="live-preview-dialog">Live preview</button> to
+					start controlling your devices.
+				</p>
+				<div class="mg-t-s text-sm" data-i18n="cli.readme">
+					<a href="https://github.com/genbs/reactive-leds/blob/master/cli/README.md">CLI README →</a>
+				</div>
+			</section>
+		</dialog>
+
+		<dialog id="flash-firmware-dialog">
+			<button class="close-button" commandfor="flash-firmware-dialog" command="close">X</button>
+			<h2 class="title" data-i18n="flash.title">Install the Firmware</h2>
+			<section class="pd-lg">
+				<div data-i18n="flash.desc">
+					<div>
+						<i class="note">Chrome or Edge only.</i>
+						<p>
+							Use the "Connect" button below to install
+							<a href="https://github.com/genbs/reactive-leds/releases/latest">the latest firmware release</a>
+							directly from your browser.
+						</p>
+					</div>
+				</div>
+				<div class="text-center mg-y-s">
+					<esp-web-install-button manifest="manifest.json">
+						<span slot="unsupported" data-i18n="flash.unsupported">
+							Your browser doesn't support Web Serial. Try <a href="https://www.google.com/chrome/">Chrome</a> or Edge.
+						</span>
+					</esp-web-install-button>
+				</div>
+				<form id="serial-provision-form" class="serial-provision">
+					<h3 class="subtitle subtitle-raw-2" data-i18n="flash.serial.title">Configure WiFi via USB</h3>
+					<div class="serial-provision-fields">
+						<label>
+							<span data-i18n="flash.serial.ssid">Network</span>
+							<input id="serial-ssid" type="text" maxlength="32" autocomplete="off" required />
+						</label>
+						<label>
+							<span data-i18n="flash.serial.password">Password</span>
+							<input id="serial-password" type="password" maxlength="63" autocomplete="current-password" />
+						</label>
+						<button type="submit" data-i18n="flash.serial.submit">Configure</button>
+					</div>
+					<output id="serial-provision-message"></output>
+				</form>
+				<p class="note" data-i18n="flash.context">
+					After flashing, configure WiFi via Web Serial above, run <code>rleds credential</code> from the
+					<button class="link" command="show-modal" commandfor="install-cli-dialog">CLI</button>
+					or use <code>rleds bt-credential</code> over Bluetooth.
+				</p>
+				<div class="mg-t-s text-sm" data-i18n="flash.readme">
+					<a href="https://github.com/genbs/reactive-leds/blob/master/firmware/README.md">Firmware README →</a>
+				</div>
+			</section>
+		</dialog>
+
+		<dialog id="live-preview-dialog" class="flex flex-mq">
+			<button class="close-button" commandfor="live-preview-dialog" command="close">X</button>
+			<aside class="flex flex-col">
+				<div class="proxy-connect">
+					<h3 class="subtitle">
+						<span data-i18n="proxy.title">PROXY</span>
+						<span class="proxy-status offline"></span>
+					</h3>
+					<div class="pd-m flex flex-col gap-m">
+						<div class="text-xs color-medium" data-i18n="proxy.desc">
+							Start the local proxy, then connect below.
+						</div>
+						<div class="input-group">
+							<input type="text" class="proxy-address" placeholder="ws://localhost:8000" pattern="ws://.*" />
+							<button class="proxy-begin">⎋</button>
+							<output class="input-message proxy-message"></output>
+							<output class="input-error proxy-error"></output>
+						</div>
+					</div>
+				</div>
+				<div class="devices-section flex flex-col flex-1" inert>
+					<h3 class="subtitle">
+						<span data-i18n="devices.title">Devices</span>
+						<span class="device-count"></span>
+					</h3>
+					<div class="pd-m flex flex-col gap-m flex-1 overflow-hidden">
+						<div class="text-xs color-medium" data-i18n="devices.desc">
+							The proxy lists your devices on startup — copy the addresses here to control them.
+						</div>
+						<div id="device-list" class="flex-1 overflow-auto"></div>
+						<div class="input-group add-device">
+							<output class="input-message add-device-message"></output>
+							<output class="input-error add-device-error"></output>
+							<div>
+								<input
+									type="text"
+									class="add-device-input"
+									placeholder="192.168.x.y:port?"
+									pattern="\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+"
+								/>
+								<button class="add-device-btn" disabled>+</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</aside>
+			<section id="examples-panel" class="overflow-auto flex flex-col flex-1" inert>
+				<nav class="top-bar" id="examples-list">
+					<button data-example="playground" data-i18n="tab.playground">Playground</button>
+				</nav>
+				<section class="dialog-preview flex-1 overflow-auto flex flex-col">
+					<div id="example-container" class="flex-1"></div>
+					<div id="preview-wrap" class="flex-1">
+						<canvas id="preview-canvas"></canvas>
+					</div>
+				</section>
+				<footer class="examples-footer">
+					<a id="example-source" target="_blank">view source</a>
+				</footer>
+			</section>
+		</dialog>
+
+		<dialog id="mapping-dialog" class="flex flex-mq">
+			<button class="close-button" commandfor="mapping-dialog" command="close">X</button>
+			<aside class="overflow-y-scroll">
+				<!-- Mapping info -->
+				<div>
+					<h3 class="subtitle" data-i18n="mapping.title">Mapping</h3>
+					<div class="pd-m flex flex-col gap-m">
+						<div class="text-xs color-medium" data-i18n="mapping.desc">
+							Canvas mapping projects what you draw on a canvas onto the strips — made for live coding. Place each strip
+							on the virtual grid, then copy the ready-to-use snippet from the Usage panel below.
+						</div>
+					</div>
+				</div>
+
+				<!-- Proxy -->
+				<div class="proxy-connect">
+					<h3 class="subtitle">
+						<span data-i18n="proxy.title">PROXY</span>
+						<span class="proxy-status offline"></span>
+					</h3>
+					<div class="pd-m flex flex-col gap-m">
+						<div class="text-xs color-medium" data-i18n="proxy.desc">
+							Start the local proxy, then connect below.
+						</div>
+						<div class="input-group">
+							<input type="text" class="proxy-address" placeholder="ws://localhost:8000" pattern="ws://.*" />
+							<button class="proxy-begin">⎋</button>
+							<output class="input-message proxy-message"></output>
+							<output class="input-error proxy-error"></output>
+						</div>
+					</div>
+				</div>
+
+				<!-- Devices -->
+				<div class="devices-section" inert>
+					<h3 class="subtitle">
+						<span data-i18n="devices.title">Devices</span>
+						<span class="device-count"></span>
+					</h3>
+					<div class="pd-m flex flex-col gap-m flex-1 overflow-hidden mh">
+						<div id="map-device-list" class="flex-1 overflow-auto"></div>
+						<div class="input-group add-device">
+							<output class="input-message add-device-message"></output>
+							<output class="input-error add-device-error"></output>
+							<div>
+								<input
+									type="text"
+									class="add-device-input"
+									placeholder="192.168.x.y:port?"
+									pattern="\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+"
+								/>
+								<button class="add-device-btn" disabled>+</button>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Grid -->
+				<div>
+					<h3 class="subtitle">Grid</h3>
+					<div class="pd-m flex gap-m justify-between flex-col">
+						<label class="map-grid-label">
+							Cols <input type="number" id="map-cols" min="1" max="200" value="10" /> × Rows
+							<input type="number" id="map-rows" min="1" max="200" value="10" />
+						</label>
+						<div class="flex gap-s content-center">
+							<button id="map-reset">⇅</button>
+							<button id="map-reset-v">⇄</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Export -->
+				<div>
+					<h3 class="subtitle" data-i18n="export.title">Export</h3>
+					<div class="pd-m flex flex-col gap-m flex-1 overflow-hidden">
+						<code class="flex-1 overflow-auto mh">
+							<pre id="map-snippet"></pre>
+						</code>
+						<button id="map-copy">Copy</button>
+					</div>
+				</div>
+
+				<!-- Usage -->
+				<div>
+					<h3 class="subtitle" data-i18n="usage.title">Usage</h3>
+					<div class="pd-m flex flex-col gap-m flex-1 overflow-hidden">
+						<div class="text-xs color-medium" data-i18n="usage.desc">
+							Ready to paste into your sketch: connects to the proxy, keeps only the devices that answer, and streams
+							the canvas — sampled along each polygon's centerline — to the strips.
+						</div>
+						<code class="flex-1 overflow-auto mh">
+							<pre id="usage-snippet"></pre>
+						</code>
+						<button id="usage-copy">Copy</button>
+					</div>
+				</div>
+
+				<!-- Hydra -->
+				<div>
+					<h3 class="subtitle" data-i18n="hydra.title">Hydra</h3>
+					<div class="pd-m flex flex-col gap-m flex-1 overflow-hidden">
+						<div class="text-xs color-medium" data-i18n="hydra.desc">
+							Generated from this mapping and ready to run in the Hydra web editor.
+						</div>
+						<code class="flex-1 overflow-auto mh">
+							<pre id="hydra-snippet"></pre>
+						</code>
+						<div class="flex gap-s">
+							<button id="hydra-copy" class="flex-1" data-i18n="hydra.copy">Copy</button>
+							<button id="hydra-open" class="flex-1" data-i18n="hydra.open">Open in Hydra</button>
+						</div>
+					</div>
+				</div>
+			</aside>
+
+			<section class="flex flex-col flex-1 overflow-hidden">
+				<div class="top-bar">
+					<h3 class="subtitle-raw">Background</h3>
+					<select id="map-preset">
+						<option value="col-row">Col x Row</option>
+						<option value="cols">Columns</option>
+						<option value="rows">Rows</option>
+						<option value="circle">Circle</option>
+					</select>
+				</div>
+				<div class="flex flex-col pd-m flex-1 w-full overflow-hidden">
+					<canvas id="mapping-canvas"></canvas>
+					<div class="flex-1 overflow-auto">
+						<canvas id="mapping-preview"></canvas>
+					</div>
+				</div>
+				<footer class="bottom-bar pd-m mg-t-a color-medium text-xs flex flex-col justify-between">
+					<div>Click to select · Drag to move · Drag corner to scale · Shift+corner = free vertex</div>
+				</footer>
+			</section>
+		</dialog>
+	</body>
+</html>

@@ -1,7 +1,6 @@
 #include "ble.h"
 #include "config.h"
-#include "storage.h"
-#include "utils.h"
+#include "credentials.h"
 #include "wifi.h"
 
 #include <stdio.h>
@@ -20,18 +19,23 @@
 #define BLE_TAG "BLE"
 #define GATTS_APP_ID 0
 
+// BLE 128-bit UUIDs are transmitted little-endian, so the byte arrays below are
+// the reverse of the human-readable form. Keep these in sync with the matching
+// constants in cli/cmd/bluetooth.ts (SERVICE_UUID, CHARACTERISTIC_UUID).
+// Contract documented in shared/README.md ("BLE provisioning").
+
+// SERVICE_UUID:        a9ca1f56-8436-41d7-81dc-947facf48fe8
 const uint8_t SERVICE_UUID_128[ESP_UUID_LEN_128] = {
     0xe8, 0x8f, 0xf4, 0xac, 0x7f, 0x94, 0xdc, 0x81,
     0xd7, 0x41, 0x36, 0x84, 0x56, 0x1f, 0xca, 0xa9
 };
 
+// CHARACTERISTIC_UUID: 474c5e20-2f61-450c-a4d3-b51a3685ba5c
 static const uint8_t CHARACTERISTIC_UUID_128[ESP_UUID_LEN_128] = {
     0x5c, 0xba, 0x85, 0x36, 0x1a, 0xb5, 0xd3, 0xa4,
     0x0c, 0x45, 0x61, 0x2f, 0x20, 0x5e, 0x4c, 0x47
 };
 
-static uint16_t gatt_service_handle = 0;
-static uint16_t gatt_char_handle = 0;
 
 static esp_ble_adv_params_t adv_params = {
     .adv_int_min       = 0x20,
@@ -54,37 +58,6 @@ static void ble_mark_activity()
     s_last_activity_ms = esp_log_timestamp();
 }
 
-// when the client sends the credentials, store them and restart the device
-// TODO: Could be a problem if the client sends too many credentials - maybe invalid - and occupies unnecessary memory
-void store_credentials(uint8_t *value, size_t len)
-{
-    const char *separator = (const char *)memchr(value, ',', len);
-
-    if (separator == NULL) {
-        ESP_LOGW(BLE_TAG, "Invalid credentials format: separator ',' not found.");
-        return;
-    }
-
-    size_t ssid_len = separator - (const char *)value;
-    size_t pass_len = len - (ssid_len + 1);
-    if (ssid_len == 0 || pass_len == 0 || ssid_len >= WIFI_SSID_MAX_LEN || pass_len >= WIFI_PASS_MAX_LEN) {
-        ESP_LOGW(BLE_TAG, "Invalid credentials length: ssid_len=%d, pass_len=%d", ssid_len, pass_len);
-        return;
-    }
-
-    char ssid[WIFI_SSID_MAX_LEN];
-    char password[WIFI_PASS_MAX_LEN];
-
-    strncpy(ssid, (const char *)value, ssid_len);
-    ssid[ssid_len] = '\0';
-
-    strncpy(password, separator + 1, pass_len);
-    password[pass_len] = '\0';
-
-    ESP_LOGI(BLE_TAG, "Received credentials: SSID='%s', PWD='%s'", ssid, mask_wifi_password(password));
-    storage_set("wifi", ssid, password);
-}
-
 static void restart_timer_callback(TimerHandle_t xTimer)
 {
     ESP_LOGI(BLE_TAG, "Restarting now...");
@@ -92,6 +65,15 @@ static void restart_timer_callback(TimerHandle_t xTimer)
 }
 
 void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param){
+    // State scoped to this handler (the only consumer for all three).
+    // gatt_*_handle: captured during service/characteristic creation, used to
+    //   route write events to the credentials characteristic.
+    // restart_scheduled: ensures the first valid BLE write schedules the
+    //   reboot; subsequent writes are no-ops (no NVS spam, no leaked timers).
+    static uint16_t gatt_service_handle = 0;
+    static uint16_t gatt_char_handle = 0;
+    static bool restart_scheduled = false;
+
     switch (event) {
     case ESP_GATTS_CONNECT_EVT:
         ESP_LOGV(BLE_TAG, "Connected, conn_id %d", param->connect.conn_id);
@@ -151,8 +133,11 @@ void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp
             }
         }
         
-        if (param->write.handle == gatt_char_handle && param->write.len > 0) {
-            store_credentials(param->write.value, param->write.len);
+        if (param->write.handle == gatt_char_handle && param->write.len > 0 && !restart_scheduled) {
+            if (!credentials_store(param->write.value, param->write.len)) {
+                // invalid input or NVS write failed — don't reboot, let the client retry
+                break;
+            }
 
             ESP_LOGV(BLE_TAG, "Credentials stored, restarting...");
             TimerHandle_t restart_timer = xTimerCreate("RestartTimer",
@@ -162,6 +147,7 @@ void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp
                 restart_timer_callback);
 
             if (restart_timer != NULL) {
+                restart_scheduled = true;
                 xTimerStart(restart_timer, 0);
             } else {
                 ESP_LOGE(BLE_TAG, "Failed to create restart timer");
