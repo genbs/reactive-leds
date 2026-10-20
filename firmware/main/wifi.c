@@ -7,7 +7,6 @@
 #include "esp_log.h"
 
 #define WIFI_TAG "WIFI_SERVICE"
-#define MAX_RETRY 10
 
 static bool s_connected = false;
 static char s_ip_address_str[16] = "0.0.0.0"; 
@@ -21,6 +20,7 @@ static uint32_t s_beacon_timeouts = 0;
 static uint32_t s_disconnects = 0;
 static esp_event_handler_instance_t s_instance_any_id;
 static esp_event_handler_instance_t s_instance_got_ip;
+static portMUX_TYPE s_state_lock = portMUX_INITIALIZER_UNLOCKED;
 
 static void wifi_start_once(void)
 {
@@ -34,14 +34,10 @@ static void wifi_start_once(void)
 static void event_handler(void* arg, esp_event_base_t event_base,
     int32_t event_id, void* event_data)
 {
-    // Connection retry counter, scoped to this handler (only consumer).
-    static int s_retry_num = 0;
-
     if (event_base == WIFI_EVENT) {
         switch (event_id) {
             case WIFI_EVENT_STA_START:
-                ESP_LOGV(WIFI_TAG, "WIFI_EVENT_STA_START => connecting...");
-                esp_wifi_connect();
+                ESP_LOGV(WIFI_TAG, "WIFI_EVENT_STA_START");
                 break;
 
             case WIFI_EVENT_STA_BEACON_TIMEOUT:
@@ -56,19 +52,12 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 s_disconnects++;
                 ESP_LOGW(WIFI_TAG, "WIFI_EVENT_STA_DISCONNECTED => reason=%d", disconn->reason);
 
-                if (s_retry_num < MAX_RETRY) {
-                    s_retry_num++;
-                    ESP_LOGV(WIFI_TAG, "Retrying to connect... Attempt #%d/%d",
-                    s_retry_num, MAX_RETRY);
-                    esp_wifi_connect();
-	                } else {
-	                    ESP_LOGE(WIFI_TAG, "Failed to connect after %d attempts", MAX_RETRY);
-	                    s_connected = false;
-
-	                    // clear IP address
-	                    snprintf(s_ip_address_str, sizeof(s_ip_address_str), "0.0.0.0");
-	                    memset(s_ip_address, 0, sizeof(s_ip_address));
-	                }
+                // The reconnect task owns application-level retries and network switching.
+                portENTER_CRITICAL(&s_state_lock);
+                s_connected = false;
+                snprintf(s_ip_address_str, sizeof(s_ip_address_str), "0.0.0.0");
+                memset(s_ip_address, 0, sizeof(s_ip_address));
+                portEXIT_CRITICAL(&s_state_lock);
                 break;
             }
 
@@ -81,16 +70,25 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             case IP_EVENT_STA_GOT_IP: {
                 ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
 
+	                portENTER_CRITICAL(&s_state_lock);
 	                // Store IP address
 	                snprintf(s_ip_address_str, sizeof(s_ip_address_str), IPSTR, IP2STR(&event->ip_info.ip));
 	                s_ip_address[0] = esp_ip4_addr1_16(&event->ip_info.ip);
 	                s_ip_address[1] = esp_ip4_addr2_16(&event->ip_info.ip);
 	                s_ip_address[2] = esp_ip4_addr3_16(&event->ip_info.ip);
 	                s_ip_address[3] = esp_ip4_addr4_16(&event->ip_info.ip);
+	                s_connected = true;
+	                portEXIT_CRITICAL(&s_state_lock);
 	                ESP_LOGV(WIFI_TAG, "IP_EVENT_STA_GOT_IP => %s", s_ip_address_str);
-
-                s_connected = true;
-                s_retry_num = 0;
+                wifi_ap_record_t ap_info;
+                if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
+                    ESP_LOGI(WIFI_TAG,
+                        "Connected AP: RSSI=%d dBm, channel=%u, BSSID=%02x:%02x:%02x:%02x:%02x:%02x",
+                        ap_info.rssi, (unsigned)ap_info.primary,
+                        (unsigned)ap_info.bssid[0], (unsigned)ap_info.bssid[1],
+                        (unsigned)ap_info.bssid[2], (unsigned)ap_info.bssid[3],
+                        (unsigned)ap_info.bssid[4], (unsigned)ap_info.bssid[5]);
+                }
                 break;
             }
 
@@ -141,10 +139,28 @@ void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
         s_handlers_registered = true;
     }
 
+    portENTER_CRITICAL(&s_state_lock);
+    s_connected = false;
+    snprintf(s_ip_address_str, sizeof(s_ip_address_str), "0.0.0.0");
+    memset(s_ip_address, 0, sizeof(s_ip_address));
+    portEXIT_CRITICAL(&s_state_lock);
+
+    if (s_wifi_started) {
+        esp_err_t err = esp_wifi_disconnect();
+        if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_CONNECT) {
+            ESP_LOGW(WIFI_TAG, "WiFi disconnect request failed: %s", esp_err_to_name(err));
+        }
+    }
+
     wifi_config_t wifi_config = {0}; 
     strncpy((char *)wifi_config.sta.ssid, (char *)WIFI_SSID, sizeof(wifi_config.sta.ssid) - 1);
     strncpy((char *)wifi_config.sta.password, (char *)WIFI_PASS, sizeof(wifi_config.sta.password) - 1);
-    wifi_config.sta.scan_method = WIFI_FAST_SCAN;
+    // Scan every channel so repeated SSIDs (mesh/repeater setups) are
+    // compared by signal instead of connecting to the first match found.
+    wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+    wifi_config.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+    // Retry transient association failures without a second application-level connect request.
+    wifi_config.sta.failure_retry_cnt = 2;
     wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     wifi_config.sta.pmf_cfg.capable = true;
     wifi_config.sta.pmf_cfg.required = false;
@@ -154,20 +170,32 @@ void wifi_connect(const char WIFI_SSID[], const char WIFI_PASS[])
     wifi_config.sta.btm_enabled = 0;
     
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
-    wifi_start_once();
 
     esp_wifi_get_mac(ESP_IF_WIFI_STA, s_mac_address);
 
     // store MAC address
     snprintf(s_mac_address_str, sizeof(s_mac_address_str), "%02x:%02x:%02x:%02x:%02x:%02x", s_mac_address[0], s_mac_address[1], s_mac_address[2], s_mac_address[3], s_mac_address[4], s_mac_address[5]);
 
-    ESP_ERROR_CHECK(esp_wifi_connect());
+    wifi_start_once();
+    esp_err_t err = esp_wifi_connect();
+    if (err != ESP_OK) {
+        ESP_LOGW(WIFI_TAG, "WiFi connect request failed: %s", esp_err_to_name(err));
+    }
 }
 
-bool wifi_connected(){ return s_connected; }
+bool wifi_connected(){
+    portENTER_CRITICAL(&s_state_lock);
+    bool connected = s_connected;
+    portEXIT_CRITICAL(&s_state_lock);
+    return connected;
+}
 char* wifi_ip(){ return s_ip_address_str; }
 char* wifi_mac(){ return s_mac_address_str; }
-void wifi_ip_bytes(uint8_t out[WIFI_IP_LEN]) { memcpy(out, s_ip_address, WIFI_IP_LEN); }
+void wifi_ip_bytes(uint8_t out[WIFI_IP_LEN]) {
+    portENTER_CRITICAL(&s_state_lock);
+    memcpy(out, s_ip_address, WIFI_IP_LEN);
+    portEXIT_CRITICAL(&s_state_lock);
+}
 void wifi_mac_bytes(uint8_t out[WIFI_MAC_LEN]) { memcpy(out, s_mac_address, WIFI_MAC_LEN); }
 uint32_t wifi_beacon_timeouts() { return s_beacon_timeouts; }
 uint32_t wifi_disconnects() { return s_disconnects; }
@@ -196,6 +224,12 @@ wifi_ap_record_t* wifi_scan(int *num_networks) {
     ESP_LOGI(WIFI_TAG, "Starting WiFi scan");
     wifi_start_once();
 
+    // A previous association may still be in progress when its timeout expires.
+    esp_err_t disconnect_err = esp_wifi_disconnect();
+    if (disconnect_err != ESP_OK && disconnect_err != ESP_ERR_WIFI_NOT_CONNECT) {
+        ESP_LOGW(WIFI_TAG, "WiFi disconnect request failed: %s", esp_err_to_name(disconnect_err));
+    }
+
     // Start scan
     wifi_scan_config_t scan_config = {
         .ssid = NULL,
@@ -203,7 +237,12 @@ wifi_ap_record_t* wifi_scan(int *num_networks) {
         .channel = 0,
         .show_hidden = true
     };
-    ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
+    esp_err_t scan_err = esp_wifi_scan_start(&scan_config, true);
+    if (scan_err != ESP_OK) {
+        ESP_LOGW(WIFI_TAG, "WiFi scan failed: %s", esp_err_to_name(scan_err));
+        *num_networks = 0;
+        return NULL;
+    }
 
     // Return every visible AP — capping risks excluding the user's saved network
     // when it isn't among the strongest (common in crowded RF environments).

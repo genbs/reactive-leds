@@ -30,7 +30,7 @@ uint32_t wifi_disconnects();
  *
  * Returns a heap-allocated array of records and writes the count into
  * *num_networks. The caller is responsible for free()-ing the returned array.
- * Returns NULL only if the underlying malloc failed.
+ * Returns NULL if the scan fails or the underlying malloc fails.
  */
 wifi_ap_record_t* wifi_scan(int *num_networks);
 
