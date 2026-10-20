@@ -1,6 +1,6 @@
 {
     "name": "@reactive-leds/cli",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "Command-line tools for provisioning, discovering, and controlling reactive-leds ESP32-S3 devices over UDP, USB and BLE. Includes a WebSocket proxy for browser-based LED control.",
     "keywords": [
         "led",
