@@ -6,9 +6,6 @@
 		"esModuleInterop": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true,
-		"paths": {
-			"@reactive-leds/shared": ["./shared/index"]
-		},
 		"types": ["jest"]
 	},
 	"exclude": ["node_modules", "**/node_modules", "**/dist", "firmware"]

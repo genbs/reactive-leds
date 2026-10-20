@@ -1,6 +1,7 @@
 {
   "name": "reactive-leds",
   "version": "latest",
+  "new_install_improv_wait_time": 0,
   "builds": [{
     "chipFamily": "ESP32-S3",
     "parts": [

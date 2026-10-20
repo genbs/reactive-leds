@@ -161,10 +161,11 @@ const MIME_TYPES: Record<string, string> = {
 }
 
 export function resolveUiDirectory(): string {
-	const candidates = [join(__dirname, "ui"), resolve(__dirname, "../../../docs")]
-	const found = candidates.find(candidate => { try { return statSync(join(candidate, "index.html")).isFile() } catch { return false } })
-	if (!found) throw new Error("UI assets not found. Reinstall or rebuild @reactive-leds/cli.")
-	return found
+	const directory = join(__dirname, "ui")
+	try {
+		if (statSync(join(directory, "index.html")).isFile()) return directory
+	} catch {}
+	throw new Error("UI assets not found. Reinstall or rebuild @reactive-leds/cli.")
 }
 
 export function serveUi(uiDirectory: string, request: IncomingMessage, response: ServerResponse): void {

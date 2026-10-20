@@ -1,6 +1,8 @@
 {
-	"extends": "../tsconfig.json",
 	"compilerOptions": {
+		"strict": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
 		"rootDir": "./",
 		"outDir": "./dist",
 		"module": "CommonJS",
