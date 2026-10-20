@@ -1,0 +1,66 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_run:
+    workflows: [Firmware Build]
+    types: [completed]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event.workflow_run.event == 'release' &&
+       github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build site
+        run: |
+          npm ci
+          npm run build:site
+
+      - name: Download latest firmware release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p docs/firmware
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern '*.bin' --dir docs/firmware
+          for file in bootloader.bin partition-table.bin firmware.bin; do
+            test -s "docs/firmware/$file"
+          done
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
