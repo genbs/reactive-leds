@@ -56,6 +56,29 @@ export const credentialCommand: Command = {
 	},
 }
 
+export const monitorCommand: Command = {
+	name: "monitor",
+	description: "Monitor ESP32 logs over USB.",
+	args: [
+		{ name: "port", required: false, type: String },
+	],
+	examples: [
+		"rleds monitor",
+		"rleds monitor /dev/cu.usbmodem1101",
+	],
+	execute: async (path: string | undefined) => {
+		if (!path) path = await selectPort()
+		if (!path) return false
+
+		try {
+			return await monitorSerial(path)
+		} catch (err) {
+			console.log(fail(err instanceof Error ? err.message : "Failed to monitor serial port"))
+			return false
+		}
+	},
+}
+
 export function serialCredentialsPacket(ssid: string, password: string): Buffer {
 	return Buffer.concat([MAGIC, Buffer.from(wifiCredentialsToBuffer(ssid, password))])
 }
@@ -122,5 +145,115 @@ function waitForResponse(port: SerialPort): Promise<boolean> {
 		port.on("data", onData)
 		port.on("error", onError)
 		port.on("close", onClose)
+	})
+}
+
+/** Stream a serial port to stdout until interrupted or disconnected. */
+export async function monitorSerial(
+	path: string,
+	options: {
+		reconnect?: boolean
+		retryDelayMs?: number
+		createPort?: (path: string) => SerialPort
+	} = {},
+): Promise<boolean> {
+	return new Promise<boolean>(resolve => {
+		const reconnect = options.reconnect ?? true
+		const retryDelayMs = options.retryDelayMs ?? 1_000
+		const createPort = options.createPort ?? (path => new SerialPort({ path, baudRate: BAUD_RATE, autoOpen: false }))
+		let port: SerialPort | undefined
+		let reconnectTimer: ReturnType<typeof setTimeout> | undefined
+		let openedOnce = false
+		let settled = false
+
+		const cleanupProcess = () => {
+			process.off("SIGINT", onSignal)
+			process.off("SIGTERM", onSignal)
+		}
+
+		const finish = (result: boolean, message?: string) => {
+			if (settled) return
+			settled = true
+			if (reconnectTimer) clearTimeout(reconnectTimer)
+			if (message) console.log(fail(message))
+
+			const current = port
+			port = undefined
+			if (current) {
+				current.off("data", onData)
+				current.off("error", onError)
+				current.off("close", onClose)
+			}
+			const complete = () => {
+				cleanupProcess()
+				resolve(result)
+			}
+			if (current?.isOpen) current.close(complete)
+			else complete()
+		}
+
+		const onData = (data: Buffer) => process.stdout.write(data)
+		const onSignal = () => finish(true)
+		const scheduleReconnect = () => {
+			if (!settled) reconnectTimer = setTimeout(openPort, retryDelayMs)
+		}
+		const disconnected = (message: string) => {
+			if (settled) return
+			if (!reconnect) {
+				finish(false, message)
+				return
+			}
+
+			const current = port
+			port = undefined
+			if (current) {
+				current.off("data", onData)
+				current.off("error", onError)
+				current.off("close", onClose)
+			}
+			console.log(`Serial port disconnected: ${path}. Waiting to reconnect...`)
+			if (current?.isOpen) current.close(scheduleReconnect)
+			else scheduleReconnect()
+		}
+		const onError = (err: Error) => disconnected(err.message)
+		const onClose = () => disconnected(`Serial port closed: ${path}`)
+
+		const openPort = () => {
+			if (settled) return
+			let nextPort: SerialPort
+			try {
+				nextPort = createPort(path)
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Failed to open serial port"
+				if (!openedOnce) finish(false, message)
+				else scheduleReconnect()
+				return
+			}
+			port = nextPort
+			nextPort.open(err => {
+				if (settled) {
+					if (nextPort.isOpen) nextPort.close(() => {})
+					return
+				}
+				if (err) {
+					port = undefined
+					if (!openedOnce) finish(false, err.message)
+					else scheduleReconnect()
+					return
+				}
+
+				port = nextPort
+				nextPort.on("data", onData)
+				nextPort.on("error", onError)
+				nextPort.on("close", onClose)
+				if (openedOnce) console.log(`Reconnected to ${path}.`)
+				else console.log(`Monitoring ${path} at ${BAUD_RATE} baud. Press Ctrl+C to exit.`)
+				openedOnce = true
+			})
+		}
+
+		process.on("SIGINT", onSignal)
+		process.on("SIGTERM", onSignal)
+		openPort()
 	})
 }

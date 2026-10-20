@@ -7,7 +7,7 @@ import { configCommand, ledsCommand } from "./cmd/device"
 import { offCommand } from "./cmd/off"
 import { proxyCommand } from "./cmd/proxy/proxy"
 import { rainbowCommand } from "./cmd/rainbow"
-import { credentialCommand, serialScanCommand } from "./cmd/serial"
+import { credentialCommand, monitorCommand, serialScanCommand } from "./cmd/serial"
 import { statusCommand } from "./cmd/status"
 import { versionCommand } from "./cmd/version"
 import { pingCommand, resetWifiCommand, scanCommand } from "./cmd/wifi"
@@ -27,6 +27,7 @@ const commands = [
 	btCredentialCommand,
 	serialScanCommand,
 	credentialCommand,
+	monitorCommand,
 	rainbowCommand,
 	colorCommand,
 	offCommand,
@@ -98,7 +99,7 @@ executeCommand(command, Object.values(validationResult.args)).catch(err => {
 
 function help(commandName?: string) {
 	const command = commandName ? commands.find(cmd => cmd.name === commandName) : null
-	console.log(command ? usage(command) : `Usage:\n\t- ${commands.map(shortUsage).join("\n\t- ")}`)
+	console.log(command ? usage(command) : `ReactiveLeds v${version}\nUsage:\n\t- ${commands.map(shortUsage).join("\n\t- ")}`)
 }
 
 async function executeCommand(command: Command, args: any[]) {
