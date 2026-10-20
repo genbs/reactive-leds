@@ -6,6 +6,7 @@
   </picture>
 </p>
 
+[![Firmware Build](https://github.com/genbs/reactive-leds/actions/workflows/firmware-build.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/firmware-build.yml)
 [![Test shared](https://github.com/genbs/reactive-leds/actions/workflows/test-shared.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/test-shared.yml)
 [![Test cli](https://github.com/genbs/reactive-leds/actions/workflows/test-cli.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/test-cli.yml)
 [![Test client](https://github.com/genbs/reactive-leds/actions/workflows/test-client.yml/badge.svg)](https://github.com/genbs/reactive-leds/actions/workflows/test-client.yml)
@@ -15,6 +16,10 @@
 # Welcome to Reactive-LEDS
 
 Language: [English](https://github.com/genbs/reactive-leds/blob/master/README.md) | [Italiano](https://github.com/genbs/reactive-leds/blob/master/README-it.md)
+
+<p align="center">
+  <img alt="rleds hero" src="./assets/reactive-leds_hero.gif" width="100%">
+</p>
 
 ## Introduction
 
@@ -83,6 +88,8 @@ This is a small monorepo. Each main area has its own folder and its own README.
 
 These are the materials I used, but the project adapts to similar strips and components. Just make sure to configure the firmware for your strip (color order, number of segments, etc.). ESP32-S3 modules with PSRAM are fine, but PSRAM is not required for this use case: the realtime LED path uses small buffers in internal RAM.
 
+If I were to improve the build, I would replace the somewhat fragile JST connectors and add a way to support the solder joint at the start of the LED strip.
+
 ## 3D printing
 
 The models and settings are only a starting point — I am not a 3D printing expert.
@@ -90,14 +97,40 @@ The enclosure is designed to house the ESP32-S3 and the DC-DC module listed abov
 
 For the rail I printed five 20 cm PLA pieces: either five `profile` pieces, or four `profile` pieces plus the optional `profile_head`. For the diffuser I used four 25 cm pieces of transparent PETG.
 
-## Assembly
-
 1. Print the enclosure parts (`case/*.stl`) and the LED rail (`tube/*.stl`); see [`3dprint/README.md`](https://github.com/genbs/reactive-leds/blob/master/3dprint/README.md) for materials and settings.
-2. Solder the 330 Ω resistor on the data line, as close as possible to the start of the LED strip.
-3. Connect power supply, DC-DC module, ESP32-S3 and strip following the diagram in [Wiring](https://github.com/genbs/reactive-leds/blob/master/firmware/README.md#wiring).
-4. Fit the ESP32-S3 and the DC-DC module into the enclosure, close it with `top`/`bottom`/`tap` — glue the `tap` pieces so the DC-DC module cannot fall out.
-5. Glue five rail pieces into the 1 m rail (`profile` × 5, or `profile` × 4 plus `profile_head`), mount the FCOB strip, then glue the four `opal` pieces on as the diffuser.
-6. Flash the firmware (see [`firmware/README.md`](https://github.com/genbs/reactive-leds/blob/master/firmware/README.md)) and configure WiFi over USB or BLE with the [CLI](https://github.com/genbs/reactive-leds/blob/master/cli/README.md).
+2. Get the microcontroller, DC-DC module, power cable, JST pins, 330 Ω resistor and LED strip.
+3. Assemble everything by following the photos and instructions below.
+4. Flash the firmware from the [project site](https://genbs.github.io/reactive-leds/) or see [`firmware/README.md`](https://github.com/genbs/reactive-leds/blob/master/firmware/README.md), and configure WiFi over USB or BLE with the [CLI](https://github.com/genbs/reactive-leds/blob/master/cli/README.md).
+
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="assets/assembly/1_pieces.jpg" alt="Printed parts, LED strip and electronics laid out"><br><sub>1. Component overview</sub></td>
+    <td align="center" valign="top"><img src="assets/assembly/2_stepdown.jpg" alt="Testing the 24V to 5V step-down module"><br><sub>2. Step down the DC-DC module voltage from 24V to 5V</sub></td>
+    <td align="center" valign="top"><img src="assets/assembly/3_power-supply.jpg" alt="Testing the power supply, step-down module and ESP32-S3"><br><sub>3. Solder the DC-DC module output to the microcontroller and check that the pins output 3.3V</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="assets/assembly/4_resistor.jpg" width="100%" alt="330 ohm resistor soldered to the ESP32-S3 data line"><br><sub>4. Solder the resistor to pin 18 (configurable via firmware)</sub></td>
+    <td align="center" valign="top"><img src="assets/assembly/5_case.jpg" width="100%" alt="ESP32-S3 and step-down module positioned in the enclosure"><br><sub>5. Insert the microcontroller into the enclosure, making sure to keep the resistor at the bottom, and position the DC-DC module compartment</sub></td>
+    <td align="center" valign="top"><img src="assets/assembly/6_case-2.jpg" width="100%" alt="Step-down module fitted inside the enclosure"><br><sub>6. Once the DC-DC module is in place, you can glue the enclosure caps</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="assets/assembly/7_connections.jpg" width="100%" alt="Power and data connections laid out before closing the case"><br><sub>7. Insert the power cable into the other part of the enclosure, glue the JST connector and crimp the male pins onto the cables</sub></td>
+    <td align="center" valign="top"><img src="assets/assembly/8_case-finish.jpg" width="100%" alt="Wired electronics and enclosure before final closure"><br><sub>8. Use heat-shrink tubing to insulate the cables and insert the pins into the connector</sub></td>
+    <td align="center" valign="top"><img src="assets/assembly/9_connections-check.jpg" width="100%" alt="Checking the connections inside the enclosure"><br><sub>9. Check that the male and female JST connectors match</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="assets/assembly/10_case-closed.jpg" width="100%" alt="Closed electronics enclosure with power connector"><br><sub>10. You can now close the enclosure</sub></td>
+    <td align="center" valign="top"><img src="assets/assembly/11_finish.jpg" width="100%" alt="Completed LED tube and electronics enclosure"><br><sub>11. Overview of the enclosure with the LED strip</sub></td>
+    <td align="center" valign="top"><img src="assets/assembly/12_led-pipe.jpg" width="100%" alt="LED strip illuminated inside the diffuser tube"><br><sub>12. After gluing the rail with the diffuser, you can insert the LED strip</sub></td>
+  </tr>
+</table>
+
+## Transporting the tubes
+
+At first I carried them in a cloth wrap with elastic bands, like a roll-up pencil case, but I did not feel they were secure enough.
+I later built a wooden case based on this [tutorial](https://www.youtube.com/watch?v=2dAB4Z64CAM) and printed PLA parts to hold the LED tubes inside it. The case fits 12 tubes.
+
+![Open wooden case with the LED tubes secured inside](assets/case.jpeg)
 
 ## Limitations and known issues
 
@@ -110,3 +143,7 @@ For the rail I printed five 20 cm PLA pieces: either five `profile` pieces, or f
 ## Power and safety
 
 The LED strip runs at 24V. Power supply sizing depends on the strip's specs and the real load — as a reference, with all LEDs on the strip draws roughly **1 A per meter**. Use a supply with adequate headroom and proper wiring.
+
+## License
+
+The firmware and CLI are licensed under GPL-3.0-only. The `client` and `shared` packages are licensed under MIT; see the `LICENSE` file in each directory for the full terms.

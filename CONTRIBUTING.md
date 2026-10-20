@@ -39,29 +39,41 @@ Firmware build requires ESP-IDF. See `firmware/README.md`.
 
 ## Releasing (maintainers)
 
-Releases are manual. From a clean `master` checkout:
+Releases are manual. After the release changes and changelog are committed, work from a clean `master` checkout:
 
 ```bash
-# 1. Align versions and changelog
-npm version X.Y.Z --workspace=cli --workspace=client --workspace=shared --no-git-tag-version
-#    ...update CHANGELOG.md, then commit as "release: vX.Y.Z"
+# 1. Verify the packages and generated site
+npm ci
+npm test
+npm run build:site
+npm pack --dry-run --workspace=client
+npm pack --dry-run --workspace=cli
 
-# 2. Verify
-npm install && npm test
-npm publish --dry-run --workspace=cli
-npm publish --dry-run --workspace=client
+# 2. Push the reviewed commits and wait for GitHub checks
+git push origin master
 
-# 3. Tag (the firmware derives its version from this tag via `git describe`)
-git tag vX.Y.Z && git push origin master --tags
-
-# 4. Publish npm packages (shared is private and is never published)
-npm publish --workspace=cli
+# 3. Publish packages with new versions, in dependency order
+#    If shared has a new version, publish and verify it before client.
 npm publish --workspace=client
+npm view @reactive-leds/client version
 
-# 5. Create the GitHub release from the tag — CI builds the firmware
-#    and attaches the binaries automatically
-gh release create vX.Y.Z --title "vX.Y.Z"
+# Verify the CLI without the monorepo before publishing it
+release_tmp=$(mktemp -d)
+git archive HEAD cli | tar -x -C "$release_tmp"
+(cd "$release_tmp/cli" && npm install && npm run build && npm pack --dry-run)
+
+npm publish --workspace=cli
+npm view @reactive-leds/cli version
+
+# 4. Tag the released commit (the firmware uses git describe for its version)
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin vX.Y.Z
+
+# 5. Publish the GitHub release; CI attaches the firmware binaries
+gh release create vX.Y.Z --title "vX.Y.Z" --generate-notes
 ```
+
+Skip any package whose current version is already published; npm cannot publish the same package version twice.
 
 ## License
 

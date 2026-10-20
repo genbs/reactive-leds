@@ -15,7 +15,7 @@
 Language: [English](https://github.com/genbs/reactive-leds/blob/master/cli/README.md) | [Italiano](https://github.com/genbs/reactive-leds/blob/master/cli/README-it.md)
 
 This package is the CLI for interacting with `reactive-leds` devices on the network.
-With the `rleds` command you can talk to the devices, run the BLE provisioning and start the WebSocket proxy — all from the terminal.
+With the `rleds` command you can talk to the devices, provision them over USB or BLE and start the WebSocket proxy — all from the terminal.
 
 ## Quickstart
 
@@ -28,10 +28,12 @@ npm install -g @reactive-leds/cli
 rleds <command>
 ```
 
-Or from the repository:
+Or from the root of the complete repository:
 
 ```bash
 npm install
+npm run build --workspace=cli
+cd cli
 npm link       # makes the rleds command available globally
 rleds <command>
 ```
@@ -52,6 +54,7 @@ rleds <command>
 - `bt-credential [indexOrHost] [ssid]` - send WiFi credentials over Bluetooth. If `indexOrHost` is omitted, runs in interactive mode: shows the list of found devices and asks which to select (by numeric index or name). If `ssid` is omitted, it is prompted (password is always prompted, hidden). If `indexOrHost` is a number, it is used as an index into the `bt-scan` list (1-based).
 - `serial-scan` - list available serial ports.
 - `credential [port] [ssid]` - send WiFi credentials over USB. If `port` is omitted, uses the only available port or asks which one to select; missing SSID and password are prompted.
+- `monitor [port]` - stream ESP-IDF device logs over USB at 115200 baud. If `port` is omitted, uses the only available port or asks which one to select. After a disconnection it waits for the same port and reconnects automatically. Press Ctrl+C to stop.
 - `proxy [host] [port] [device_port] [options]` - start the WebSocket proxy between browser clients and the firmware. Defaults: `host=127.0.0.1`, `port=8000`, `device_port=4210`. Add `--ui` to serve the browser UI locally, or `--origin <origin>` to authorize a specific remote page. Scans the LAN every 10 seconds and shows discovered devices in real time.
 - `benchmark <target> [fps] [duration] [format]` - measure RTT and send timed LED frames to one device, reporting delivery, jitter and drops. `format` is `text` or `json`. Defaults: `fps=60`, `duration=30`, `format=text`.
 - `rainbow [target] [seconds] [speed]` - scroll a rainbow across the strip. Use `all` or omit `target` to target every discovered device.
@@ -72,6 +75,8 @@ rleds bt-scan
 rleds bt-credential
 rleds serial-scan
 rleds credential
+rleds monitor
+rleds monitor /dev/cu.usbmodem1101
 rleds proxy
 rleds proxy --ui
 rleds benchmark 192.168.1.10 60 120
@@ -169,6 +174,8 @@ From a terminal, connect the device over USB and use:
 
 `serial-scan` → `credential` → device reboots → WiFi ready.
 
+To inspect firmware logs without starting the ESP-IDF tools, keep the device connected over USB and run `rleds monitor [port]`. The monitor is passive: reset the board manually after it starts if you need to capture boot logs. If the device disconnects or resets, the command retries the same path every second without repeating errors. It accepts a local serial-port path, not a network hostname such as `esp32-X`.
+
 Bluetooth remains useful when the device is already installed or only its power connection is accessible:
 
 `bt-scan` → `bt-credential` → device reboots → WiFi ready.
@@ -208,10 +215,20 @@ Config:
 
 ## Updating
 
+If you installed the CLI from npm:
+
 ```bash
-git pull                     # latest code
-npm install && npm run build # rebuild
-npm link                     # refresh the global link
+npm install -g @reactive-leds/cli@latest
+```
+
+If you linked it from the repository, run these commands from the root:
+
+```bash
+git pull
+npm install
+npm run build --workspace=cli
+cd cli
+npm link
 ```
 
 ## Links

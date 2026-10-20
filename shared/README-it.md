@@ -9,7 +9,7 @@ Questo pacchetto contiene la specifica del protocollo binario per comunicare con
 
 Se vuoi controllare i LED da un altro linguaggio, puoi partire da qui.
 
-> Questo è un pacchetto interno al monorepo: viene inlinato in `@reactive-leds/client` e `@reactive-leds/cli` al build time, non è pubblicato su npm.
+Installa gli helper del protocollo con `npm install @reactive-leds/shared`. Client e CLI usano questo pacchetto durante la build e includono il codice del protocollo nei rispettivi bundle.
 
 ## Protocollo
 
@@ -59,7 +59,7 @@ Lo stesso pattern vale per ogni tipo richiesta/risposta: invia `[id, type, ...da
 
 ### Formato GET_STATUS
 
-`GET_STATUS` restituisce un pacchetto fisso di 91 byte: l’header di due byte seguito da un payload di 89 byte. Questi contatori e istantanee di stato sono utili per il debug e per il benchmark della latenza. Il firmware mantiene i contatori in memoria, quindi non vengono persi tra un pacchetto e l’altro.
+`GET_STATUS` restituisce un pacchetto fisso di 91 byte: l’header di due byte seguito da un payload di 89 byte. Non esegue un benchmark. Il firmware mantiene la maggior parte dei contatori dall'avvio; la CLI legge uno stato prima e uno dopo il benchmark e ne calcola la differenza.
 
 | Offset nel pacchetto | Campo                                                                                      | Encoding   | Significato                                                                 |
 | -------------------- | ------------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------------- |
@@ -164,11 +164,11 @@ Se vuoi scrivere un client in un altro linguaggio (Python, Rust, Go, Pure Data, 
 - **UDP sender (Node)**: [`cli/protocol.ts`](https://github.com/genbs/reactive-leds/blob/master/cli/protocol.ts) — client UDP grezzo usato dalla CLI.
 - **WebSocket sender (browser)**: [`client/src/main.ts`](https://github.com/genbs/reactive-leds/blob/master/client/src/main.ts) — usa il proxy WebSocket della CLI per raggiungere il device.
 
-Il protocollo in sé non è coperto da licenza — il byte layout sopra è sufficiente per scrivere un client completamente compatibile da zero.
+Il formato dei pacchetti è documentato qui per permettere di scrivere un client compatibile anche in altri linguaggi. Il pacchetto `shared` e la sua documentazione sono distribuiti sotto licenza MIT.
 
 ## Versionamento
 
-Il protocollo cresce per aggiunta: un comportamento nuovo è un `PacketType` nuovo, e le risposte esistenti possono crescere solo aggiungendo campi opzionali in coda. Prima della prima release pubblica, una pulizia incompatibile resta accettabile quando rende il protocollo più chiaro; `GET_INFO` ha sostituito il più limitato `GET_VERSION` per questo motivo.
+Il protocollo cresce per aggiunta: un comportamento nuovo è un `PacketType` nuovo, e le risposte esistenti possono crescere solo aggiungendo campi opzionali in coda. Le modifiche incompatibili richiedono una nuova versione maggiore dei pacchetti coinvolti. `GET_INFO` ha sostituito il più limitato `GET_VERSION` prima della prima release pubblica.
 
 La regola d'oro: non riordinare o reinterpretare byte esistenti senza aggiornare tutti i pacchetti che li usano (firmware, CLI, client).
 

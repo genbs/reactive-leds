@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.3 — 2026-10-20
+
+### cli
+- Add `rleds monitor` for USB serial logs, with automatic reconnection after a disconnect.
+- Bundle the web UI from CLI-owned static assets and the published browser client so the CLI can be built from its own source directory.
+
+### client
+- Build against the published `@reactive-leds/shared@1.0.0` package.
+
+### firmware
+- Scan all Wi-Fi channels and select the strongest access point when multiple APs share an SSID; log the selected AP's signal, channel and BSSID.
+- Use limited driver retries for association; let the reconnect task manage subsequent attempts and network switching.
+
+### documentation and models
+- Add assembly photos, transport notes and new 3D-printable tube-clamp files.
+
 ## 1.0.0 — 2026-06-03
 
 First public release.

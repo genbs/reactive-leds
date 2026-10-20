@@ -9,7 +9,7 @@ This package contains the binary protocol specification for talking to `reactive
 
 If you want to control the LEDs from another language, start here.
 
-> Internal monorepo package: it is inlined into `@reactive-leds/client` and `@reactive-leds/cli` at build time, not published to npm.
+Install the protocol helpers with `npm install @reactive-leds/shared`. The client and CLI use this package at build time and include the protocol code in their bundles.
 
 ## Protocol
 
@@ -164,11 +164,11 @@ If you want to write a client in another language (Python, Rust, Go, Pure Data, 
 - **UDP sender (Node)**: [`cli/protocol.ts`](https://github.com/genbs/reactive-leds/blob/master/cli/protocol.ts) — raw UDP client used by the CLI.
 - **WebSocket sender (browser)**: [`client/src/main.ts`](https://github.com/genbs/reactive-leds/blob/master/client/src/main.ts) — uses the CLI's WebSocket proxy to reach the device.
 
-The protocol itself is not covered by any license — the byte layout above is enough to write a fully compatible client from scratch.
+The packet format is documented here so you can write a compatible client in another language. The `shared` package and its documentation are licensed under MIT.
 
 ## Versioning
 
-The protocol grows by addition: new behavior means a new `PacketType`, and existing responses may only grow by appending optional fields at the end. Before the first public release, an incompatible cleanup is still acceptable when it makes the protocol clearer; `GET_INFO` replaced the more limited `GET_VERSION` for this reason.
+The protocol grows by addition: new behavior means a new `PacketType`, and existing responses may only grow by appending optional fields at the end. Incompatible changes require a new major version of the affected packages. `GET_INFO` replaced the more limited `GET_VERSION` before the first public release.
 
 The golden rule: never reorder or reinterpret existing bytes without updating every packet that uses them (firmware, CLI, client).
 

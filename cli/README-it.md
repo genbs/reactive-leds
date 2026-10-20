@@ -28,10 +28,12 @@ npm install -g @reactive-leds/cli
 rleds <comando>
 ```
 
-Oppure dal repository:
+Oppure dalla root del repository completo:
 
 ```bash
 npm install
+npm run build --workspace=cli
+cd cli
 npm link       # rende disponibile il comando rleds globalmente
 rleds <comando>
 ```
@@ -52,6 +54,7 @@ rleds <comando>
 - `bt-credential [indexOrHost] [ssid]` - invia credenziali Wi-Fi via Bluetooth. Se `indexOrHost` è omesso, parte in modalità interattiva: mostra la lista dei dispositivi trovati e chiede quale selezionare (per indice numerico o nome). Se `ssid` è omesso, lo chiede al prompt (la password viene chiesta sempre, nascosta). Se `indexOrHost` è un numero, viene usato come indice della lista `bt-scan` (1-based).
 - `serial-scan` - elenca le porte seriali disponibili.
 - `credential [port] [ssid]` - invia le credenziali Wi-Fi tramite USB. Se `port` è omessa, usa l'unica porta disponibile oppure chiede quale scegliere; SSID e password mancanti vengono richiesti al prompt.
+- `monitor [port]` - mostra i log ESP-IDF del dispositivo via USB a 115200 baud. Se `port` è omessa, usa l'unica porta disponibile oppure chiede quale scegliere. Dopo una disconnessione attende la stessa porta e si riconnette automaticamente. Premi Ctrl+C per interrompere.
 - `proxy [host] [port] [device_port] [opzioni]` - avvia il proxy WebSocket tra client browser e firmware. Valori predefiniti: `host=127.0.0.1`, `port=8000`, `device_port=4210`. Aggiungi `--ui` per servire localmente l'interfaccia browser, oppure `--origin <origine>` per autorizzare una pagina remota specifica.
 - `benchmark <target> [fps] [duration] [format]` - misura RTT e invia frame LED temporizzati a un singolo device, riportando consegna, jitter e drop. `format` è `text` o `json`. Default: `fps=60`, `duration=30`, `format=text`.
 - `rainbow [target] [seconds] [speed]` - effetto arcobaleno che scorre sulla strip. Usa `all` o ometti `target` per applicare a tutti i device scoperti.
@@ -72,6 +75,8 @@ rleds bt-scan
 rleds bt-credential
 rleds serial-scan
 rleds credential
+rleds monitor
+rleds monitor /dev/cu.usbmodem1101
 rleds proxy
 rleds proxy --ui
 rleds benchmark 192.168.1.10 60 120
@@ -169,6 +174,8 @@ Da terminale, collega il dispositivo via USB e usa:
 
 `serial-scan` → `credential` → riavvio dispositivo → Wi-Fi pronto.
 
+Per controllare i log del firmware senza avviare gli strumenti ESP-IDF, lascia il dispositivo collegato via USB ed esegui `rleds monitor [port]`. Il monitor è passivo: per acquisire i log di boot, resetta manualmente la board dopo averlo avviato. Se il dispositivo si disconnette o si resetta, il comando riprova lo stesso percorso ogni secondo senza ripetere gli errori. Accetta il percorso di una porta seriale locale, non un hostname di rete come `esp32-X`.
+
 Il Bluetooth rimane un'alternativa utile quando il dispositivo è già montato o raggiungibile solo tramite alimentazione:
 
 `bt-scan` → `bt-credential` → riavvio dispositivo → Wi-Fi pronto.
@@ -208,10 +215,20 @@ Config:
 
 ## Aggiornamento
 
+Se hai installato la CLI da npm:
+
 ```bash
-git pull                     # ultimo codice
-npm install && npm run build # ricompila
-npm link                     # aggiorna il collegamento globale
+npm install -g @reactive-leds/cli@latest
+```
+
+Se l'hai collegata dal repository, esegui questi comandi dalla root:
+
+```bash
+git pull
+npm install
+npm run build --workspace=cli
+cd cli
+npm link
 ```
 
 ## Link

@@ -47,6 +47,8 @@ ESP-IDF la combina con i propri default per generare `sdkconfig` al build time:
 
 I default device-specifici (`LED_PIN=18`, `NUM_LEDS=16`, `PORT=4210`) vivono in [`main/Kconfig.projbuild`](https://github.com/genbs/reactive-leds/blob/master/firmware/main/Kconfig.projbuild). Cambiali con `idf.py menuconfig` prima della build, oppure aggiorna ogni device flashato a runtime con `rleds config`.
 
+La scansione Wi-Fi esamina tutti i canali e, quando più access point condividono lo stesso SSID (per esempio in reti mesh/repeater), seleziona quello con RSSI più forte. Ogni connessione registra RSSI, canale e BSSID nei log, così la selezione dell'AP e le variazioni di segnale possono essere confrontate tramite `rleds monitor`.
+
 ### Configurazione del device
 
 Lancia `idf.py menuconfig` e cerca sotto "Device configuration".
@@ -116,7 +118,7 @@ Gli aggiornamenti LED viaggiano su UDP. L'obiettivo è la latenza minima: le gar
 Sotto carico sostenuto, la mailbox UDP piccola (`CONFIG_LWIP_UDP_RECVMBOX_SIZE = 6`) limita il lavoro accodato: quando la coda è piena il kernel droppa i nuovi arrivi (drop-tail), così il firmware continua a processare i pacchetti in ordine di arrivo invece di accumulare una lunga backlog. Testato empiricamente, questo si percepisce come più fluido rispetto al drenare la coda e mostrare solo l'ultimo frame (i frame intermedi verrebbero persi e le animazioni risultano scattose).
 
 **WiFi tarato per un dispositivo fisso**
-Il dispositivo non si sposta mai, quindi il roaming 802.11k/v è disabilitato (`rm_enabled = 0`, `btm_enabled = 0` in `wifi.c`) e l'associazione usa `WIFI_FAST_SCAN`. Gli scan periodici di canale in background che il roaming innesca interrompono brevemente la ricezione UDP — visibile come uno stutter nell'animazione. Disabilitarli ha eliminato i singhiozzi periodici; lo stutter casuale residuo è un limite intrinseco del WiFi, non qualcosa che ulteriori tweak di config risolvono.
+Il dispositivo non si sposta mai, quindi il roaming 802.11k/v è disabilitato (`rm_enabled = 0`, `btm_enabled = 0` in `wifi.c`). Durante la connessione usa `WIFI_ALL_CHANNEL_SCAN` e seleziona l'access point con il segnale migliore quando più reti hanno lo stesso SSID. Gli scan periodici di canale in background che il roaming innesca interrompono brevemente la ricezione UDP — visibile come uno stutter nell'animazione. Disabilitarli ha eliminato i singhiozzi periodici; lo stutter casuale residuo è un limite intrinseco del WiFi, non qualcosa che ulteriori tweak di config risolvono.
 
 **Provisioning senza captive portal**
 Dal [sito](https://genbs.github.io/reactive-leds/) puoi inviare le credenziali via USB subito dopo il flash. In alternativa, con la [CLI](https://github.com/genbs/reactive-leds/blob/master/cli/README-it.md) puoi inviarle tramite Bluetooth. Entrambi i trasporti usano lo stesso payload length-prefixed documentato in [`shared/README-it.md`](https://github.com/genbs/reactive-leds/blob/master/shared/README-it.md#provisioning-ble-e-usb).
