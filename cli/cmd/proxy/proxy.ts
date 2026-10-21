@@ -77,7 +77,7 @@ export const proxyCommand: Command = {
 	],
 	examples: [
 		"proxy --ui",
-		"proxy --origin https://genbs.github.io",
+		"proxy --origin https://reactive-leds.genbs.dev",
 		"proxy --origin all",
 	],
 	execute: async (host: string, port: number, devicePort: number, ui: boolean, origin?: string) =>

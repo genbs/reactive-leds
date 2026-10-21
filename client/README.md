@@ -16,7 +16,7 @@ Language: [English](https://github.com/genbs/reactive-leds/blob/master/client/RE
 
 Browser JavaScript client for real-time LED control over WiFi. It is designed for interactive visuals, including live coding. The client uses browser APIs such as `Worker`, `WebSocket` and `ImageData`; non-browser JavaScript runtimes are not currently supported.
 
-⚠️ a local WebSocket proxy is required to talk to the devices. Use `rleds proxy --ui` for the local UI, or `rleds proxy --origin https://genbs.github.io` when connecting from the GitHub Page. See [`cli/README.md`](https://github.com/genbs/reactive-leds/blob/master/cli/README.md#proxy).
+⚠️ a local WebSocket proxy is required to talk to the devices. Use `rleds proxy --ui` for the local UI, or `rleds proxy --origin https://reactive-leds.genbs.dev` when connecting from the project site. See [`cli/README.md`](https://github.com/genbs/reactive-leds/blob/master/cli/README.md#proxy).
 
 ## Installation
 

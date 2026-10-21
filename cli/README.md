@@ -97,10 +97,10 @@ browser (WebSocket) → proxy → device (UDP)
 
 It uses the binary multiplexed protocol consumed by `@reactive-leds/client`. WS responses have the form `[requestId, ...payload]` (no `PacketType` byte): the browser matches each response to its request by `requestId`. The device-side wire format is documented in [`shared/README.md`](https://github.com/genbs/reactive-leds/blob/master/shared/README.md).
 
-To run the bundled web interface locally, use `rleds proxy --ui` and open `http://localhost:8000`. To connect from the GitHub Page, authorize its origin explicitly:
+To run the bundled web interface locally, use `rleds proxy --ui` and open `http://localhost:8000`. To connect from the project site, authorize its origin explicitly:
 
 ```bash
-rleds proxy --origin https://genbs.github.io
+rleds proxy --origin https://reactive-leds.genbs.dev
 ```
 
 The page connects to `ws://localhost:8000`. Browsers may report active mixed content because the page is HTTPS while the local WebSocket is not; use `--ui` for the cleanest local experience. Remote origins remain denied unless explicitly listed; comma-separate multiple origins when needed.

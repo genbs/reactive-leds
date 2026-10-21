@@ -40,7 +40,9 @@ window.devices = new Map()
 // i18n
 let strings = {}
 let i18nCache = null
-const pageContext = location.hostname === "genbs.github.io" ? "github" : "local"
+const pageContext = ["genbs.github.io", "reactive-leds.genbs.dev"].includes(location.hostname)
+	? "github"
+	: "local"
 document.querySelectorAll("[data-github-only]").forEach(el => el.toggleAttribute("hidden", pageContext !== "github"))
 
 function applyStrings(root = document) {
