@@ -18,8 +18,21 @@
 Language: [English](https://github.com/genbs/reactive-leds/blob/master/README.md) | [Italiano](https://github.com/genbs/reactive-leds/blob/master/README-it.md)
 
 <p align="center">
-  <img alt="rleds hero" src="./assets/reactive-leds_hero.gif" width="100%">
+  <a href="https://youtube.com/shorts/z1Bkg0t3RoA">
+    <img
+      src="./assets/reactive-leds_hero.gif"
+      alt="Reactive-LEDs demo"
+      width="100%"
+    >
+  </a>
 </p>
+
+<p align="center">
+  <a href="https://youtube.com/shorts/z1Bkg0t3RoA">
+    ▶ Guarda la demo di 44 secondi su YouTube
+  </a>
+</p>
+
 
 ## Introduzione
 
