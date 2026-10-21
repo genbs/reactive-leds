@@ -1,6 +1,7 @@
 node_modules
 build
 dist
+/docs/
 
 # npm workspaces: only the root lockfile is authoritative
 cli/package-lock.json
